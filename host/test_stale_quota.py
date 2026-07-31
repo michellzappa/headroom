@@ -418,6 +418,22 @@ class AuthRequiredTests(unittest.TestCase):
         self.assertFalse(out["auth_required"])
         self.assertIn("429", out["error"])
 
+    def test_a_rate_limits_retry_after_reaches_the_backoff(self):
+        # The one wait that is not a guess. It has to land in the cache the
+        # retry TTL reads, or the fetcher keeps knocking on the provider's
+        # stated cooldown.
+        blob = {"claudeAiOauth": {"accessToken": "t", "refreshToken": "r"}}
+        boom = urllib.error.HTTPError(
+            oauth_usage.USAGE_URL, 429, "Too Many Requests",
+            {"Retry-After": "120"}, None)
+        with patch.object(oauth_usage, "_read_creds_blob",
+                          return_value=("keychain", blob)), \
+             patch.object(oauth_usage, "_http_get_usage", side_effect=boom):
+            oauth_usage.fetch_quota(force=True)
+        cache = oauth_usage._cache_for(None)
+        self.assertEqual(cache.get("retry_after_s"), 120.0)
+        self.assertEqual(cache.get("fail_streak"), 1)
+
     def test_the_flag_reaches_providers_and_sources(self):
         state = {"claude": quota_payload(
             stale=True, auth_required=True, error="no plan token")}

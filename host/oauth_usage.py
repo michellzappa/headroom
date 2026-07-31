@@ -55,7 +55,23 @@ KEYCHAIN_STORE_PREFIX = "keychain:"
 HEADROOM_STORE_PREFIX = "headroom:"
 OAUTH_DIR = os.path.expanduser("~/.headroom/oauth")
 CACHE_TTL_S = 60
-FAIL_TTL_S = 20          # retry sooner after transient misses (429, etc.)
+# First retry after a miss. Consecutive failures back off from here
+# (cache_util._fail_ttl_s) — without that, several accounts on this short a
+# leash hammer a rate-limited endpoint hard enough to keep it rate-limited.
+FAIL_TTL_S = 20
+
+
+def _retry_after_s(err):
+    """Seconds a 429/503 asked us to wait, or None.
+
+    Only the delta-seconds form; the HTTP-date form is rare enough here that
+    guessing at clock skew is worse than falling back to our own backoff.
+    """
+    try:
+        raw = err.headers.get("Retry-After")
+        return float(raw) if raw else None
+    except (AttributeError, TypeError, ValueError):
+        return None
 EXPIRY_SKEW_S = 120
 
 # One cache per account, keyed by account id ("" is the default login). The
@@ -613,10 +629,10 @@ def fetch_quota(force=False, account=None):
 
     empty = {"ok": False, "plan": None, "session": None, "week": None, "error": None}
 
-    def _keep_stale(err, auth_required=False):
+    def _keep_stale(err, auth_required=False, retry_after_s=None):
         return cache_util.keep_stale(
             cache, now, err, empty, disk_name=disk_name,
-            auth_required=auth_required)
+            auth_required=auth_required, retry_after_s=retry_after_s)
 
     try:
         try:
@@ -663,8 +679,11 @@ def fetch_quota(force=False, account=None):
                     return _keep_stale(str(exc), auth_required=True)
                 status, body = _http_get_usage(oauth["accessToken"])
             else:
-                # 429 / 5xx — keep last good bars instead of wiping the page.
-                return _keep_stale(f"HTTP Error {e.code}: {e.reason}")
+                # 429 / 5xx — keep last good bars instead of wiping the page,
+                # and let a Retry-After floor the backoff: it is the one wait
+                # the provider stated rather than one we guessed.
+                return _keep_stale(f"HTTP Error {e.code}: {e.reason}",
+                                   retry_after_s=_retry_after_s(e))
 
         if status != 200:
             return _keep_stale(f"usage HTTP {status}")
@@ -721,6 +740,10 @@ def reset_for_tests():
         _oauth_mem.clear()
     with _deny_lock:
         _keychain_denied.clear()
+    # Clear, not update: the cache also carries bookkeeping keys written on
+    # failure (fail_streak, retry_after_s, stale_since) that an update would
+    # leave behind, bleeding one test's outage into the next.
+    _cache.clear()
     _cache.update(t=0.0, data=None, err=None)
     _caches.clear()
     _caches[""] = _cache

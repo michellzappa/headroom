@@ -65,17 +65,44 @@ def save_disk(name: str, data: dict) -> None:
         pass
 
 
+# A failure that keeps failing doubles its retry interval up to this cap.
+# The short `fail_ttl_s` exists so a blip clears in seconds — but against a
+# rate limit it is the disease: three Claude accounts retrying every 20s is
+# nine requests a minute from one IP, enough to sustain the very 429 they are
+# retrying. Doubling reaches the cap in minutes, and a recovered provider is
+# then at most one cap behind. Kept below no ceiling a human notices: Refresh
+# all still forces an immediate attempt.
+FAIL_BACKOFF_CAP_S = 15 * 60
+
+# Ceiling on a provider-sent Retry-After. It is an instruction, not a
+# suggestion, so it may push the wait past the doubling cap — but an
+# ill-formed or hostile header must not park a source for a day.
+RETRY_AFTER_CAP_S = 60 * 60
+
+
+def _fail_ttl_s(cache, fail_ttl_s):
+    """Seconds to sit on a failure before retrying, given the streak so far."""
+    streak = int(cache.get("fail_streak") or 1)
+    ttl = min(fail_ttl_s * (2 ** max(0, streak - 1)), FAIL_BACKOFF_CAP_S)
+    floor = cache.get("retry_after_s")
+    if isinstance(floor, (int, float)) and floor > 0:
+        ttl = max(ttl, min(float(floor), RETRY_AFTER_CAP_S))
+    return ttl
+
+
 def fresh(cache, now, ttl_s, fail_ttl_s, force=False):
     """True when the in-memory copy is young enough to serve as-is.
 
     A cache holding an error retries on the shorter `fail_ttl_s`, so a 429 or
     a dropped VPN clears in seconds rather than making the meter sit wrong for
-    a full TTL.
+    a full TTL. Consecutive failures back that interval off exponentially
+    (`_fail_ttl_s`), so a failure that is not transient stops being polled as
+    if it were.
     """
     if force or cache.get("data") is None:
         return False
     return now - cache.get("t", 0.0) < (
-        fail_ttl_s if cache.get("err") else ttl_s
+        _fail_ttl_s(cache, fail_ttl_s) if cache.get("err") else ttl_s
     )
 
 
@@ -98,11 +125,18 @@ def store(cache, now, data, disk_name=None):
         data["auth_required"] = False
     if disk_name:
         save_disk(disk_name, data)
+    # A good fetch ends the failure streak; the next miss starts over at the
+    # short TTL instead of inheriting a backoff earned by an outage that is
+    # over.
+    cache.pop("fail_streak", None)
+    cache.pop("retry_after_s", None)
+    cache.pop("stale_since", None)
     cache.update(t=now, data=data, err=None)
     return data
 
 
-def keep_stale(cache, now, err, empty, disk_name=None, auth_required=False):
+def keep_stale(cache, now, err, empty, disk_name=None, auth_required=False,
+               retry_after_s=None):
     """Prefer last-good snapshot on transient failure instead of wiping UI.
 
     `cache` is a dict with at least `data` (and usually `t`). On success paths
@@ -121,7 +155,16 @@ def keep_stale(cache, now, err, empty, disk_name=None, auth_required=False):
     carry when the numbers were last *true*, or a source that has been failing
     for a day reads as one poll old and nothing downstream can tell the
     difference.
+
+    `retry_after_s` is a provider-mandated wait (the Retry-After header on a
+    429). It floors the next retry interval; pass it only when the provider
+    actually said so, or the backoff loses the one number that is not a guess.
     """
+    cache["fail_streak"] = int(cache.get("fail_streak") or 0) + 1
+    if isinstance(retry_after_s, (int, float)) and retry_after_s > 0:
+        cache["retry_after_s"] = float(retry_after_s)
+    else:
+        cache.pop("retry_after_s", None)
     prev = cache.get("data")
     if not (prev and prev.get("ok")) and disk_name:
         prev = load_disk(disk_name)
