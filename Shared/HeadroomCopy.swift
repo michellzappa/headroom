@@ -168,6 +168,38 @@ enum HeadroomCopy {
         return days == 1 ? "1 day ago" : "\(days) days ago"
     }
 
+    /// Compact age for dense rows: "just now", "4m ago", "18h ago", "3d ago".
+    /// `ago(_:)` spells the units out, which is right on a card and wrong in
+    /// a table column that has to hold eight of them.
+    static func agoShort(_ age: TimeInterval) -> String {
+        let minutes = Int((age / 60).rounded())
+        if minutes < 2 { return "just now" }
+        if minutes < 60 { return "\(minutes)m ago" }
+        let hours = Int((age / 3600).rounded())
+        if hours < 24 { return "\(hours)h ago" }
+        return "\(Int((age / 86_400).rounded()))d ago"
+    }
+
+    // MARK: Sources pane (design 2a "Active vs. Library")
+
+    /// Enabled sources, rich rows with live usage.
+    static let sourcesActive = "Active"
+    /// Everything available but off, as compact chips.
+    static let sourcesLibrary = "Library"
+    static let sourcesActiveHint = "Drag to reorder · ①②③ show in the menu bar"
+    static let sourcesLibraryHint = "Turn one on to move it up to Active"
+    /// The inline add link under a multi-account-capable service.
+    static let addAccount = "Add account…"
+    /// A Library chip whose credential has no local trace to import.
+    static let notDetected = "not detected"
+    /// Row-subtitle category labels. The Library groups use `aiProvidersGroup`
+    /// / `devTools`; in Active the category is metadata riding the subtitle.
+    static let aiProviderCategory = "AI provider"
+    static let devToolCategory = "Dev tool"
+    /// Library group header for the coding side. Distinct from `aiTools`
+    /// ("AI coding tools"), which titles onboarding's checklist.
+    static let aiProvidersGroup = "AI providers"
+
     /// A meter the Mac is replaying instead of fetching. The word alone reads
     /// as a hiccup you can wait out, so the age travels with it — "2 hours
     /// ago" is what turns it into something to go and fix.

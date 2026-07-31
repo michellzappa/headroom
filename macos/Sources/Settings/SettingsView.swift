@@ -24,8 +24,17 @@ struct SettingsView: View {
     @State private var sourcesMessage: String?
     @State private var isSyncing = false
     @State private var togglingSourceID: String?
-    /// Row the pointer is dragging over, for the insertion line.
+    /// Service the pointer is dragging over, for the insertion line.
     @State private var dropTargetID: String?
+    /// Live usage by account id — feeds the Active card's bars.
+    @State private var usageProviders: [String: QuotaProviderInfo] = [:]
+    /// Multi-account capability + current logins, from `/accounts`. Empty on
+    /// hosts predating the endpoint, which simply hides "Add account…".
+    @State private var accountProviders: [AccountProvider] = []
+    /// Credential detection from `/setup`, for the Library's dimmed chips.
+    @State private var detectedSources: [String: Bool] = [:]
+    /// Provider whose add-account sheet is open.
+    @State private var addingAccountProvider: AccountProvider?
 
     @State private var supabaseToken = ""
     @State private var tokenStored = false
@@ -521,45 +530,46 @@ struct SettingsView: View {
     }
 
     private var sourcesPane: some View {
-        Form {
-            if sources.isEmpty {
-                Section {
-                    Text(sourcesMessage ?? "Waiting for host…")
-                        .foregroundStyle(.secondary)
-                }
-            } else {
-                sourceGroupSection(.ai)
-                AccountsSection(endpoint: endpoint) {
-                    await reloadSources()
-                }
-                sourceGroupSection(.devtools)
+        SettingsSourcesPane(
+            sources: sources,
+            usage: usageProviders,
+            accountProviders: accountProviders,
+            detected: detectedSources,
+            busyID: togglingSourceID,
+            isSyncing: isSyncing,
+            message: sourcesMessage,
+            dropTargetID: dropTargetID,
+            onToggleRows: { ids, enabled in
+                Task { await setSourceRows(ids, enabled: enabled) }
+            },
+            onRemoveAccount: { id in
+                Task { await removeAccount(id) }
+            },
+            onAddAccount: { provider in
+                addingAccountProvider = provider
+            },
+            onRefresh: { ids in
+                Task { await refreshSources(ids) }
+            },
+            onMoveService: { dragged, target in
+                dropTargetID = nil
+                Task { await moveService(dragged, before: target) }
+            },
+            onNudgeService: { id, offset in
+                Task { await nudgeService(id, by: offset) }
+            },
+            onDropTarget: { id, targeted in
+                dropTargetID = targeted ? id : nil
+            },
+            onAccent: { ids, hex in
+                Task { await setAccents(ids, hex: hex) }
             }
-            Section {
-                Button {
-                    Task { await refreshSources(nil) }
-                } label: {
-                    HStack {
-                        Text(HeadroomCopy.refreshAll)
-                        Spacer()
-                        if isSyncing {
-                            ProgressView()
-                                .controlSize(.small)
-                        }
-                    }
-                }
-                .disabled(isSyncing || sources.isEmpty)
-
-                if let sourcesMessage {
-                    Text(sourcesMessage)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                }
-            } footer: {
-                Text("Refreshes every source at once. Same list Welcome calls “\(HeadroomCopy.welcomeWhatToWatch)”.")
+        )
+        .sheet(item: $addingAccountProvider) { provider in
+            AddAccountSheet(provider: provider, endpoint: endpoint) {
+                await reloadSources()
             }
         }
-        .formStyle(.grouped)
     }
 
     private var integrationsHub: some View {
@@ -832,99 +842,80 @@ struct SettingsView: View {
         .formStyle(.grouped)
     }
 
-    /// One toggle list per `SourceGroup`. AI tools meter plans you're signed
-    /// into; dev tools watch projects and want the keys in the sections below.
-    @ViewBuilder
-    private func sourceGroupSection(_ group: SourceGroup) -> some View {
-        let rows = sources.filter { $0.sourceGroup == group }
-        if !rows.isEmpty {
-            Section {
-                ForEach(rows) { source in
-                    SourceRow(
-                        source: source,
-                        isBusy: togglingSourceID == source.id || isSyncing,
-                        // Position only means something where it picks the
-                        // top 3 — the metered providers.
-                        isDraggable: group == .ai,
-                        isDropTarget: dropTargetID == source.id,
-                        onToggle: { enabled in
-                            Task { await setSource(source.id, enabled: enabled) }
-                        },
-                        onRefresh: {
-                            Task { await refreshSources([source.id]) }
-                        },
-                        onNudge: { offset in
-                            Task { await nudgeSource(source.id, by: offset) }
-                        },
-                        onAccent: { hex in
-                            Task { await setAccent(source.id, hex: hex) }
-                        }
-                    )
-                    .modifier(DragReorder(
-                        enabled: group == .ai,
-                        id: source.id,
-                        onTargeted: { targeted in
-                            dropTargetID = targeted ? source.id : nil
-                        },
-                        onDrop: { dragged in
-                            dropTargetID = nil
-                            Task { await moveSource(dragged, before: source.id) }
-                        }
-                    ))
-                }
-            } header: {
-                Text(group.title)
-            } footer: {
-                Text(group == .ai
-                     ? "\(group.subtitle) Drag to reorder — the top \(focusLimit) fill the menu bar, the widget, and the board."
-                     : "\(group.subtitle) ESP32 dots mirror this list.")
-            }
-        }
-    }
-
     /// Mirrors `sources_config.FOCUS_LIMIT`.
     private var focusLimit: Int { 3 }
 
-    private var pinnedAIOrder: [String] {
-        sources.filter { $0.sourceGroup == .ai }.map(\.id)
+    /// AI services in pinned order, each carrying its account ids as a block.
+    /// The wire order stays account-level; the pane reorders services.
+    private var aiServiceBlocks: [(id: String, rowIDs: [String])] {
+        SourceService.services(from: sources)
+            .filter { $0.group == .ai }
+            .map { ($0.id, $0.rows.map(\.id)) }
     }
 
-    /// Drop `dragged` into `target`'s slot. The list sent is the whole AI
-    /// group including disabled rows — a provider you turned off keeps its
-    /// place rather than sinking to the bottom.
-    private func moveSource(_ dragged: String, before target: String) async {
+    /// Drop `dragged` into `target`'s slot, moving the service's accounts as
+    /// one block. The list sent is the whole AI group including disabled
+    /// rows — a service you turned off keeps its place rather than sinking.
+    private func moveService(_ dragged: String, before target: String) async {
         guard dragged != target else { return }
-        var order = pinnedAIOrder
-        guard let from = order.firstIndex(of: dragged) else { return }
-        order.remove(at: from)
-        guard let to = order.firstIndex(of: target) else { return }
-        order.insert(dragged, at: to)
-        await commitOrder(order, movedID: dragged)
+        var blocks = aiServiceBlocks
+        guard let from = blocks.firstIndex(where: { $0.id == dragged }) else {
+            return
+        }
+        let moved = blocks.remove(at: from)
+        guard let to = blocks.firstIndex(where: { $0.id == target }) else {
+            return
+        }
+        blocks.insert(moved, at: to)
+        await commitOrder(blocks.flatMap(\.rowIDs), movedID: dragged)
     }
 
     /// Keyboard / VoiceOver path to the same reorder, so pinning isn't
     /// drag-only.
-    private func nudgeSource(_ id: String, by offset: Int) async {
-        var order = pinnedAIOrder
-        guard let from = order.firstIndex(of: id) else { return }
+    private func nudgeService(_ id: String, by offset: Int) async {
+        var blocks = aiServiceBlocks
+        guard let from = blocks.firstIndex(where: { $0.id == id }) else {
+            return
+        }
         let to = from + offset
-        guard order.indices.contains(to) else { return }
-        order.swapAt(from, to)
-        await commitOrder(order, movedID: id)
+        guard blocks.indices.contains(to) else { return }
+        blocks.swapAt(from, to)
+        await commitOrder(blocks.flatMap(\.rowIDs), movedID: id)
     }
 
-    /// Repaint one source everywhere. `nil` restores the shipped color.
-    private func setAccent(_ id: String, hex: String?) async {
-        togglingSourceID = id
+    /// Repaint a service everywhere — every account of it, one POST each,
+    /// then one reload. `nil` restores the shipped color.
+    private func setAccents(_ ids: [String], hex: String?) async {
+        togglingSourceID = ids.first
         defer { togglingSourceID = nil }
         do {
-            _ = try await client.setSourceAccent(id, hex: hex)
+            for id in ids {
+                _ = try await client.setSourceAccent(id, hex: hex)
+            }
             // Colors are presentation only — the host republished the cached
             // document, so re-reading it is the whole update.
             await reloadSources()
             sourcesMessage = hex == nil
                 ? "Restored the default color."
                 : "Color updated — menu bar, rings and iPhone follow."
+        } catch {
+            sourcesMessage = error.localizedDescription
+        }
+    }
+
+    /// Remove an extra login. The host re-execs to rebuild its registry, so
+    /// this waits for the restart the same way the add sheet does.
+    private func removeAccount(_ id: String) async {
+        togglingSourceID = id
+        defer { togglingSourceID = nil }
+        let before = try? await client.health().uptimeS
+        do {
+            _ = try await client.removeAccount(id)
+            sourcesMessage = "Removed \(id). Restarting host…"
+            await AddAccountSheet.waitForRestart(
+                client: client, previousUptime: before)
+            await reloadSources()
+            sourcesMessage = "Removed \(id)."
         } catch {
             sourcesMessage = error.localizedDescription
         }
@@ -1283,23 +1274,28 @@ struct SettingsView: View {
         Task { await refreshSources(["github"]) }
     }
 
-    private func setSource(_ id: String, enabled: Bool) async {
-        togglingSourceID = id
+    /// Toggle a whole service or a single account — same path, different id
+    /// lists. One POST either way, so three Claude accounts flip together
+    /// instead of racing three writes.
+    private func setSourceRows(_ ids: [String], enabled: Bool) async {
+        guard let first = ids.first else { return }
+        togglingSourceID = first
         defer { togglingSourceID = nil }
         do {
             var map = Dictionary(
                 uniqueKeysWithValues: sources.map { ($0.id, $0.enabled ?? true) })
-            map[id] = enabled
+            for id in ids { map[id] = enabled }
             _ = try await client.setSources(map)
             // Toggling on kicks a refresh host-side; wait for it to land rather
             // than guessing how long it takes.
             if enabled {
-                await client.waitForRefresh(sources: [id])
+                await client.waitForRefresh(sources: ids)
             }
             await reloadSources()
+            let names = ids.joined(separator: ", ")
             sourcesMessage = enabled
-                ? "Enabled \(id) — ESP32 will show it on next poll."
-                : "Disabled \(id) — ESP32 will hide that page."
+                ? "Enabled \(names) — ESP32 will show it on next poll."
+                : "Disabled \(names) — ESP32 will hide that page."
         } catch {
             sourcesMessage = error.localizedDescription
         }
@@ -1336,6 +1332,9 @@ struct SettingsView: View {
         do {
             let snapshot = try await client.fetchUsage()
             sources = snapshot.sources ?? []
+            usageProviders = Dictionary(
+                (snapshot.providers ?? []).map { ($0.id, $0) },
+                uniquingKeysWith: { first, _ in first })
             if let range = snapshot.plausible?.range {
                 plausibleRange = range
             }
@@ -1344,6 +1343,17 @@ struct SettingsView: View {
             }
         } catch {
             sourcesMessage = error.localizedDescription
+        }
+        // Capability and detection are additive context: a host predating
+        // either endpoint just means no "Add account…" links and no dimmed
+        // chips, never an error in the pane.
+        if let accounts = try? await client.fetchAccounts() {
+            accountProviders = accounts.providers
+        }
+        if let setup = try? await client.fetchSetup() {
+            detectedSources = Dictionary(
+                setup.sources.map { ($0.id, $0.detected) },
+                uniquingKeysWith: { first, _ in first })
         }
     }
 

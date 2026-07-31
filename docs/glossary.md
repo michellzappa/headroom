@@ -135,6 +135,10 @@ blank axis.
 | **Needs sign-in** | That source's credential is missing or was rejected — `auth_required` on `providers[]` / `sources[]`. Ages the same way |
 | **Clear** | Dismiss attention on every surface |
 | **Refresh all** | Force-sync every source |
+| **Active** | Mac Settings → Sources: the enabled services, rich reorderable rows with live usage |
+| **Library** | Mac Settings → Sources: everything available but off, as compact chips grouped **AI providers** / **Dev tools** |
+| **Add account…** | Inline link under a multi-account-capable service; opens the add sheet that carries the credential-path prose |
+| **not detected** | A Library chip whose credential has no local trace to import — dimmed, never a dead toggle |
 
 **Needs sign-in** outranks **Not updating** wherever both are true, which is
 most of the time — a dead login also freezes the numbers. Staleness is shared
