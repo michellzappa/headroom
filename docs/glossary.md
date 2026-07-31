@@ -135,10 +135,11 @@ blank axis.
 | **Needs sign-in** | That source's credential is missing or was rejected — `auth_required` on `providers[]` / `sources[]`. Ages the same way |
 | **Clear** | Dismiss attention on every surface |
 | **Refresh all** | Force-sync every source |
-| **Active** | Mac Settings → Sources: the enabled services, rich reorderable rows with live usage |
-| **Library** | Mac Settings → Sources: everything available but off, as compact chips grouped **AI providers** / **Dev tools** |
+| **Active** | Mac Settings → Sources: the services you track, rich reorderable rows with live usage. A switched-off row stays here as **Off** — paused, configured, not polled |
+| **Library** | Mac Settings → Sources: everything you don't track, as compact chips grouped **AI providers** / **Dev tools** |
+| **Move to Library** | The Active row's ✕: stop tracking a service. Never touches credentials — Headroom has no sign-ins to revoke, so wording must not imply signing out |
 | **Add account…** | Inline link under a multi-account-capable service; opens the add sheet that carries the credential-path prose |
-| **not detected** | A Library chip whose credential has no local trace to import — dimmed, never a dead toggle |
+| **not detected** | A Library chip whose credential has no local trace to import — dimmed, never a dead toggle. On a service that takes accounts the chip stays live and opens **Add account…** instead |
 
 **Needs sign-in** outranks **Not updating** wherever both are true, which is
 most of the time — a dead login also freezes the numbers. Staleness is shared

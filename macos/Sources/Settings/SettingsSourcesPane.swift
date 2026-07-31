@@ -38,6 +38,10 @@ struct SourceService: Identifiable {
 
     var enabledRows: [SyncSource] { rows.filter { $0.enabled ?? true } }
     var isActive: Bool { !enabledRows.isEmpty }
+    /// Active-list membership. Distinct from `isActive`: a paused service —
+    /// every row off, none dismissed — stays listed, dimmed. On hosts
+    /// predating `dismissed` the two collapse to the same answer.
+    var isListed: Bool { rows.contains { !$0.isDismissed } }
     var accent: String? { rows.compactMap(\.accent).first }
     var accentDefault: String? { rows.compactMap(\.accentDefault).first }
 
@@ -79,6 +83,8 @@ struct SettingsSourcesPane: View {
     let dropTargetID: String?
 
     let onToggleRows: ([String], Bool) -> Void
+    /// Move a whole service to the Library (all row ids at once).
+    let onDismissRows: ([String]) -> Void
     let onRemoveAccount: (String) -> Void
     let onAddAccount: (AccountProvider) -> Void
     let onRefresh: ([String]?) -> Void
@@ -93,15 +99,16 @@ struct SettingsSourcesPane: View {
 
     /// Active: AI services in pinned order, then dev tools in registry
     /// order. The category rides each row's subtitle; the split is not
-    /// structural here — only the Library groups by it.
+    /// structural here — only the Library groups by it. Paused services
+    /// (configured, switched off, not dismissed) stay in this list.
     private var activeServices: [SourceService] {
-        let active = services.filter(\.isActive)
-        return active.filter { $0.group == .ai }
-            + active.filter { $0.group == .devtools }
+        let listed = services.filter(\.isListed)
+        return listed.filter { $0.group == .ai }
+            + listed.filter { $0.group == .devtools }
     }
 
     private var libraryServices: [SourceService] {
-        services.filter { !$0.isActive }
+        services.filter { !$0.isListed }
     }
 
     /// Menu-bar slots: the first three enabled quota accounts in pinned
@@ -169,6 +176,9 @@ struct SettingsSourcesPane: View {
                         isBusy: isBusy(service),
                         isDropTarget: dropTargetID == service.id,
                         onToggleRows: onToggleRows,
+                        onDismiss: {
+                            onDismissRows(service.rows.map(\.id))
+                        },
                         onRemoveAccount: onRemoveAccount,
                         onAddAccount: onAddAccount,
                         onRefresh: onRefresh,
@@ -210,9 +220,11 @@ struct SettingsSourcesPane: View {
                             service: service,
                             isDetected: isDetected(service),
                             isBusy: isBusy(service),
+                            capability: capability(for: service),
                             onEnable: {
                                 onToggleRows(service.rows.map(\.id), true)
-                            }
+                            },
+                            onAddAccount: onAddAccount
                         )
                     }
                 }
@@ -281,6 +293,7 @@ private struct ActiveServiceRow: View {
     let isBusy: Bool
     let isDropTarget: Bool
     let onToggleRows: ([String], Bool) -> Void
+    let onDismiss: () -> Void
     let onRemoveAccount: (String) -> Void
     let onAddAccount: (AccountProvider) -> Void
     let onRefresh: ([String]?) -> Void
@@ -289,20 +302,24 @@ private struct ActiveServiceRow: View {
 
     @State private var isHovering = false
     @State private var isPickingColor = false
+    @FocusState private var refreshFocused: Bool
+    @FocusState private var dismissFocused: Bool
 
     private var enabledIDs: [String] { service.enabledRows.map(\.id) }
 
     /// Named sub-rows only from two accounts up; a single account keeps its
-    /// bar inline in the service row with no name to repeat.
+    /// bar inline in the service row with no name to repeat. Disabled
+    /// accounts stay listed — this block is their only controls while a
+    /// sibling keeps the service out of the Library.
     private var namedAccounts: [SyncSource]? {
-        guard service.group == .ai, service.enabledRows.count >= 2 else {
+        guard service.group == .ai, service.rows.count >= 2 else {
             return nil
         }
-        return service.enabledRows
+        return service.rows
     }
 
     private var inlineAccount: SyncSource? {
-        guard service.group == .ai, service.enabledRows.count == 1 else {
+        guard service.group == .ai, service.rows.count == 1 else {
             return nil
         }
         return service.enabledRows.first
@@ -357,10 +374,16 @@ private struct ActiveServiceRow: View {
                     .frame(height: 2)
             }
         }
+        .opacity(service.isActive ? 1 : 0.6)
         .onHover { isHovering = $0 }
+        .contextMenu {
+            Button(HeadroomCopy.moveToLibrary) { onDismiss() }
+        }
         .accessibilityElement(children: .contain)
         .accessibilityAction(named: "Move up") { onNudge(-1) }
         .accessibilityAction(named: "Move down") { onNudge(1) }
+        .accessibilityAction(named: "Refresh") { onRefresh(enabledIDs) }
+        .accessibilityAction(named: HeadroomCopy.moveToLibrary) { onDismiss() }
     }
 
     /// "①", "②③", "①–③" — the menu-bar slots this service's accounts fill.
@@ -408,11 +431,21 @@ private struct ActiveServiceRow: View {
             isPickingColor = true
         } label: {
             // Providers get the design's square color swatch; dev tools keep
-            // the round health dot — their dot *is* the status light.
+            // the round health dot — their dot *is* the status light. The
+            // swatch grows a status-colored ring only when something is
+            // wrong, so brand color never swallows an Error the row text
+            // has no other place to show.
             if let brandColor {
                 RoundedRectangle(cornerRadius: 6)
                     .fill(brandColor)
                     .frame(width: 20, height: 20)
+                    .overlay {
+                        if isUnhealthy {
+                            RoundedRectangle(cornerRadius: 8)
+                                .strokeBorder(statusColor, lineWidth: 1.5)
+                                .padding(-3)
+                        }
+                    }
                     .contentShape(RoundedRectangle(cornerRadius: 6))
             } else {
                 Circle()
@@ -438,22 +471,36 @@ private struct ActiveServiceRow: View {
     }
 
     /// Staleness label normally; the refresh button while hovered — the ⟳
-    /// per row exists but never as fourteen resting buttons.
+    /// per row exists but never as fourteen resting buttons. The button
+    /// stays in the hierarchy at zero opacity so Tab can reach it; keyboard
+    /// focus reveals it the same way hover does.
     @ViewBuilder
     private var trailing: some View {
         if isBusy {
             ProgressView()
                 .controlSize(.small)
-        } else if isHovering {
-            Button {
-                onRefresh(enabledIDs)
-            } label: {
-                Image(systemName: "arrow.clockwise")
+        } else if service.isActive {
+            let showsRefresh = isHovering || refreshFocused
+            ZStack(alignment: .trailing) {
+                stalenessLabel
+                    .opacity(showsRefresh ? 0 : 1)
+                Button {
+                    onRefresh(enabledIDs)
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .buttonStyle(.borderless)
+                .focused($refreshFocused)
+                .opacity(showsRefresh ? 1 : 0)
+                .help("Force refresh")
+                .accessibilityLabel("Force refresh \(service.title)")
             }
-            .buttonStyle(.borderless)
-            .help("Force refresh")
         } else {
-            stalenessLabel
+            // Paused: configured, listed, not polled. No refresh — the host
+            // skips disabled rows, so offering one would be a dead button.
+            Text(HeadroomCopy.sourcePaused)
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
 
         Toggle(
@@ -467,14 +514,36 @@ private struct ActiveServiceRow: View {
         .disabled(isBusy)
         .toggleStyle(.switch)
         .controlSize(.small)
+
+        // The ✕ that files the whole service back in the Library. Same
+        // reveal contract as the ⟳: resting rows stay quiet, but the button
+        // never leaves the hierarchy, so Tab reaches it.
+        Button {
+            onDismiss()
+        } label: {
+            Image(systemName: "xmark")
+                .font(.caption2.weight(.semibold))
+        }
+        .buttonStyle(.borderless)
+        .focused($dismissFocused)
+        .opacity(isHovering || dismissFocused ? 1 : 0)
+        .disabled(isBusy)
+        .help("\(HeadroomCopy.moveToLibrary) — stops tracking. Your sign-ins are untouched.")
+        .accessibilityLabel("\(HeadroomCopy.moveToLibrary): \(service.title)")
     }
 
+    /// Needs sign-in carries the age too — the bars below may still show
+    /// last-known numbers, and the age is what says how old they are. Same
+    /// rule as the glossary: Needs sign-in ages like Not updating.
     @ViewBuilder
     private var stalenessLabel: some View {
         if service.enabledRows.contains(where: \.needsSignIn) {
-            Text(HeadroomCopy.needsSignIn)
+            Text(worstAge.map {
+                "\(HeadroomCopy.needsSignIn) · \(HeadroomCopy.agoShort($0))"
+            } ?? HeadroomCopy.needsSignIn)
                 .font(.caption)
                 .foregroundStyle(HeadroomPalette.red)
+                .monospacedDigit()
         } else if let age = worstAge {
             Text(isStaleWarning
                 ? "\(HeadroomCopy.agoShort(age)) ⚠︎"
@@ -506,21 +575,13 @@ private struct ActiveServiceRow: View {
         VStack(alignment: .leading, spacing: 6) {
             if let accounts = namedAccounts {
                 ForEach(accounts) { account in
-                    AccountBar(
-                        name: account.label ?? "Default",
-                        row: account,
+                    AccountRow(
+                        account: account,
                         usage: usage[account.id],
-                        tint: tint)
-                    .contextMenu {
-                        Button("Turn off") {
-                            onToggleRows([account.id], false)
-                        }
-                        if account.id.contains(":") {
-                            Button("Remove…", role: .destructive) {
-                                onRemoveAccount(account.id)
-                            }
-                        }
-                    }
+                        tint: tint,
+                        isBusy: isBusy,
+                        onToggleRows: onToggleRows,
+                        onRemoveAccount: onRemoveAccount)
                 }
             }
             if let capability, !capability.isFull {
@@ -544,6 +605,13 @@ private struct ActiveServiceRow: View {
         }
         return service.enabledRows.contains { $0.stale == true }
             ? "Stale" : "Healthy"
+    }
+
+    /// Anything the status light would not paint green.
+    private var isUnhealthy: Bool {
+        service.enabledRows.contains {
+            $0.needsSignIn || $0.ok != true || $0.stale == true
+        }
     }
 
     private var statusColor: Color {
@@ -570,6 +638,66 @@ private struct ActiveServiceRow: View {
     }
 }
 
+/// One named account under a service: the bar plus its controls. Extra
+/// accounts wear a hover ✕ for Remove — the context menu still has both
+/// actions, but a control someone asked "how do I remove one?" about is a
+/// control that was too hidden.
+private struct AccountRow: View {
+    let account: SyncSource
+    let usage: QuotaProviderInfo?
+    let tint: Color
+    let isBusy: Bool
+    let onToggleRows: ([String], Bool) -> Void
+    let onRemoveAccount: (String) -> Void
+
+    @State private var isHovering = false
+    @FocusState private var removeFocused: Bool
+
+    private var isRemovable: Bool { account.id.contains(":") }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            AccountBar(
+                name: account.label ?? "Default",
+                row: account,
+                usage: usage,
+                tint: tint)
+            if isRemovable {
+                Button {
+                    onRemoveAccount(account.id)
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.caption2.weight(.semibold))
+                }
+                .buttonStyle(.borderless)
+                .focused($removeFocused)
+                .opacity(isHovering || removeFocused ? 1 : 0)
+                .disabled(isBusy)
+                .help("Remove this account")
+                .accessibilityLabel(
+                    "Remove account \(account.label ?? account.id)")
+            }
+        }
+        .onHover { isHovering = $0 }
+        .contextMenu {
+            if account.enabled ?? true {
+                Button("Turn off") {
+                    onToggleRows([account.id], false)
+                }
+            } else {
+                Button("Turn on") {
+                    onToggleRows([account.id], true)
+                }
+            }
+            if isRemovable {
+                Button("Remove…", role: .destructive) {
+                    onRemoveAccount(account.id)
+                }
+            }
+        }
+    }
+}
+
 /// One account's usage: optional name, a thin bar tinted with the service
 /// color, and "44% · week". The bar is the plan's primary window — the ring
 /// pool with the longest window, which is the number the plan is sold in.
@@ -579,15 +707,24 @@ private struct AccountBar: View {
     let usage: QuotaProviderInfo?
     let tint: Color
 
+    private var isOff: Bool { row.enabled == false }
+
     var body: some View {
         HStack(spacing: 8) {
             if let name {
                 Text(name)
                     .font(.system(size: 12))
+                    .foregroundStyle(isOff ? AnyShapeStyle(.secondary)
+                                           : AnyShapeStyle(.primary))
                     .frame(width: 70, alignment: .leading)
                     .lineLimit(1)
             }
-            if row.needsSignIn {
+            if isOff {
+                Text(HeadroomCopy.sourcePaused)
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else if row.needsSignIn {
                 Text(HeadroomCopy.needsSignIn)
                     .font(.caption)
                     .foregroundStyle(HeadroomPalette.amber)
@@ -633,24 +770,57 @@ private struct AccountBar: View {
         return period.isEmpty ? value : "\(value) · \(period)"
     }
 
+    /// The host's declared headline pool when it sent one; otherwise the
+    /// longest ring window, tie-broken by declared pool rank and then id —
+    /// `pools` is a dictionary, and Copilot ships two ring pools with the
+    /// same window, so a bare `max` would flip between launches.
     private var primaryPool: QuotaPoolInfo? {
         guard let pools = usage?.pools, !pools.isEmpty else { return nil }
-        let ringPools = pools.values.filter { $0.ring == true }
-        let candidates = ringPools.isEmpty ? Array(pools.values) : ringPools
-        return candidates.max { ($0.windowS ?? 0) < ($1.windowS ?? 0) }
+        if let headline = usage?.headline, let pool = pools[headline] {
+            return pool
+        }
+        let ringPools = pools.filter { $0.value.ring == true }
+        let candidates = ringPools.isEmpty ? pools : ringPools
+        return candidates.min { lhs, rhs in
+            let lw = lhs.value.windowS ?? 0
+            let rw = rhs.value.windowS ?? 0
+            if lw != rw { return lw > rw }
+            let lr = QuotaProviderInfo.poolRank(id: lhs.key, pool: lhs.value)
+            let rr = QuotaProviderInfo.poolRank(id: rhs.key, pool: rhs.value)
+            if lr != rr { return lr < rr }
+            return lhs.key < rhs.key
+        }?.value
     }
 }
 
 /// A switched-off source: dot, name, "+". Undetectable sources dim in place
-/// with "not detected" instead of growing a toggle that cannot work.
+/// with "not detected" instead of growing a toggle that cannot work — unless
+/// the service takes accounts, in which case the chip opens the add-account
+/// sheet: a missing default credential is exactly when someone needs to point
+/// the host at an alternate one.
 private struct LibraryChip: View {
     let service: SourceService
     let isDetected: Bool
     let isBusy: Bool
+    /// Multi-account capability, when the host reports one.
+    let capability: AccountProvider?
     let onEnable: () -> Void
+    let onAddAccount: (AccountProvider) -> Void
+
+    /// No credential to import, but the service takes accounts — the tap
+    /// becomes "Add account…" instead of a dead end.
+    private var addsInstead: Bool {
+        !isDetected && capability.map { !$0.isFull } == true
+    }
 
     var body: some View {
-        Button(action: onEnable) {
+        Button {
+            if addsInstead, let capability {
+                onAddAccount(capability)
+            } else {
+                onEnable()
+            }
+        } label: {
             HStack(spacing: 6) {
                 Circle()
                     .fill(Color(nsColor: .tertiaryLabelColor))
@@ -661,6 +831,10 @@ private struct LibraryChip: View {
                 Spacer(minLength: 0)
                 if isDetected {
                     Image(systemName: "plus")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                } else if addsInstead {
+                    Text(HeadroomCopy.addAccount)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 } else {
@@ -682,14 +856,28 @@ private struct LibraryChip: View {
             .contentShape(RoundedRectangle(cornerRadius: 8))
         }
         .buttonStyle(.plain)
-        .disabled(!isDetected || isBusy)
-        .opacity(isDetected ? 1 : 0.55)
-        .help(isDetected
-            ? "Turn on — moves up to \(HeadroomCopy.sourcesActive)"
-            : "Nothing to import on this Mac")
-        .accessibilityLabel(isDetected
-            ? "Turn on \(service.title)"
-            : "\(service.title), \(HeadroomCopy.notDetected)")
+        .disabled((!isDetected && !addsInstead) || isBusy)
+        .opacity(isDetected || addsInstead ? 1 : 0.55)
+        .help(helpText)
+        .accessibilityLabel(accessibilityText)
+    }
+
+    private var helpText: String {
+        if isDetected {
+            return "Turn on — moves up to \(HeadroomCopy.sourcesActive)"
+        }
+        if addsInstead {
+            return "Nothing to import on this Mac — add an account by picking its credential location"
+        }
+        return "Nothing to import on this Mac"
+    }
+
+    private var accessibilityText: String {
+        if isDetected { return "Turn on \(service.title)" }
+        if addsInstead {
+            return "\(service.title), \(HeadroomCopy.notDetected). \(HeadroomCopy.addAccount)"
+        }
+        return "\(service.title), \(HeadroomCopy.notDetected)"
     }
 }
 

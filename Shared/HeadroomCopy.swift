@@ -188,6 +188,11 @@ enum HeadroomCopy {
     static let sourcesLibrary = "Library"
     static let sourcesActiveHint = "Drag to reorder · ①②③ show in the menu bar"
     static let sourcesLibraryHint = "Turn one on to move it up to Active"
+    /// Sends a service from Active back to the Library. Tracking stops;
+    /// credentials are never touched — Headroom has no sign-ins to revoke.
+    static let moveToLibrary = "Move to Library"
+    /// A paused row: configured, still in Active, not polled.
+    static let sourcePaused = "Off"
     /// The inline add link under a multi-account-capable service.
     static let addAccount = "Add account…"
     /// A Library chip whose credential has no local trace to import.

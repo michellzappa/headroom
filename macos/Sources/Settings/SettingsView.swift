@@ -542,6 +542,9 @@ struct SettingsView: View {
             onToggleRows: { ids, enabled in
                 Task { await setSourceRows(ids, enabled: enabled) }
             },
+            onDismissRows: { ids in
+                Task { await dismissSourceRows(ids) }
+            },
             onRemoveAccount: { id in
                 Task { await removeAccount(id) }
             },
@@ -1285,7 +1288,15 @@ struct SettingsView: View {
             var map = Dictionary(
                 uniqueKeysWithValues: sources.map { ($0.id, $0.enabled ?? true) })
             for id in ids { map[id] = enabled }
-            _ = try await client.setSources(map)
+            // Turning on also un-dismisses: a Library chip tap and an Active
+            // toggle are the same write, and both must land the row in
+            // Active. Turning off sends no dismissed key — that's a pause,
+            // and the row stays put.
+            _ = try await client.setSources(
+                map,
+                dismissed: enabled
+                    ? Dictionary(uniqueKeysWithValues: ids.map { ($0, false) })
+                    : nil)
             // Toggling on kicks a refresh host-side; wait for it to land rather
             // than guessing how long it takes.
             if enabled {
@@ -1295,7 +1306,26 @@ struct SettingsView: View {
             let names = ids.joined(separator: ", ")
             sourcesMessage = enabled
                 ? "Enabled \(names) — ESP32 will show it on next poll."
-                : "Disabled \(names) — ESP32 will hide that page."
+                : "Paused \(names) — stays listed, stops fetching; ESP32 will hide that page."
+        } catch {
+            sourcesMessage = error.localizedDescription
+        }
+    }
+
+    /// The row's ✕: back to the Library. The host flips `dismissed` and
+    /// disables the rows in the same write.
+    private func dismissSourceRows(_ ids: [String]) async {
+        guard let first = ids.first else { return }
+        togglingSourceID = first
+        defer { togglingSourceID = nil }
+        do {
+            _ = try await client.setSources(
+                [:],
+                dismissed: Dictionary(
+                    uniqueKeysWithValues: ids.map { ($0, true) }))
+            await reloadSources()
+            sourcesMessage =
+                "Moved \(ids.joined(separator: ", ")) to the Library."
         } catch {
             sourcesMessage = error.localizedDescription
         }

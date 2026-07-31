@@ -726,11 +726,33 @@ def _normalize_order(raw):
 
 
 def _blank_store():
+    enabled = _default_enabled()
     return {
-        "enabled": _default_enabled(),
+        "enabled": enabled,
+        "dismissed": _infer_dismissed(enabled, None),
         "order": _normalize_order(None),
         "accents": {},
     }
+
+
+def _infer_dismissed(enabled, raw):
+    """Full dismissed map: stored values, else inferred from enabled.
+
+    `dismissed` says whether a source sits in Settings' Library rather than
+    its Active list; disabled-but-not-dismissed is "paused" — configured,
+    visible, not polled. Files from before the flag never distinguished the
+    two: off *meant* Library. So a missing id inherits `not enabled`, which
+    keeps every pre-upgrade Library chip a Library chip instead of promoting
+    ten switched-off sources to paused rows on first launch.
+    """
+    raw = raw if isinstance(raw, dict) else {}
+    out = {}
+    for sid, on in enabled.items():
+        if sid in raw:
+            out[sid] = bool(raw[sid])
+        else:
+            out[sid] = not bool(on)
+    return out
 
 
 def _load():
@@ -742,6 +764,7 @@ def _load():
         enabled = _default_enabled()
         state = {
             "enabled": enabled,
+            "dismissed": _infer_dismissed(enabled, None),
             "order": _normalize_order(None),
             "seeded_from": "detect",
             "detected": detect_sources.detected_map(),
@@ -750,7 +773,8 @@ def _load():
             _save(state)
         except OSError:
             pass
-        return {"enabled": enabled, "order": state["order"], "accents": {}}
+        return {"enabled": enabled, "dismissed": state["dismissed"],
+                "order": state["order"], "accents": {}}
     except (OSError, json.JSONDecodeError):
         return _blank_store()
     if not isinstance(data, dict):
@@ -767,12 +791,16 @@ def _load():
     raw = data.get("enabled") if isinstance(data.get("enabled"), dict) else {}
     if not raw and data.get("seeded_from") is None:
         # Pre-detect era file that somehow lacks enabled — treat as all on.
-        return {"enabled": {sid: True for sid in known}, "order": order,
-                "accents": accents}
+        enabled = {sid: True for sid in known}
+        return {"enabled": enabled,
+                "dismissed": _infer_dismissed(enabled, data.get("dismissed")),
+                "order": order, "accents": accents}
     for sid in known:
         if sid in raw:
             enabled[sid] = bool(raw[sid])
-    return {"enabled": enabled, "order": order, "accents": accents}
+    return {"enabled": enabled,
+            "dismissed": _infer_dismissed(enabled, data.get("dismissed")),
+            "order": order, "accents": accents}
 
 
 def _save(state):
@@ -802,17 +830,56 @@ def is_enabled(source_id):
 
 
 def set_enabled(updates):
-    """Apply {source_id: bool} updates. Returns the full enabled map."""
+    """Apply {source_id: bool} updates. Returns the full enabled map.
+
+    Turning a source on also un-dismisses it — a source someone just enabled
+    is by definition one they track, so it must land in Active, not stay a
+    Library chip that happens to poll. Turning one off leaves `dismissed`
+    alone: that is the paused state.
+    """
     known = set(_known_ids())
     with _lock:
         state = _state_locked()
         enabled = dict(state["enabled"])
+        dismissed = dict(state.get("dismissed") or {})
         for sid, value in (updates or {}).items():
             if sid in known:
                 enabled[sid] = bool(value)
+                if value:
+                    dismissed[sid] = False
         state["enabled"] = enabled
+        state["dismissed"] = dismissed
         _save(state)
         return dict(enabled)
+
+
+def dismissed_map():
+    with _lock:
+        state = _state_locked()
+        return dict(state.get("dismissed") or {})
+
+
+def set_dismissed(updates):
+    """Apply {source_id: bool}. Returns the full dismissed map.
+
+    Dismissing also disables — a Library chip must not keep polling — but
+    un-dismissing does not enable by itself, so a caller restoring a source
+    to Active decides separately whether it comes back on.
+    """
+    known = set(_known_ids())
+    with _lock:
+        state = _state_locked()
+        enabled = dict(state["enabled"])
+        dismissed = dict(state.get("dismissed") or {})
+        for sid, value in (updates or {}).items():
+            if sid in known:
+                dismissed[sid] = bool(value)
+                if value:
+                    enabled[sid] = False
+        state["enabled"] = enabled
+        state["dismissed"] = dismissed
+        _save(state)
+        return dict(dismissed)
 
 
 def _forget_enabled(source_id):
@@ -823,6 +890,9 @@ def _forget_enabled(source_id):
         if enabled.pop(source_id, None) is None:
             return
         state["enabled"] = enabled
+        dismissed = dict(state.get("dismissed") or {})
+        dismissed.pop(source_id, None)
+        state["dismissed"] = dismissed
         state["order"] = [sid for sid in state["order"] if sid != source_id]
         accents = dict(state.get("accents") or {})
         accents.pop(source_id, None)

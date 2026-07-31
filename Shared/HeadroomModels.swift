@@ -1339,6 +1339,11 @@ struct SyncSource: Decodable, Identifiable, Sendable {
     /// an overridden row from a shipped one.
     var accentDefault: String?
     var enabled: Bool?
+    /// Settings' Library vs Active membership. Off-but-not-dismissed is
+    /// paused: the row stays in Active, dimmed, and nothing polls it. Nil
+    /// from hosts predating the flag — read through `isDismissed`, which
+    /// falls back to the old rule (off meant Library).
+    var dismissed: Bool?
     var ok: Bool?
     var stale: Bool?
     /// This row's credential needs re-authenticating. Settings sorts on it and
@@ -1352,9 +1357,11 @@ struct SyncSource: Decodable, Identifiable, Sendable {
 
     var needsSignIn: Bool { authRequired == true }
 
+    var isDismissed: Bool { dismissed ?? !(enabled ?? true) }
+
     enum CodingKeys: String, CodingKey {
         case id, title, label, hint, kind, group, accent, enabled, ok, stale
-        case configured, error, detail
+        case configured, error, detail, dismissed
         case authRequired = "auth_required"
         case accentDefault = "accent_default"
         case ageS = "age_s"

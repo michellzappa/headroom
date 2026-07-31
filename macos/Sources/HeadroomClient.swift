@@ -198,11 +198,19 @@ struct HeadroomClient: Sendable {
         }
     }
 
-    func setSources(_ enabled: [String: Bool]) async throws -> [String: Bool] {
+    /// Write source flags. `enabled` pauses/resumes; `dismissed` moves rows
+    /// between Settings' Active list and its Library. One POST for both, so
+    /// a Library chip tap (un-dismiss + enable) can't land half-applied.
+    func setSources(
+        _ enabled: [String: Bool], dismissed: [String: Bool]? = nil
+    ) async throws -> [String: Bool] {
         let url = try base().appendingPathComponent("sources")
+        var body: [String: Any] = [:]
+        if !enabled.isEmpty { body["enabled"] = enabled }
+        if let dismissed { body["dismissed"] = dismissed }
         let data = try await send(request(
             url, method: "POST",
-            body: try JSONSerialization.data(withJSONObject: ["enabled": enabled]),
+            body: try JSONSerialization.data(withJSONObject: body),
             timeout: 8))
         let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         return (object?["enabled"] as? [String: Bool]) ?? enabled
