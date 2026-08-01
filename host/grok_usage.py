@@ -142,12 +142,30 @@ def _map(blob):
     used = _num(config.get("onDemandUsed"))
     pct = quota_util.used_pct(used, cap) if cap else None
 
+    credits = quota_util.pool(pct, resets_in, WEEK_WINDOW_S)
+    if cap is not None:
+        if credits is None:
+            credits = {
+                "pct": pct,
+                "resets_in_s": resets_in,
+                "resets_in": oauth_usage.fmt_resets(resets_in),
+                "window_s": WEEK_WINDOW_S,
+            }
+        remaining = None
+        if used is not None:
+            remaining = round(max(0.0, cap - used), 2)
+        credits.update({
+            "used_usd": used,
+            "limit_usd": cap,
+            "remaining_usd": remaining,
+        })
+
     ok = bool(tier) or resets_in is not None
     return {
         "ok": ok,
         "plan": tier,
         "error": None if ok else "no Grok billing data",
-        "credits": quota_util.pool(pct, resets_in, WEEK_WINDOW_S),
+        "credits": credits,
         "week_resets_in_s": resets_in,
         "week_resets_in": oauth_usage.fmt_resets(resets_in),
         "prepaid_balance": _num(config.get("prepaidBalance")),

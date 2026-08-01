@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import copilot_usage
+import grok_usage
 import jetbrains_usage
 import quota_util
 import sources_config
@@ -23,15 +24,32 @@ class QuotaUtilTests(unittest.TestCase):
 
 
 class RegistryHasNewProviders(unittest.TestCase):
-    def test_eight_quota_sources(self):
+    def test_nine_quota_sources(self):
         ids = [s.id for s in sources_config.QUOTA_SOURCES]
         self.assertEqual(
             ids,
             ["claude", "codex", "cursor", "copilot", "gemini",
-             "windsurf", "jetbrains", "zed"],
+             "windsurf", "jetbrains", "zed", "grok"],
         )
         self.assertTrue(all(s.group == sources_config.GROUP_AI for s in
                             sources_config.QUOTA_SOURCES))
+
+
+class GrokMapTests(unittest.TestCase):
+    def test_maps_overage_as_dollars_without_a_burn_headline(self):
+        out = grok_usage._map({
+            "subscription_tier": "SuperGrok",
+            "config": {
+                "currentPeriod": {"end": "2099-08-01T00:00:00Z"},
+                "onDemandCap": {"val": 20},
+                "onDemandUsed": {"val": 5},
+            },
+        })
+        self.assertTrue(out["ok"])
+        self.assertEqual(out["credits"]["used_usd"], 5.0)
+        self.assertEqual(out["credits"]["limit_usd"], 20.0)
+        self.assertEqual(out["credits"]["remaining_usd"], 15.0)
+        self.assertIsNone(sources_config.headline_pct("grok", out))
 
 
 class JetBrainsParseTests(unittest.TestCase):

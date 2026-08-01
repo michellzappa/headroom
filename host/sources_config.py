@@ -559,7 +559,7 @@ BASE_SOURCES = (
     Source("grok", "Grok", "~/.grok/auth.json (Grok CLI)", 300,
            grok_usage.fetch_quota, detail_fn=_detail_grok,
            kind="quota", group=GROUP_AI, pools=_GROK_POOLS,
-           headline=("credits",), accent="#8E8E93"),
+           accent="#8E8E93"),
     # Non-quota rows are appended after quotas in ordered_sources(); keep this
     # with the other activity sources so SOURCE_IDS stays in rollup order.
     Source("claude-status", "Claude Status", "status.claude.com", 60,

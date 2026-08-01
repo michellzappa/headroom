@@ -252,7 +252,12 @@ class QuotaRegistryTests(unittest.TestCase):
         self.assertEqual(
             sources_config.BURN_SOURCE_IDS,
             tuple(s.id for s in sources_config.QUOTA_SOURCES))
-        self.assertEqual(quota_samples.PROVIDERS, sources_config.BURN_SOURCE_IDS)
+        self.assertEqual(
+            quota_samples.PROVIDERS,
+            tuple(source.id for source in sources_config.QUOTA_SOURCES
+                  if source.windows()),
+        )
+        self.assertNotIn("grok", quota_samples.PROVIDERS)
         self.assertTrue({"claude", "codex", "cursor"}.issubset(
             set(sources_config.BURN_SOURCE_IDS)))
         # Windows, not every meter. The sample store records percentages
