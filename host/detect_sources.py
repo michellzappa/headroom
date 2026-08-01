@@ -14,6 +14,7 @@ import subprocess
 import app_config
 import copilot_usage
 import gemini_usage
+import grok_usage
 import jetbrains_usage
 import oauth_usage
 import windsurf_usage
@@ -160,6 +161,7 @@ PROBES = {
     "windsurf": windsurf_usage.signed_in,
     "jetbrains": jetbrains_usage.signed_in,
     "zed": zed_usage.signed_in,
+    "grok": grok_usage.signed_in,
     "vercel": vercel_signed_in,
     "git": git_available,
     "github": github_signed_in,

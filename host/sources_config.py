@@ -44,6 +44,7 @@ import detect_sources
 import gemini_usage
 import git_activity
 import github_actions
+import grok_usage
 import jetbrains_usage
 import local_servers
 import oauth_usage
@@ -482,6 +483,27 @@ _ZED_POOLS = (
     PoolSpec("predictions", "predictions", "Predictions",
              zed_usage.MONTH_WINDOW_S),
 )
+# xAI exposes no percent-used figure for the subscription window (only the
+# window bounds + on-demand credit cap/used), so the sole meter is on-demand
+# credits — dollars against a cap, same shape as Cursor's on-demand.
+_GROK_POOLS = (
+    PoolSpec("credits", "credits", "Credits", grok_usage.WEEK_WINDOW_S,
+             kind=KIND_OVERAGE, ring=False),
+)
+
+
+def _detail_grok(payload):
+    if not isinstance(payload, dict) or not payload.get("ok"):
+        return None
+    parts = []
+    if payload.get("plan"):
+        parts.append(str(payload["plan"]))
+    credits = payload.get("credits")
+    if isinstance(credits, dict) and credits.get("pct") is not None:
+        parts.append("credits {:.0f}%".format(credits["pct"]))
+    if payload.get("week_resets_in"):
+        parts.append("resets {}".format(payload["week_resets_in"]))
+    return " · ".join(parts) if parts else None
 
 BASE_SOURCES = (
     Source("claude", "Claude", "~/.headroom/oauth (imports Claude login)", 60,
@@ -534,6 +556,10 @@ BASE_SOURCES = (
            zed_usage.fetch_quota,
            kind="quota", group=GROUP_AI, pools=_ZED_POOLS,
            headline=("predictions",), accent="#084CCF"),
+    Source("grok", "Grok", "~/.grok/auth.json (Grok CLI)", 300,
+           grok_usage.fetch_quota, detail_fn=_detail_grok,
+           kind="quota", group=GROUP_AI, pools=_GROK_POOLS,
+           headline=("credits",), accent="#8E8E93"),
     # Non-quota rows are appended after quotas in ordered_sources(); keep this
     # with the other activity sources so SOURCE_IDS stays in rollup order.
     Source("claude-status", "Claude Status", "status.claude.com", 60,
