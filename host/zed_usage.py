@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import keychain
 import time
 import urllib.error
 import urllib.request
@@ -48,63 +49,16 @@ def _settings_server():
 
 
 def _keychain_creds():
+    # All in-process. security(1) prompted on every call (it is on no item's
+    # ACL), and `find-internet-password -g` additionally echoed the secret to
+    # stderr. keychain.* never shows UI and never leaks to a stream.
     server = _settings_server()
-    user_id = None
-    token = None
     try:
-        dump = subprocess.check_output(
-            [
-                "/usr/bin/security", "find-internet-password",
-                "-s", server, "-g",
-            ],
-            stderr=subprocess.STDOUT,
-            timeout=4,
-            text=True,
-        )
-        for line in dump.splitlines():
-            line = line.strip()
-            if '"acct"' in line:
-                i = line.find('="')
-                if i >= 0:
-                    user_id = line[i + 2:].rstrip('"')
-            if line.startswith("password:"):
-                i = line.find('"')
-                if i >= 0:
-                    token = line[i + 1:].rstrip('"')
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired,
-            FileNotFoundError, OSError):
-        pass
-
+        _, user_id, token = keychain.get_internet_password(server)
+    except (keychain.KeychainError, OSError, ValueError):
+        return None, None
     if not token:
-        try:
-            token = subprocess.check_output(
-                [
-                    "/usr/bin/security", "find-internet-password",
-                    "-s", server, "-w",
-                ],
-                stderr=subprocess.DEVNULL,
-                timeout=4,
-                text=True,
-            ).strip() or None
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired,
-                FileNotFoundError, OSError):
-            token = None
-
-    if not token:
-        try:
-            token = subprocess.check_output(
-                [
-                    "/usr/bin/security", "find-generic-password",
-                    "-s", f"https://{server}", "-w",
-                ],
-                stderr=subprocess.DEVNULL,
-                timeout=4,
-                text=True,
-            ).strip() or None
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired,
-                FileNotFoundError, OSError):
-            token = None
-
+        token = keychain.read_secret(f"https://{server}")
     return user_id, token
 
 

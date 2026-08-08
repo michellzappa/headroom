@@ -14,6 +14,7 @@ from __future__ import annotations
 import concurrent.futures
 import os
 import subprocess
+import keychain
 import time
 import urllib.error
 import urllib.parse
@@ -45,21 +46,10 @@ _EMPTY = {
 
 
 def _keychain_token():
-    try:
-        return subprocess.check_output(
-            [
-                "/usr/bin/security", "find-generic-password",
-                "-s", KEYCHAIN_SERVICE,
-                "-a", KEYCHAIN_ACCOUNT,
-                "-w",
-            ],
-            stderr=subprocess.DEVNULL,
-            timeout=4,
-            text=True,
-        ).strip() or None
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired,
-            FileNotFoundError, OSError):
-        return None
+    # Read in-process. Shelling out to security(1) makes /usr/bin/security the
+    # caller, and it is on no item's ACL — so macOS prompts on every read, even
+    # for items Headroom created itself. keychain.read_secret never shows UI.
+    return keychain.read_secret(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT)
 
 
 def _token():

@@ -90,6 +90,9 @@ def _service_from_store(store):
 
 
 def _keychain_account(service=KEYCHAIN_SERVICE):
+    # Left as a subprocess deliberately: this reads *attributes* only (no -w),
+    # and attribute reads are not ACL-gated, so they never prompt. Adding -w
+    # here would reintroduce the modal loop.
     try:
         out = subprocess.check_output(
             ["security", "find-generic-password", "-s", service],
@@ -111,19 +114,30 @@ def _creds_file(account=None):
     return account.child(CREDS_NAME) if account else CREDS_FILE
 
 
+# Services this process is not allowed to read. Denial is a property of the
+# item's ACL, so it will not change between polls — retrying at FAIL_TTL_S is
+# what turned one refusal into an unbounded prompt loop. Cleared only by a
+# restart or an explicit user-initiated re-check.
+_denied_services = set()
+
+
 def _read_keychain_blob(service=KEYCHAIN_SERVICE):
+    # In-process and UI-free. The old subprocess made /usr/bin/security the
+    # caller, which is on no item's ACL, so every poll raised a modal — and a
+    # denial was indistinguishable from "absent", so the caller retried it.
+    if service in _denied_services:
+        return None
     try:
-        raw = subprocess.check_output(
-            ["security", "find-generic-password",
-             "-s", service, "-w"],
-            stderr=subprocess.DEVNULL, text=True,
-        ).strip()
-    except (subprocess.CalledProcessError, FileNotFoundError):
+        status, raw = keychain.get_generic_password(service)
+    except (keychain.KeychainError, OSError, ValueError):
+        return None
+    if status in keychain.DENIED_STATUSES:
+        _denied_services.add(service)
         return None
     if not raw:
         return None
     try:
-        return json.loads(raw)
+        return json.loads(raw.strip())
     except json.JSONDecodeError:
         return None
 

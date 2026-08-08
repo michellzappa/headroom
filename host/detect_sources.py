@@ -10,6 +10,7 @@ import json
 import os
 import sqlite3
 import subprocess
+import keychain
 
 import app_config
 import copilot_usage
@@ -91,16 +92,9 @@ def git_available():
 def github_signed_in():
     if os.environ.get("HEADROOM_GITHUB_TOKEN") or os.environ.get("GITHUB_TOKEN"):
         return True
-    try:
-        raw = subprocess.check_output(
-            ["/usr/bin/security", "find-generic-password",
-             "-s", "com.centaur-labs.headroom.github", "-a", "access-token", "-w"],
-            stderr=subprocess.DEVNULL, text=True,
-        ).strip()
-        if raw:
-            return True
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        pass
+    # In-process: security(1) prompts even for our own items.
+    if keychain.read_secret("com.centaur-labs.headroom.github", "access-token"):
+        return True
     hosts = os.path.expanduser("~/.config/gh/hosts.yml")
     return os.path.isfile(hosts)
 
@@ -108,16 +102,9 @@ def github_signed_in():
 def supabase_signed_in():
     if os.environ.get("SUPABASE_ACCESS_TOKEN"):
         return True
-    try:
-        raw = subprocess.check_output(
-            ["/usr/bin/security", "find-generic-password",
-             "-s", "com.centaur-labs.headroom.supabase", "-a", "access-token", "-w"],
-            stderr=subprocess.DEVNULL, text=True,
-        ).strip()
-        if raw:
-            return True
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        pass
+    # In-process: security(1) prompts even for our own items.
+    if keychain.read_secret("com.centaur-labs.headroom.supabase", "access-token"):
+        return True
     path = os.path.expanduser("~/.supabase/access-token")
     try:
         with open(path) as handle:
@@ -130,15 +117,9 @@ def plausible_signed_in():
     if (os.environ.get("PLAUSIBLE_API_KEY")
             or os.environ.get("HEADROOM_PLAUSIBLE_TOKEN")):
         return True
-    try:
-        raw = subprocess.check_output(
-            ["/usr/bin/security", "find-generic-password",
-             "-s", "com.centaur-labs.headroom.plausible", "-a", "access-token", "-w"],
-            stderr=subprocess.DEVNULL, text=True,
-        ).strip()
-        return bool(raw)
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return False
+    # In-process: security(1) prompts even for our own items.
+    return bool(keychain.read_secret("com.centaur-labs.headroom.plausible", "access-token"))
+
 
 
 def local_available():
