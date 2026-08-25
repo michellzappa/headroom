@@ -4005,21 +4005,6 @@ static void drawGlanceSpend(int16_t padX, int16_t span, int16_t midY,
     return;
   }
 
-  int16_t numberX = padX;
-  int16_t numberW = span;
-  int16_t captionY = (int16_t)(midY + 24);
-  int16_t valueY = (int16_t)(midY + 41);
-  uint8_t valueSize = 3;
-#if defined(BOARD_ROUND_UI)
-  // The figures sit near the circle's widest chord, so do not inherit the
-  // narrow footer geometry. Drop them into the visual center and use the
-  // largest common type size that keeps all three columns aligned.
-  captionY = (int16_t)(midY + 60);
-  valueY = (int16_t)(midY + 81);
-  roundBand(captionY, (int16_t)(valueY + 32), 10, &numberX, &numberW);
-  valueSize = 4;
-#endif
-  const int16_t colW = (int16_t)(numberW / 3);
   const char *captions[3] = {"today", "per active day", "month"};
   const String values[3] = {
       formatUsd(spendSummary.today),
@@ -4027,30 +4012,60 @@ static void drawGlanceSpend(int16_t padX, int16_t span, int16_t midY,
       formatUsd(spendSummary.total),
   };
 #if defined(BOARD_ROUND_UI)
+  // Rows, not columns. Three columns on a circle are width-starved: the chord
+  // at the figures' height affords about 130px a column, which caps the type
+  // at the size the square panel already uses and leaves the bottom third of
+  // the band empty. One figure a row gets most of the chord, so the numbers
+  // fill the lower band the way the burn and history charts do.
+  const int16_t bandTop = (int16_t)(midY + 30);
+  const int16_t rowGap = 7;
+  // Each row's budget is measured against its own caption, not the widest
+  // one. "per active day" is the long label and the month total is the long
+  // figure, and they are never on the same row — charging every row for both
+  // costs two type sizes for a collision that cannot happen.
+  uint8_t valueSize = 6;
+  int16_t rowH = 0, totalH = 0, top = 0, numberX = 0, numberW = 0;
   while (valueSize > 2) {
+    rowH = (int16_t)(valueSize * 8);
+    totalH = (int16_t)(3 * rowH + 2 * rowGap);
+    if (bandTop + totalH > lowBottom) {
+      valueSize--;
+      continue;
+    }
+    top = (int16_t)(bandTop + (lowBottom - bandTop - totalH) / 2);
+    // The circle narrows row by row. Taking the narrowest chord the block
+    // crosses and giving it to every row keeps the figures in one column
+    // instead of a ragged right edge.
+    roundBand(top, (int16_t)(top + totalH), 10, &numberX, &numberW);
     bool fits = true;
     for (uint8_t i = 0; i < 3; i++) {
-      if (textWidth(values[i].c_str(), valueSize) > colW - 8) fits = false;
+      const int16_t budget =
+          (int16_t)(numberW - textWidth(captions[i], 2) - 14);
+      if (textWidth(values[i].c_str(), valueSize) > budget) fits = false;
     }
     if (fits) break;
     valueSize--;
   }
-#endif
+  rowH = (int16_t)(valueSize * 8);
+  totalH = (int16_t)(3 * rowH + 2 * rowGap);
+  top = (int16_t)(bandTop + (lowBottom - bandTop - totalH) / 2);
+  roundBand(top, (int16_t)(top + totalH), 10, &numberX, &numberW);
   for (uint8_t i = 0; i < 3; i++) {
-    const int16_t colX = (int16_t)(numberX + i * colW);
-#if defined(BOARD_ROUND_UI)
-    const int16_t captionX =
-        (int16_t)(colX + (colW - textWidth(captions[i], 1)) / 2);
-    const int16_t valueX = (int16_t)(
-        colX + (colW - textWidth(values[i].c_str(), valueSize)) / 2);
-#else
-    const int16_t captionX = colX;
-    const int16_t valueX = colX;
-#endif
-    drawTextAt(captions[i], captionX, captionY, 1, COL_DIM);
-    drawTextAt(values[i], valueX, valueY, valueSize, COL_WHITE);
+    const int16_t rowY = (int16_t)(top + i * (rowH + rowGap));
+    drawTextAt(captions[i], numberX, (int16_t)(rowY + (rowH - 16) / 2), 2,
+               COL_DIM);
+    drawRightAt(values[i], (int16_t)(numberX + numberW), rowY, valueSize,
+                COL_WHITE);
   }
-#if !defined(BOARD_ROUND_UI)
+#else
+  const int16_t colW = (int16_t)(span / 3);
+  const int16_t captionY = (int16_t)(midY + 24);
+  const int16_t valueY = (int16_t)(midY + 41);
+  for (uint8_t i = 0; i < 3; i++) {
+    const int16_t colX = (int16_t)(padX + i * colW);
+    drawTextAt(captions[i], colX, captionY, 1, COL_DIM);
+    drawTextAt(values[i], colX, valueY, 3, COL_WHITE);
+  }
   gfx->drawFastHLine(padX, lowBottom, span,
                      dimToward(COL_DIM, COL_BG, 0.35f));
 #endif

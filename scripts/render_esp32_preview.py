@@ -784,31 +784,49 @@ def draw_glance_spend(draw, device, mid_y, low_bottom):
         draw_text(draw, "No spend yet", PAD, mid_y + 45, FONT2, COL_DIM)
         return
 
-    caption_y = mid_y + (60 if ROUND_PANEL else 24)
-    value_y = mid_y + (81 if ROUND_PANEL else 41)
-    number_x, number_w = (
-        round_band(caption_y, value_y + 32, 10)
-        if ROUND_PANEL else (PAD, W - PAD * 2)
-    )
-    col_w = number_w // 3
     captions = ("today", "per active day", "month")
     values = (format_usd(today), format_usd(spend.get("avg")),
               format_usd(total))
-    value_font = FONT4 if ROUND_PANEL else FONT3
-    while value_font > FONT2 and any(
-            text_w(draw, value, value_font) > col_w - 8 for value in values):
-        value_font -= 1
-    for index, (caption, value) in enumerate(zip(captions, values)):
-        col_x = number_x + index * col_w
-        caption_x = (col_x + (col_w - text_w(draw, caption, FONT1)) // 2
-                     if ROUND_PANEL else col_x)
-        value_x = (col_x + (col_w - text_w(draw, value, value_font)) // 2
-                   if ROUND_PANEL else col_x)
-        draw_text(draw, caption, caption_x, caption_y, FONT1, COL_DIM)
-        draw_text(draw, value, value_x, value_y, value_font, COL_WHITE)
+
     if not ROUND_PANEL:
+        col_w = (W - PAD * 2) // 3
+        for index, (caption, value) in enumerate(zip(captions, values)):
+            col_x = PAD + index * col_w
+            draw_text(draw, caption, col_x, mid_y + 24, FONT1, COL_DIM)
+            draw_text(draw, value, col_x, mid_y + 41, FONT3, COL_WHITE)
         draw.line([(PAD, low_bottom), (W - PAD - 1, low_bottom)],
                   fill=dim(COL_DIM, 0.35), width=1)
+        return
+
+    # Rows, not columns. Mirror of drawGlanceSpend() in main.cpp — see the
+    # comments there for why the circle rules out three columns, why each row
+    # is budgeted against its own caption, and why every row shares one chord.
+    band_top = mid_y + 30
+    row_gap = 7
+    size = 6
+    while size > 2:
+        row_h = size * 8
+        total_h = 3 * row_h + 2 * row_gap
+        if band_top + total_h > low_bottom:
+            size -= 1
+            continue
+        top = band_top + (low_bottom - band_top - total_h) // 2
+        number_x, number_w = round_band(top, top + total_h, 10)
+        if all(text_w(draw, values[i], size)
+               <= number_w - text_w(draw, captions[i], FONT2) - 14
+               for i in range(3)):
+            break
+        size -= 1
+    row_h = size * 8
+    total_h = 3 * row_h + 2 * row_gap
+    top = band_top + (low_bottom - band_top - total_h) // 2
+    number_x, number_w = round_band(top, top + total_h, 10)
+    for index, (caption, value) in enumerate(zip(captions, values)):
+        row_y = top + index * (row_h + row_gap)
+        draw_text(draw, caption, number_x, row_y + (row_h - 16) // 2, FONT2,
+                  COL_DIM)
+        draw_text(draw, value, number_x + number_w - text_w(draw, value, size),
+                  row_y, size, COL_WHITE)
 
 
 def seal_edges(img: Image.Image, bg) -> Image.Image:
