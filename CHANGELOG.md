@@ -7,6 +7,17 @@ are not tracked here because they move on every commit.
 Add a section here before cutting a tag. `scripts/cut-release.sh` refuses to
 tag a version that has no entry.
 
+## 2.1.0 — 2026-08-26
+
+### Changed
+
+- **The desk board no longer dims at night.** It followed local solar times
+  and a fixed 22:00 bedtime, and stepped the panel to 30% after sunset and
+  10% after bedtime. It now holds one level all day and all night.
+  `PANEL_BRIGHTNESS` in `firmware/src/config.h` sets that level and replaces
+  the `BRIGHTNESS_*` set. An existing `config.h` keeps building.
+- Agent docs record the rotated-grant trap behind the 2.0.9 fix.
+
 ## 2.0.9 — 2026-08-26
 
 ### Fixed
