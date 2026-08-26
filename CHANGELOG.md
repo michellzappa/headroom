@@ -7,7 +7,39 @@ are not tracked here because they move on every commit.
 Add a section here before cutting a tag. `scripts/cut-release.sh` refuses to
 tag a version that has no entry.
 
-## Unreleased
+## 2.0.8 — 2026-08-26
+
+### Fixed
+
+- **Claude token history counted one assistant message once per content block**
+  (#28, reported by @tonydzi). Claude Code writes one JSONL line per content
+  block — thinking, text, each `tool_use` — and every line repeats the same
+  `message.usage` under the same `message.id`. Both readers treated each line
+  as its own API call, so daily tokens, `cost_usd` and the model mix were
+  multiplied by the block count of every message. Measured x1.83 over 120 real
+  session files here, x2.12 on the reporter's tree; 45% of the tokens on record
+  were the same calls counted again. The blocks of a message are written
+  consecutively, so a shared `MessageDeduper` skips a line repeating the id of
+  the line before it — O(1) per file, which lets the live tail keep one per open
+  session and catch a message that straddles a poll boundary. Records with no
+  `message.id` and subagent runs, which carry their own ids, are untouched.
+  `claude_history.json` bumps its schema so stores already written under the
+  inflated count are rebuilt rather than kept.
+
+- **The desk display's round panel stacked spend figures in three columns.**
+  Three columns on a circle are width-starved at the figures' height, which
+  capped the type size and left the lower band empty. One figure per row uses
+  most of the chord and fills the band the way the burn and history charts
+  already do. Each row is sized against its own caption and value rather than
+  the widest of all three, because the long label and the long figure never
+  share a row.
+
+- **The dashboard's mode tabs scrolled away with the content.** They sat inside
+  the scroll view, so they left the window as soon as a list was long enough to
+  move. They now sit in the popover chrome above the divider, where the rest of
+  the window furniture is.
+
+## 2.0.7 — 2026-08-21
 
 ### Added
 
@@ -18,10 +50,6 @@ tag a version that has no entry.
   `tanh((used − pace) / 8)` curve the Mac uses. It drops the arc, so it answers
   whether the burn is ahead or behind and nothing else. Rings stay the default,
   the board keeps its own choice in NVS, and a tap still opens the detail page.
-
-## 2.0.7 — 2026-08-21
-
-### Added
 
 - **First-boot Wi-Fi setup for the ESP32.** When no saved network can be
   reached, the board starts a `Headroom-XXXX` setup network with a captive
@@ -60,21 +88,6 @@ tag a version that has no entry.
   `.wrangler` cache is now ignored.
 
 ### Fixed
-
-- **Claude token history counted one assistant message once per content block**
-  (#28, reported by @tonydzi). Claude Code writes one JSONL line per content
-  block — thinking, text, each `tool_use` — and every line repeats the same
-  `message.usage` under the same `message.id`. Both readers treated each line
-  as its own API call, so daily tokens, `cost_usd` and the model mix were
-  multiplied by the block count of every message. Measured x1.83 over 120 real
-  session files here, x2.12 on the reporter's tree; 45% of the tokens on record
-  were the same calls counted again. The blocks of a message are written
-  consecutively, so a shared `MessageDeduper` skips a line repeating the id of
-  the line before it — O(1) per file, which lets the live tail keep one per open
-  session and catch a message that straddles a poll boundary. Records with no
-  `message.id` and subagent runs, which carry their own ids, are untouched.
-  `claude_history.json` bumps its schema so stores already written under the
-  inflated count are rebuilt rather than kept.
 
 - **The medium widget drew a blank box** (#27). Two causes, both able to empty
   the tile on their own. It asked whether a provider carried a burndown *key*
