@@ -7,6 +7,23 @@ are not tracked here because they move on every commit.
 Add a section here before cutting a tag. `scripts/cut-release.sh` refuses to
 tag a version that has no entry.
 
+## 2.0.9 — 2026-08-26
+
+### Fixed
+
+- **Claude kept saying Needs sign-in after `claude /login`.** Headroom holds
+  its own copy of the Claude OAuth blob and prefers it over the Keychain, and
+  it drops that copy once the refresh expiry the blob states has passed. A new
+  `/login` does not wait for that date: it rotates the grant, and the replaced
+  copy goes on stating an expiry days out. So the copy still tested as live,
+  the read returned it before it looked at the Keychain, and every refresh came
+  back `invalid_grant` — for as long as the old date said the login was fine.
+  Nothing recovered it, because the one arm that handles a dead grant only
+  cleared the in-memory blob and the next poll re-read the same file. The token
+  endpoint is now the witness: an `invalid_grant` expires Headroom's copy on
+  disk, so the next read falls through to the Keychain, and records the
+  rejected token so the same grant is not imported straight back from there.
+
 ## 2.0.8 — 2026-08-26
 
 ### Fixed
