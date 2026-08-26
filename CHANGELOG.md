@@ -61,6 +61,21 @@ tag a version that has no entry.
 
 ### Fixed
 
+- **Claude token history counted one assistant message once per content block**
+  (#28, reported by @tonydzi). Claude Code writes one JSONL line per content
+  block — thinking, text, each `tool_use` — and every line repeats the same
+  `message.usage` under the same `message.id`. Both readers treated each line
+  as its own API call, so daily tokens, `cost_usd` and the model mix were
+  multiplied by the block count of every message. Measured x1.83 over 120 real
+  session files here, x2.12 on the reporter's tree; 45% of the tokens on record
+  were the same calls counted again. The blocks of a message are written
+  consecutively, so a shared `MessageDeduper` skips a line repeating the id of
+  the line before it — O(1) per file, which lets the live tail keep one per open
+  session and catch a message that straddles a poll boundary. Records with no
+  `message.id` and subagent runs, which carry their own ids, are untouched.
+  `claude_history.json` bumps its schema so stores already written under the
+  inflated count are rebuilt rather than kept.
+
 - **The medium widget drew a blank box** (#27). Two causes, both able to empty
   the tile on their own. It asked whether a provider carried a burndown *key*
   rather than whether the key held a *stroke*, so a cache written by an older

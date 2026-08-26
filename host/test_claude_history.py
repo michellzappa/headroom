@@ -14,17 +14,20 @@ TZ = ZoneInfo("Europe/Berlin")
 
 
 def record(when, *, model="claude-sonnet-5", inp=100, out=50,
-           cache_read=0, cache_write=0):
+           cache_read=0, cache_write=0, message_id=None):
     usage = {
         "input_tokens": inp,
         "output_tokens": out,
         "cache_read_input_tokens": cache_read,
         "cache_creation": {"ephemeral_5m_input_tokens": cache_write},
     }
+    message = {"model": model, "usage": usage}
+    if message_id is not None:
+        message["id"] = message_id
     return json.dumps({
         "timestamp": when.astimezone(timezone.utc).strftime(
             "%Y-%m-%dT%H:%M:%S.000Z"),
-        "message": {"model": model, "usage": usage},
+        "message": message,
     })
 
 
@@ -140,6 +143,60 @@ class BackfillTests(unittest.TestCase):
         claude_history.backfill(tz=TZ)
         self.write("b.jsonl", [record(day.replace(minute=30), inp=100)])
         claude_history.reset_for_tests()
+        claude_history.backfill(tz=TZ)
+        self.assertEqual(claude_history.series(days=10)[0]["input"], 200)
+
+    def test_one_message_is_billed_once_across_its_content_blocks(self):
+        """Claude Code writes one line per content block, repeating the usage.
+
+        Thinking, text and each tool_use are separate JSONL records carrying
+        the same message.id and the same message.usage. They are one API call.
+        """
+        day = datetime(2026, 7, 1, 12, 0, tzinfo=TZ)
+        self.write("a.jsonl", [
+            record(day, inp=1000, out=500, message_id="msg_01A"),
+            record(day, inp=1000, out=500, message_id="msg_01A"),
+            record(day, inp=1000, out=500, message_id="msg_01A"),
+        ])
+        claude_history.backfill(tz=TZ)
+        row = claude_history.series(days=10)[0]
+        self.assertEqual(row["input"], 1000)
+        self.assertEqual(row["output"], 500)
+        self.assertEqual(row["total"], 1500)
+
+    def test_distinct_messages_still_add_up(self):
+        day = datetime(2026, 7, 1, 12, 0, tzinfo=TZ)
+        self.write("a.jsonl", [
+            record(day, inp=100, message_id="msg_01A"),
+            record(day, inp=100, message_id="msg_01A"),
+            record(day, inp=100, message_id="msg_01B"),
+        ])
+        claude_history.backfill(tz=TZ)
+        self.assertEqual(claude_history.series(days=10)[0]["input"], 200)
+
+    def test_subagent_messages_are_kept(self):
+        """Sidechain runs carry their own message ids — separate API calls."""
+        day = datetime(2026, 7, 1, 12, 0, tzinfo=TZ)
+        self.write("a.jsonl", [
+            record(day, inp=100, message_id="msg_main"),
+            record(day, inp=100, message_id="msg_main"),
+            record(day, inp=700, message_id="msg_sidechain"),
+        ])
+        claude_history.backfill(tz=TZ)
+        self.assertEqual(claude_history.series(days=10)[0]["input"], 800)
+
+    def test_records_without_a_message_id_are_never_collapsed(self):
+        """Older logs carry no message.id; two of them are two calls."""
+        day = datetime(2026, 7, 1, 12, 0, tzinfo=TZ)
+        self.write("a.jsonl", [record(day, inp=100), record(day, inp=100)])
+        claude_history.backfill(tz=TZ)
+        self.assertEqual(claude_history.series(days=10)[0]["input"], 200)
+
+    def test_the_same_id_in_two_files_is_two_messages(self):
+        """The deduper is per file, matching what the log tree actually does."""
+        day = datetime(2026, 7, 1, 12, 0, tzinfo=TZ)
+        self.write("a.jsonl", [record(day, inp=100, message_id="msg_01A")])
+        self.write("b.jsonl", [record(day, inp=100, message_id="msg_01A")])
         claude_history.backfill(tz=TZ)
         self.assertEqual(claude_history.series(days=10)[0]["input"], 200)
 

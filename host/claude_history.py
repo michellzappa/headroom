@@ -41,7 +41,9 @@ LOG_ROOT = os.path.expanduser("~/.claude/projects")
 SESSION_GAP_S = 30 * 60
 # Keep the store bounded; well past any window worth charting.
 RETENTION_DAYS = 400
-SCHEMA_VERSION = 1
+# 2: one assistant message is billed once, not once per content block. Bumping
+# discards stores written under the inflated count and rebuilds them.
+SCHEMA_VERSION = 2
 
 _lock = threading.Lock()
 _state = None
@@ -88,6 +90,47 @@ def usage_from_record(rec):
     return (t, model, inp, out, cache_read, w5, w1h, cost)
 
 
+class MessageDeduper:
+    """Collapse the several JSONL lines Claude Code writes per assistant message.
+
+    One assistant message becomes one line per content block — thinking, text,
+    and each tool_use — and every line repeats the *same* `message.usage`, the
+    same `message.id` and the same `requestId`. Counting each line as an API
+    call inflates tokens and cost by the block count: x1.83 measured over 120
+    real session files, 2,560 of 4,298 messages emitting more than one record.
+
+    The blocks of a message are written consecutively, so remembering only the
+    previous id is enough to catch every repeat. That keeps this O(1) per file
+    — which is what lets the live tail hold one of these per open session for
+    the life of the process, and lets a message straddle a read boundary
+    without escaping the check.
+
+    Records with no `message.id` are always counted. Subagent runs carry their
+    own distinct ids and are genuinely separate API calls, so they survive.
+
+    `usage_from_record()` stays stateless and stays the single source of truth
+    for *reading* a line; this is the single source of truth for deciding
+    whether a line is a repeat of the one before it. Both callers use both.
+    """
+
+    __slots__ = ("_last",)
+
+    def __init__(self):
+        self._last = None
+
+    def accept(self, rec):
+        """True if this record is a new message; False if it repeats the last."""
+        if not isinstance(rec, dict):
+            return True
+        message_id = (rec.get("message") or {}).get("id")
+        if message_id is None:
+            return True
+        if message_id == self._last:
+            return False
+        self._last = message_id
+        return True
+
+
 def _blank_day():
     return {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0,
             "cost_usd": 0.0, "active_minutes": 0, "sessions": 0,
@@ -130,6 +173,7 @@ def _state_locked():
 
 def _scan_file(path, tz, days, minutes):
     """Fold one session file into `days` / `minutes`. Streams line by line."""
+    deduper = MessageDeduper()
     try:
         with open(path, "r", errors="replace") as handle:
             for line in handle:
@@ -139,6 +183,8 @@ def _scan_file(path, tz, days, minutes):
                 try:
                     rec = json.loads(line)
                 except (json.JSONDecodeError, UnicodeDecodeError):
+                    continue
+                if not deduper.accept(rec):
                     continue
                 parsed = usage_from_record(rec)
                 if parsed is None:

@@ -117,6 +117,11 @@ def _local_tz():
 
 _lock = threading.Lock()
 _offsets = {}   # filepath -> bytes already consumed
+# filepath -> MessageDeduper, so the several log lines Claude Code writes per
+# assistant message are billed once. It has to outlive a single read: the
+# blocks of one message can straddle a poll boundary. O(1) each, and dropped
+# with the offset when a file is finished, rotated, or gone.
+_dedupers = {}
 # (minute_epoch, model) -> [input, output, cache_read, write_5m, write_1h, cost].
 # Bucketing by minute bounds memory by active minutes rather than by message
 # count, and makes the rollup O(active minutes) instead of O(every message).
@@ -519,8 +524,10 @@ def _event_from(rec, cutoff):
     return (int(t) // 60, model, inp, out, cr, w5, w1, cost)
 
 
-def _read_file(path, from_offset, cutoff):
+def _read_file(path, from_offset, cutoff, deduper=None):
     """Read a jsonl file from a byte offset; return (events, new_offset)."""
+    if deduper is None:
+        deduper = claude_history.MessageDeduper()
     events = []
     try:
         with open(path, "rb") as fh:
@@ -542,6 +549,8 @@ def _read_file(path, from_offset, cutoff):
         try:
             rec = json.loads(line)
         except (json.JSONDecodeError, UnicodeDecodeError):
+            continue
+        if not deduper.accept(rec):
             continue
         ev = _event_from(rec, cutoff)
         if ev:
@@ -568,12 +577,17 @@ def scan():
         # keeps a cold start from parsing hundreds of MB of archived sessions.
         if stat.st_mtime < cutoff:
             _offsets[path] = stat.st_size
+            _dedupers.pop(path, None)
             continue
         if stat.st_size < off:
             off = 0          # truncated or rotated — start over
+            _dedupers.pop(path, None)
         elif stat.st_size == off:
             continue         # nothing appended since last tick
-        evs, new_off = _read_file(path, off, cutoff)
+        deduper = _dedupers.get(path)
+        if deduper is None:
+            deduper = _dedupers[path] = claude_history.MessageDeduper()
+        evs, new_off = _read_file(path, off, cutoff, deduper)
         _offsets[path] = new_off
         fresh.extend(evs)
 
@@ -582,6 +596,7 @@ def scan():
     if len(_offsets) > len(seen):
         for gone in [p for p in _offsets if p not in seen]:
             del _offsets[gone]
+            _dedupers.pop(gone, None)
 
     cutoff_minute = int(cutoff) // 60
     with _lock:
