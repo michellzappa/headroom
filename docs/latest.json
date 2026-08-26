@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "version": "2.0.9",
-  "published": "2026-08-26T12:41:22Z",
-  "url": "https://github.com/michellzappa/headroom/releases/download/v2.0.9/Headroom-macOS.zip",
-  "sha256": "b4517ba358e6914d1e69b03ccbee23c58d0302369ed8b959d3e5ad413ea4f28b",
-  "size": 6214479,
+  "version": "2.1.0",
+  "published": "2026-08-26T18:52:35Z",
+  "url": "https://github.com/michellzappa/headroom/releases/download/v2.1.0/Headroom-macOS.zip",
+  "sha256": "8a54b7570522734bbda66e4407331e048947c511f188836bafed43ac6eff37fe",
+  "size": 6214640,
   "min_macos": "14.0",
-  "notes_md": "### Fixed\n\n- **Claude kept saying Needs sign-in after `claude /login`.** Headroom holds\n  its own copy of the Claude OAuth blob and prefers it over the Keychain, and\n  it drops that copy once the refresh expiry the blob states has passed. A new\n  `/login` does not wait for that date: it rotates the grant, and the replaced\n  copy goes on stating an expiry days out. So the copy still tested as live,\n  the read returned it before it looked at the Keychain, and every refresh came\n  back `invalid_grant` — for as long as the old date said the login was fine.\n  Nothing recovered it, because the one arm that handles a dead grant only\n  cleared the in-memory blob and the next poll re-read the same file. The token\n  endpoint is now the witness: an `invalid_grant` expires Headroom's copy on\n  disk, so the next read falls through to the Keychain, and records the\n  rejected token so the same grant is not imported straight back from there."
+  "notes_md": "### Changed\n\n- **The desk board no longer dims at night.** It followed local solar times\n  and a fixed 22:00 bedtime, and stepped the panel to 30% after sunset and\n  10% after bedtime. It now holds one level all day and all night.\n  `PANEL_BRIGHTNESS` in `firmware/src/config.h` sets that level and replaces\n  the `BRIGHTNESS_*` set. An existing `config.h` keeps building.\n- Agent docs record the rotated-grant trap behind the 2.0.9 fix."
 }
