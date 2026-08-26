@@ -113,6 +113,53 @@ class CredentialSelectionTests(unittest.TestCase):
         self.assertIsNotNone(store)
         self.assertEqual(got["claudeAiOauth"]["accessToken"], "stale")
 
+    def test_rejected_grant_falls_through_even_when_dated_live(self):
+        # The failure this guards: `claude /login` rotates the grant without
+        # moving the expiry the old blob states, so the replaced copy goes on
+        # testing as live and the early return above never reaches the fresh
+        # Keychain item. Only the token endpoint can tell the two apart.
+        self.write_owned(blob(access="stale", refresh="rotated"))
+        oauth_usage._bury_grant("rotated")
+        fresh = blob(access="fresh", refresh="live")
+        with patch.object(oauth_usage, "_read_keychain_blob",
+                          return_value=fresh):
+            store, got = oauth_usage._read_creds_blob()
+        self.assertEqual(got["claudeAiOauth"]["accessToken"], "fresh")
+        self.assertTrue(store.startswith(oauth_usage.HEADROOM_STORE_PREFIX))
+
+    def test_burial_expires_the_copy_on_disk(self):
+        # Memory alone would forget across a KeepAlive respawn, and the
+        # daemon would be pinned again on the next start.
+        self.write_owned(blob(access="stale", refresh="rotated"))
+        oauth_usage._bury_grant("rotated")
+        self.assertIsNone(
+            oauth_usage._live_oauth(json.loads(self.owned.read_text())))
+
+    def test_rejected_grant_is_not_imported_back(self):
+        # The same dead token still sits in the Keychain until the user logs
+        # in. Importing it would undo the expiry just written.
+        self.write_owned(blob(access="stale", refresh="rotated"))
+        oauth_usage._bury_grant("rotated")
+        with patch.object(oauth_usage, "_read_keychain_blob",
+                          return_value=blob(access="same", refresh="rotated")):
+            _store, got = oauth_usage._read_creds_blob()
+        self.assertNotEqual(got["claudeAiOauth"]["accessToken"], "same")
+        self.assertIsNone(
+            oauth_usage._live_oauth(json.loads(self.owned.read_text())))
+
+    def test_invalid_grant_buries_the_token_it_used(self):
+        self.write_owned(blob(access="stale", refresh="rotated"))
+        data = blob(access="stale", refresh="rotated")
+        with patch.object(oauth_usage.http_util, "request_json",
+                          side_effect=http_error(400, {
+                              "error": "invalid_grant",
+                              "error_description": "Refresh token not found",
+                          })):
+            with self.assertRaises(oauth_usage.OAuthLoginRequired):
+                oauth_usage._refresh(
+                    data["claudeAiOauth"], oauth_usage._headroom_store(), data)
+        self.assertIn("rotated", oauth_usage._dead_refresh_tokens())
+
     def test_legacy_blobs_still_selected(self):
         self.write_owned(blob(access="legacy", refresh_in_h=None))
         with patch.object(oauth_usage, "_read_keychain_blob") as read:

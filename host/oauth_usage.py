@@ -80,6 +80,13 @@ _caches = {"": _cache}
 _oauth_mem = {}
 _oauth_lock = threading.Lock()
 
+# Refresh tokens the token endpoint answered `invalid_grant` for, keyed by
+# account. A blob states its own refresh expiry and Claude Code rotates the
+# grant without moving that date, so the date alone cannot tell a live login
+# from a replaced one — only the server can, and this is where it is written
+# down.
+_dead_refresh = {}
+
 # Sticky Keychain refusals, keyed by Claude Code service name. Survives across
 # polls until rearm_keychain(); also mirrored to disk so a KeepAlive respawn
 # does not immediately re-prompt.
@@ -194,6 +201,50 @@ def _invalidate_oauth_mem(account=None):
     key = _account_key(account)
     with _oauth_lock:
         _oauth_mem.pop(key, None)
+
+
+def _dead_refresh_tokens(account=None):
+    key = _account_key(account)
+    with _oauth_lock:
+        return set(_dead_refresh.get(key) or ())
+
+
+def _buried(blob, dead):
+    """True when this blob carries a refresh token the server has rejected."""
+    if not dead:
+        return False
+    o = (blob or {}).get("claudeAiOauth") or {}
+    return o.get("refreshToken") in dead
+
+
+def _bury_grant(refresh, account=None):
+    """Record that the token endpoint rejected this refresh token.
+
+    `_live_oauth` trusts the expiry a blob states, and Claude Code rotates the
+    grant on `claude /login` without moving that date. Headroom's own copy
+    therefore went on testing as live for days after it had been replaced, and
+    `_read_creds_blob` returns that copy before it looks at the Keychain — so
+    the fresh login sat one branch away and nothing ever reached it.
+
+    Expiring the copy on disk is what lets the next read fall through to the
+    import sources. Remembering the token itself is what stops the same dead
+    grant from being imported straight back out of the Keychain.
+    """
+    _invalidate_oauth_mem(account)
+    with _oauth_lock:
+        _dead_refresh.setdefault(_account_key(account), set()).add(refresh)
+    blob = _read_file_blob(_headroom_path(account))
+    oauth = (blob or {}).get("claudeAiOauth")
+    if not isinstance(oauth, dict) or oauth.get("refreshToken") != refresh:
+        return
+    if _refresh_dead(oauth):
+        return
+    oauth["refreshTokenExpiresAt"] = 0
+    try:
+        _write_headroom_blob(account, blob)
+    except OSError as exc:
+        # Read-only home. The in-memory record still keeps this poll honest.
+        print("oauth: could not expire dead grant:", exc)
 
 
 def _oauth_mem_entry(account=None):
@@ -314,10 +365,15 @@ def _read_creds_blob(account=None, allow_keychain=True):
     the daemon to a login it could not renew. `claude /login` wrote a good token
     to the Keychain every time and this function never looked, so the only
     visible symptom was a refresh that failed forever.
+
+    Nor is a store whose refresh token the server has rejected. A stated
+    expiry only catches the grants that ran out; `claude /login` replaces one
+    that has not, and `_bury_grant` is how that answer gets back here.
     """
+    dead = _dead_refresh_tokens(account)
     headroom_path = _headroom_path(account)
     headroom_blob = _read_file_blob(headroom_path)
-    if _live_oauth(headroom_blob):
+    if _live_oauth(headroom_blob) and not _buried(headroom_blob, dead):
         return _headroom_store(account), headroom_blob
 
     refused = None
@@ -352,8 +408,13 @@ def _read_creds_blob(account=None, allow_keychain=True):
     # second pass is the legacy shape — blobs with no stated refresh expiry,
     # where `_live_oauth` and `_oauth_block` agree — so nothing regresses for
     # installs that predate the field.
+    #
+    # A grant the server has already rejected is out of both passes, whichever
+    # store holds it. Importing it again would overwrite the expiry `_refresh`
+    # just wrote and put the daemon back on the login it was pinned to.
+    live = [(s, b) for s, b in candidates if not _buried(b, dead)]
     for usable in (_live_oauth, _oauth_block):
-        for store, blob in candidates:
+        for store, blob in live:
             if usable(blob):
                 # Claim ownership so the daemon need not touch the foreign
                 # item again — until this one expires too, and re-import is
@@ -541,6 +602,7 @@ def _refresh(oauth, store, blob, account=None):
             if kind == "invalid_grant":
                 # Definitive, and true of every host: this grant is gone. The
                 # next URL can only replace a clear answer with a worse one.
+                _bury_grant(refresh, account)
                 raise OAuthLoginRequired(
                     detail or "Claude sign-in expired — run `claude /login`")
             if e.code == 404:
@@ -859,6 +921,7 @@ def reset_for_tests():
     """Drop process-local caches (unit tests only)."""
     with _oauth_lock:
         _oauth_mem.clear()
+        _dead_refresh.clear()
     with _deny_lock:
         _keychain_denied.clear()
     # Includes the failure bookkeeping: leaving it set bleeds one test's
