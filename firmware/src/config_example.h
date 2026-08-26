@@ -41,23 +41,6 @@ static const struct { const char *ssid; const char *pass; } WIFI_NETWORKS[] = {
 #define OTA_HOSTNAME "headroom"
 #define OTA_PASSWORD "change-me"
 
-// ---- Auto brightness (AMOLED) ----
-// Local solar times from lat/lon + a fixed bedtime. Defaults are Amsterdam.
-// Schedule (local clock):
-//   day      → 100% from (sunrise − lead) until evening dim
-//   evening  → ~30% from (sunset + lag) until bedtime
-//   night    → ~10% from bedtime until (sunrise − lead)
-// Winter: sunset is early, so evening can last hours — intentional.
-// Summer: if sunset+lag falls after bedtime, evening is skipped and the
-// panel goes day → night at bedtime (no haywire late-dusk plateau).
-#define BRIGHTNESS_AUTO 1
-#define LATITUDE  52.3676
-#define LONGITUDE 4.9041
-// POSIX TZ for SNTP + localtime. Europe/Amsterdam:
-#define TIMEZONE_POSIX "CET-1CEST,M3.5.0/2,M10.5.0/3"
-#define BRIGHTNESS_DAY          200   // panel units 0–255; boot used this
-#define BRIGHTNESS_EVENING_PCT   30   // percent of DAY
-#define BRIGHTNESS_NIGHT_PCT     10
-#define BRIGHTNESS_BEDTIME_MIN  (22 * 60)  // 22:00 local
-#define BRIGHTNESS_SUNSET_LAG_MIN   30
-#define BRIGHTNESS_SUNRISE_LEAD_MIN 30
+// ---- Panel brightness (AMOLED) ----
+// One level, all day and all night. Panel units 0-255.
+#define PANEL_BRIGHTNESS 200

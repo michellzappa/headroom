@@ -165,26 +165,14 @@ The command is picked up on the board's next normal poll. Omit `provider` to
 use the first selected model's accent. The endpoint is token-authenticated and
 private-network-only.
 
-## Auto brightness
+## Brightness
 
-Follows local solar times from lat/lon (Amsterdam defaults) plus a fixed
-bedtime. Knobs live in `firmware/src/config.h` (see `config_example.h`).
+The panel holds one level, all day and all night. `PANEL_BRIGHTNESS` in
+`firmware/src/config.h` sets it (see `config_example.h`); panel units 0-255,
+default 200.
 
-| Window | Level |
-|---|---|
-| Sunrise − 30 min → evening dim | 100% (`BRIGHTNESS_DAY`, default 200) |
-| Sunset + 30 min → bedtime | ~30% |
-| Bedtime (default 22:00) → sunrise − 30 min | ~10% |
-
-Winter keeps a long evening plateau when dusk is early. If sunset + 30 min
-would land after bedtime (late summer), evening is skipped and the panel goes
-day → night at bedtime — so August does not put a one-minute 30% step after
-lights-out.
-
-Clock from SNTP when Wi‑Fi is up (`TIMEZONE_POSIX`, default Europe/Amsterdam),
-else the host’s `updated` stamp advanced by millis. Override `LATITUDE` /
-`LONGITUDE` / `BRIGHTNESS_BEDTIME_MIN` / the percents, or set
-`BRIGHTNESS_AUTO 0` to freeze at day level.
+There is no night dimming. The board followed solar times and a bedtime up to
+2.0.9 and no longer does.
 
 ## Token
 
@@ -199,6 +187,5 @@ LAN client. Do not paste the iPhone **mobile token**. See
 | **NO HOST** on the panel | The board names the failing half — SSID, address, token, why. `pio device monitor` prints the same plus `curl` checks for the Mac |
 | Flash fights the cable | Host LaunchAgent holds the port — bootout / flash / bootstrap as above, or use `./scripts/flash-esp32.sh` which refuses when busy |
 | Green fringe / black panel | Expander address or bring-up order — see Supported board |
-| Stays bright at night | Wait for SNTP or a successful `/usage` so the clock is known; confirm `BRIGHTNESS_AUTO 1` |
 
 More: [troubleshooting.md](troubleshooting.md).
