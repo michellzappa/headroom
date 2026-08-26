@@ -147,6 +147,43 @@ Two traps that cost real time when the plist does need touching:
   whether the host will start. Anything newer than 3.9 syntax fails at launch,
   not in the tests.
 
+## Provider credentials Headroom owns a copy of
+
+Headroom does not read a provider's credential store on every poll. It imports
+the blob once into `~/.headroom/oauth/`, and `_read_creds_blob` prefers that
+copy over the Keychain from then on. Two failures live in that one decision,
+and both of them shipped: the copy going stale, in 2.0.0, and the copy being
+replaced under it, in every build up to 2.0.8.
+
+**A copy is retired by evidence, not by a date.** Headroom's copy states its
+own `refreshTokenExpiresAt`, and dropping the copy when that date passes
+catches only the grants that ran out. `claude /login` does not wait for the
+date — it rotates the grant, so the copy Headroom holds goes on stating an
+expiry days away while the server has already stopped honouring it. Through
+2.0.8 that pinned the daemon to a replaced login: every refresh came back
+`invalid_grant`, the fresh Keychain item sat one branch away, and the source
+read **Needs sign-in** for as long as the stale date lasted. Only the token
+endpoint can tell a live grant from a rotated one, so `_bury_grant` writes its
+answer down — the copy is expired on disk, and the rejected refresh token is
+remembered so the same grant is not imported straight back out of the Keychain
+that still holds it.
+
+**Clearing memory is not clearing the pin.** The arm that handled a dead grant
+called `_invalidate_oauth_mem()` and said the next poll would re-read. It did
+re-read — the same file, which is what the pin is. Anything that means "try
+the other stores again" has to change what is on disk.
+
+The user-visible shape of this is one source stuck on **Needs sign-in** with an
+age that keeps growing while the provider's own CLI is signed in. Read the
+error before anything else; the host reports what the server said:
+
+```bash
+curl -s localhost:8737/usage | python3 -c 'import json,sys; print([p for p in json.load(sys.stdin)["providers"] if p["id"]=="claude"])'
+```
+
+Do not delete a user's `~/.headroom/oauth/` file to unstick it. That hides the
+bug and takes the reproduction with it.
+
 ## The board
 
 There is one ESP32 on one desk and it takes one owner at a time. Before you
