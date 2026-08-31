@@ -111,11 +111,10 @@ struct HeadroomWidgetConfiguration: WidgetConfigurationIntent {
 
     /// Nil when the tile draws everything it is given.
     ///
-    /// Two paths reach that: the explicit "All providers" choice, and a tile
-    /// placed before this configuration existed, which carries no parameter at
-    /// all. Both drew every provider before and both keep drawing every
-    /// provider — the new single-provider default applies to tiles added from
-    /// here on, and never rewrites one already on a screen.
+    /// Two paths reach that: the explicit "All providers" choice, and a
+    /// configurable tile whose stored parameter is absent. The original
+    /// static tiles do not come through this intent at all; their separate
+    /// compatibility definition always draws every provider.
     var chosenProviderID: String? {
         guard let id = provider?.id,
               id != HeadroomProviderEntity.everyProviderID

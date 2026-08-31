@@ -794,6 +794,21 @@ final class WidgetSnapshotSkewTests: XCTestCase {
             HeadroomWidgetSnapshot.self, from: Data(json.utf8))
     }
 
+    func testWidgetKindsStayDistinctAndStable() {
+        // WidgetKit cannot migrate an already-placed StaticConfiguration to
+        // AppIntentConfiguration. Reusing this identity strands the old tile
+        // on its last snapshot; the configurable widget must be a new kind.
+        XCTAssertEqual(HeadroomWidgetIdentity.legacyKind, "HeadroomWidget")
+        XCTAssertEqual(
+            HeadroomWidgetIdentity.configurableKind,
+            "HeadroomWidget.Configurable"
+        )
+        XCTAssertNotEqual(
+            HeadroomWidgetIdentity.configurableKind,
+            HeadroomWidgetIdentity.legacyKind
+        )
+    }
+
     func testAnEmptyObjectStillDecodes() throws {
         // The floor: whatever a future build adds, the envelope survives.
         let snapshot = try decode("{}")
