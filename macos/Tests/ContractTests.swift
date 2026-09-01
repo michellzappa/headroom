@@ -205,6 +205,27 @@ final class ContractTests: XCTestCase {
         )
     }
 
+    /// Keeps the decoded burndown status wired through the overview instead
+    /// of testing only the copy formatter's Boolean input.
+    func testQuotaOverviewSummariesMapDecodedOverPaceStatus() throws {
+        let json = """
+        {
+          "providers": [{"id": "claude", "title": "Claude", "enabled": true}],
+          "burndown": {"claude": {"week": {
+            "provider": "claude", "pool": "week", "status": "ahead",
+            "window_s": 604800, "delta_pct": -4
+          }}}
+        }
+        """
+        let snapshot = try JSONDecoder().decode(
+            UsageSnapshot.self, from: Data(json.utf8))
+
+        XCTAssertEqual(
+            QuotaOverviewSummary.lines(for: snapshot),
+            ["Claude: over pace. 4% over."]
+        )
+    }
+
     func testEveryProviderMeterResolves() throws {
         let snapshot = try decodeDemo()
         for provider in snapshot.activeQuotaProviders {
