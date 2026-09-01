@@ -151,18 +151,33 @@ struct HeadroomWidgetView: View {
         VStack(alignment: .leading, spacing: 0) {
             if providers.count == 1, let solo = providers.first {
                 HeadroomRings(layers: solo.ringLayers, tint: solo.tint)
-                    .frame(width: 62, height: 62)
-                Spacer(minLength: 8)
+                    .frame(
+                        width: entry.snapshot.isStale ? 46 : 62,
+                        height: entry.snapshot.isStale ? 46 : 62
+                    )
+                Spacer(minLength: entry.snapshot.isStale ? 4 : 8)
                 Text(solo.title)
                     .font(.caption.weight(.semibold))
                     .lineLimit(1)
                 Text(HeadroomCopy.percentUsed(solo.percent))
                     .font(.caption2.monospacedDigit())
                     .foregroundStyle(.secondary)
+                ForEach(solo.widgetResetLabels, id: \.self) { label in
+                    Text(label)
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             } else if providers.isEmpty {
                 emptyLine
             } else {
-                ringRow(diameter: providers.count > 2 ? 38 : 50)
+                ringRow(
+                    diameter: providers.count > 2
+                        ? (entry.snapshot.isStale ? 32 : 38)
+                        : (entry.snapshot.isStale ? 38 : 50),
+                    showsResets: true,
+                    showsPace: false
+                )
             }
             staleNote
         }
@@ -178,8 +193,15 @@ struct HeadroomWidgetView: View {
             VStack(alignment: .leading, spacing: 0) { emptyLine }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         } else if charted.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-                ringRow(diameter: 54)
+            VStack(
+                alignment: .leading,
+                spacing: entry.snapshot.isStale ? 4 : 8
+            ) {
+                ringRow(
+                    diameter: entry.snapshot.isStale ? 40 : 54,
+                    showsResets: false,
+                    showsPace: true
+                )
                 Text(HeadroomCopy.noHistoryYet)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -195,13 +217,21 @@ struct HeadroomWidgetView: View {
         }
     }
 
-    /// One cell per source: its rings, its name, its reading. Used by the small
-    /// family whenever there is more than one source, and by both families when
-    /// there is no history to chart yet.
-    private func ringRow(diameter: CGFloat) -> some View {
-        HStack(alignment: .top, spacing: 12) {
+    /// One cell per source: its rings, its name, and its readings. The small
+    /// family reserves both reset rows; the medium fallback reserves pace,
+    /// matching the chart legend even before history arrives.
+    private func ringRow(
+        diameter: CGFloat,
+        showsResets: Bool,
+        showsPace: Bool
+    ) -> some View {
+        HStack(alignment: .top, spacing: providers.count > 2 ? 4 : 8) {
             ForEach(providers) { provider in
-                VStack(spacing: 5) {
+                VStack(
+                    spacing: entry.snapshot.isStale
+                        ? 2
+                        : (providers.count > 2 ? 3 : 5)
+                ) {
                     HeadroomRings(
                         layers: provider.ringLayers, tint: provider.tint
                     )
@@ -209,14 +239,34 @@ struct HeadroomWidgetView: View {
                     Text(provider.title)
                         .font(.caption2)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.5)
                     Text(HeadroomCopy.percentUsed(provider.percent))
                         .font(.caption2.monospacedDigit())
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
+                    if showsPace {
+                        Text(provider.widgetPaceSlackLabel)
+                            .font(.caption2.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                    }
+                    if showsResets {
+                        ForEach(provider.widgetResetLabels, id: \.self) { label in
+                            Text(label)
+                                .font(.caption2.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.5)
+                        }
+                    }
                 }
+                .frame(
+                    maxWidth: providers.count > 1 ? .infinity : nil,
+                    alignment: .top
+                )
             }
-            Spacer(minLength: 0)
         }
     }
 
@@ -229,20 +279,27 @@ struct HeadroomWidgetView: View {
     /// A source with no line still gets its row: it is one of your sources, and
     /// a widget that quietly drops it reads as a widget that lost it.
     private var legend: some View {
-        HStack(spacing: 10) {
+        HStack(alignment: .top, spacing: 8) {
             ForEach(providers) { provider in
-                HStack(spacing: 4) {
-                    Capsule()
-                        .fill(provider.burndownTint)
-                        .frame(width: 10, height: 2.5)
-                    Text(provider.title)
-                        .font(.caption2)
-                        .lineLimit(1)
+                VStack(alignment: .leading, spacing: 1) {
+                    HStack(spacing: 4) {
+                        Capsule()
+                            .fill(provider.burndownTint)
+                            .frame(width: 10, height: 2.5)
+                        Text(provider.title)
+                            .font(.caption2)
+                            .lineLimit(1)
+                    }
                     Text(HeadroomCopy.percentLeft(100 - provider.percent))
                         .font(.caption2.monospacedDigit())
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                    Text(provider.widgetPaceSlackLabel)
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .layoutPriority(1)
             }
             Spacer(minLength: 0)

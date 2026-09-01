@@ -447,6 +447,18 @@ computes its own top-N. Drag to reorder under Mac Settings → Providers.
 
 Say **top 3** in user-facing copy, not "focus" — that word is API vocabulary.
 
+### Widgets
+
+The medium widget names each provider with both remaining quota and pace:
+**84% left · 11% to spare**. Use **N% over** when the signed pace slack is
+negative. The pace slot is always present; a cache written before that reading
+existed shows **— to spare** rather than dropping the words.
+
+The small widget always gives each provider two reset rows: **5h 1h34m** and
+**Weekly 5d2h**. Widget durations remove internal spaces to fit the tile. A
+missing or older-cache reading keeps the row as **5h —** or **Weekly —**;
+neither reset row is conditional.
+
 ### Menu bar icon
 
 Mac Settings → General → **Menu bar icon** picks the glyph’s reading. Same

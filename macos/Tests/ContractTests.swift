@@ -932,6 +932,178 @@ final class WidgetSnapshotSkewTests: XCTestCase {
         XCTAssertEqual(provider.percent, 0)
     }
 
+    /// The medium widget's pace slot is required. A cache without the new
+    /// field gets an explicit unknown reading rather than losing the label.
+    func testWidgetPaceSlackAlwaysHasAReading() throws {
+        let current = try decode("""
+        {"providers": [
+            {"id": "claude", "title": "Claude", "percent": 16,
+             "paceDeltaPct": 11}
+        ]}
+        """)
+        XCTAssertEqual(
+            current.providers.first?.widgetPaceSlackLabel,
+            "11% to spare"
+        )
+
+        let older = try decode("""
+        {"providers": [
+            {"id": "claude", "title": "Claude", "percent": 16}
+        ]}
+        """)
+        XCTAssertEqual(
+            older.providers.first?.widgetPaceSlackLabel,
+            "— to spare"
+        )
+
+        let over = try decode("""
+        {"providers": [
+            {"id": "codex", "title": "Codex", "percent": 64,
+             "paceDeltaPct": -4}
+        ]}
+        """)
+        XCTAssertEqual(over.providers.first?.widgetPaceSlackLabel, "4% over")
+    }
+
+    /// The small widget reserves both reset rows even when it reads a cache
+    /// written before reset countdowns were added.
+    func testWidgetResetRowsAreAlwaysPresent() throws {
+        let current = try decode("""
+        {"providers": [
+            {"id": "claude", "title": "Claude", "percent": 16,
+             "layers": [
+                {"id": "session", "name": "Session", "percent": 4,
+                 "resetsIn": "1h 34m"},
+                {"id": "week", "name": "Weekly", "percent": 16,
+                 "resetsIn": "5d 2h"}
+             ]}
+        ]}
+        """)
+        XCTAssertEqual(
+            current.providers.first?.widgetResetLabels,
+            ["5h 1h34m", "Weekly 5d2h"]
+        )
+
+        let older = try decode("""
+        {"providers": [
+            {"id": "codex", "title": "Codex", "percent": 9}
+        ]}
+        """)
+        XCTAssertEqual(
+            older.providers.first?.widgetResetLabels,
+            ["5h —", "Weekly —"]
+        )
+    }
+
+    /// The app has to carry the live pool values into the widget cache. The
+    /// presentation fallbacks above must not mask a writer that drops them.
+    func testWidgetCacheCarriesPaceAndResetReadings() throws {
+        let usage = try JSONDecoder().decode(
+            UsageSnapshot.self,
+            from: Data("""
+            {
+              "focus": ["claude"],
+              "providers": [{
+                "id": "claude", "title": "Claude", "enabled": true,
+                "pools": {
+                  "week": {
+                    "title": "Weekly", "rank": 0, "pct": 16,
+                    "pace_pct": 27, "resets_in": "5d 2h", "ring": true
+                  },
+                  "session": {
+                    "title": "Session", "rank": 1, "pct": 4,
+                    "pace_pct": 8, "resets_in": "1h 34m", "ring": true
+                  }
+                }
+              }]
+            }
+            """.utf8)
+        )
+
+        let cached = HeadroomWidgetCache.save(usage)
+        let provider = try XCTUnwrap(cached.providers.first)
+        XCTAssertEqual(provider.paceDeltaPct, 11)
+        XCTAssertEqual(provider.sessionResetsIn, "1h 34m")
+        XCTAssertEqual(provider.weekResetsIn, "5d 2h")
+        XCTAssertEqual(
+            provider.layers?.first { $0.id == "session" }?.resetsIn,
+            "1h 34m"
+        )
+        XCTAssertEqual(
+            provider.layers?.first { $0.id == "week" }?.resetsIn,
+            "5d 2h"
+        )
+    }
+
+    func testWidgetCacheKeepsResetWithoutARingReading() throws {
+        let usage = try JSONDecoder().decode(
+            UsageSnapshot.self,
+            from: Data("""
+            {
+              "focus": ["claude"],
+              "providers": [{
+                "id": "claude", "title": "Claude", "enabled": true,
+                "pools": {
+                  "week": {
+                    "title": "Weekly", "rank": 0, "pct": 16,
+                    "resets_in": "5d 2h", "ring": true
+                  },
+                  "session": {
+                    "title": "Session", "rank": 1, "pct": null,
+                    "resets_in": "1h 34m", "ring": true
+                  }
+                }
+              }]
+            }
+            """.utf8)
+        )
+
+        let provider = try XCTUnwrap(
+            HeadroomWidgetCache.save(usage).providers.first)
+        XCTAssertEqual(
+            provider.widgetResetLabels,
+            ["5h 1h34m", "Weekly 5d2h"]
+        )
+    }
+
+    func testWidgetPaceNeverBorrowsFromAnotherPool() throws {
+        let usage = try JSONDecoder().decode(
+            UsageSnapshot.self,
+            from: Data("""
+            {
+              "focus": ["claude"],
+              "providers": [{
+                "id": "claude", "title": "Claude", "enabled": true,
+                "pools": {
+                  "week": {
+                    "title": "Weekly", "rank": 0, "pct": 20,
+                    "ring": true
+                  },
+                  "session": {
+                    "title": "Session", "rank": 1, "pct": 80,
+                    "ring": true
+                  }
+                }
+              }],
+              "burndown": {
+                "claude": {
+                  "week": {
+                    "provider": "claude", "pool": "week",
+                    "window_s": 604800, "delta_pct": 10
+                  }
+                }
+              }
+            }
+            """.utf8)
+        )
+
+        let provider = try XCTUnwrap(
+            HeadroomWidgetCache.save(usage).providers.first)
+        XCTAssertEqual(provider.percent, 80)
+        XCTAssertNil(provider.paceDeltaPct)
+        XCTAssertEqual(provider.widgetPaceSlackLabel, "— to spare")
+    }
+
     func testAnAbsentBurndownCurveIsEmptyNotAFailure() throws {
         let snapshot = try decode("""
         {"updatedAt": 0, "providers": [
@@ -1064,8 +1236,16 @@ final class WidgetSnapshotSkewTests: XCTestCase {
                     title: "Claude",
                     name: "Claude · Work",
                     percent: 42,
+                    paceDeltaPct: 9,
+                    sessionResetsIn: "2h 3m",
+                    weekResetsIn: "3d 4h",
                     accent: "#D97757",
-                    layers: [.init(id: "week", name: "Week", percent: 42)],
+                    layers: [
+                        .init(
+                            id: "week", name: "Week", percent: 42,
+                            resetsIn: "3d 4h"
+                        ),
+                    ],
                     burndown: .init(
                         actual: [[1, 100], [2, 80]],
                         projected: [[2, 80], [3, 60]])
@@ -1079,7 +1259,11 @@ final class WidgetSnapshotSkewTests: XCTestCase {
         XCTAssertEqual(read.attentionSummary, "one build failed")
         XCTAssertEqual(read.providers.first?.name, "Claude · Work")
         XCTAssertEqual(read.providers.first?.percent, 42)
+        XCTAssertEqual(read.providers.first?.paceDeltaPct, 9)
+        XCTAssertEqual(read.providers.first?.sessionResetsIn, "2h 3m")
+        XCTAssertEqual(read.providers.first?.weekResetsIn, "3d 4h")
         XCTAssertEqual(read.providers.first?.layers?.first?.name, "Week")
+        XCTAssertEqual(read.providers.first?.layers?.first?.resetsIn, "3d 4h")
         XCTAssertEqual(read.providers.first?.burndown?.actual.count, 2)
     }
 }

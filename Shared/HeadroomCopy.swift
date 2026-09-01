@@ -271,6 +271,23 @@ enum HeadroomCopy {
         "\(Int(percent.rounded()))% left"
     }
 
+    /// The medium widget's compact pace reading. The slot is deliberate even
+    /// when an older cache has no pace value: losing the words would make the
+    /// legend jump between layouts and hide that the reading is unavailable.
+    static func widgetPaceSlack(_ deltaPct: Double?) -> String {
+        guard let deltaPct else { return "— to spare" }
+        let rounded = Int(abs(deltaPct).rounded())
+        return deltaPct >= 0 ? "\(rounded)% to spare" : "\(rounded)% over"
+    }
+
+    /// One mandatory small-widget reset row. Host durations are spaced for
+    /// prose (`5d 2h`); the tile removes that internal whitespace (`5d2h`).
+    static func widgetReset(_ title: String, duration: String?) -> String {
+        let compact = duration?.filter { !$0.isWhitespace }
+        let reading = compact.flatMap { $0.isEmpty ? nil : $0 } ?? "—"
+        return "\(title) \(reading)"
+    }
+
     /// "Empty Thu" — the forecast reaches zero before the pool renews.
     ///
     /// The counterpart to `resets(_:)`, and the one that outranks it wherever

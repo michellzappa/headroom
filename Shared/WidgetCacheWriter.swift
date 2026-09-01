@@ -36,10 +36,23 @@ enum HeadroomWidgetCache {
         // Same three the menu bar draws — the host picked them.
         let providers = snapshot.focusProviders()
             .map { provider in
-                let percent = provider.pools?.values
-                    .filter { $0.ring != false }
-                    .compactMap(\.pct)
-                    .max() ?? 0
+                let burndownRings = snapshot.burndownRings(
+                    forProviderID: provider.id
+                )
+                let ringLayers = provider.ringLayers(burndown: burndownRings)
+                let bindingPool = provider.visiblePools
+                    .compactMap { entry -> (id: String, percent: Double, pace: Double?)? in
+                        guard let percent = entry.pool.pct else { return nil }
+                        let sampledPace = burndownRings.first {
+                            $0.pool == entry.id
+                        }?.pacePercent
+                        return (entry.id, percent, sampledPace ?? entry.pool.pacePct)
+                    }
+                    .max { $0.percent < $1.percent }
+                let percent = bindingPool?.percent ?? 0
+                let paceDeltaPct = bindingPool.flatMap { pool in
+                    pool.pace.map { $0 - pool.percent }
+                }
                 return HeadroomWidgetSnapshot.Provider(
                     id: provider.id,
                     title: provider.markTitle,
@@ -48,17 +61,17 @@ enum HeadroomWidgetCache {
                     // ask, and VoiceOver needs the full name there.
                     name: provider.displayTitle,
                     percent: percent,
+                    paceDeltaPct: paceDeltaPct,
+                    sessionResetsIn: provider.pools?["session"]?.resetsIn,
+                    weekResetsIn: provider.pools?["week"]?.resetsIn,
                     accent: provider.accent,
-                    layers: provider.ringLayers(
-                        burndown: snapshot.burndownRings(
-                            forProviderID: provider.id
-                        )
-                    ).map {
+                    layers: ringLayers.map {
                         HeadroomWidgetSnapshot.Provider.Layer(
                             id: $0.id,
                             name: $0.name,
                             percent: $0.percent,
-                            pacePercent: $0.pacePercent
+                            pacePercent: $0.pacePercent,
+                            resetsIn: provider.pools?[$0.id]?.resetsIn
                         )
                     },
                     burndown: series(

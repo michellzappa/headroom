@@ -79,6 +79,9 @@ struct HeadroomWidgetSnapshot: Codable, Sendable {
             var name: String?
             var percent: Double?
             var pacePercent: Double?
+            /// Compact countdown source for the small widget. Optional for
+            /// caches written before reset rows existed.
+            var resetsIn: String?
         }
 
         /// One provider's line on the combined burndown: what is left against
@@ -138,6 +141,15 @@ struct HeadroomWidgetSnapshot: Codable, Sendable {
         /// and `title` is the closest thing it holds.
         var name: String?
         var percent: Double
+        /// Percentage points between this provider's binding quota and its
+        /// ideal pace. Optional so an older cache still decodes; the widget
+        /// presents absence as an explicit unknown reading.
+        var paceDeltaPct: Double?
+        /// Reset countdowns live at provider scope rather than only on ring
+        /// layers: a provider can know when a pool resets before it has a
+        /// percentage worth drawing. Optional for older caches.
+        var sessionResetsIn: String?
+        var weekResetsIn: String?
         var accent: String?
         /// Optional so widgets can still decode a cache written by an older app.
         var layers: [Layer]?
@@ -150,6 +162,9 @@ struct HeadroomWidgetSnapshot: Codable, Sendable {
             title: String,
             name: String? = nil,
             percent: Double = 0,
+            paceDeltaPct: Double? = nil,
+            sessionResetsIn: String? = nil,
+            weekResetsIn: String? = nil,
             accent: String? = nil,
             layers: [Layer]? = nil,
             burndown: Series? = nil
@@ -158,6 +173,9 @@ struct HeadroomWidgetSnapshot: Codable, Sendable {
             self.title = title
             self.name = name
             self.percent = percent
+            self.paceDeltaPct = paceDeltaPct
+            self.sessionResetsIn = sessionResetsIn
+            self.weekResetsIn = weekResetsIn
             self.accent = accent
             self.layers = layers
             self.burndown = burndown
@@ -173,6 +191,12 @@ struct HeadroomWidgetSnapshot: Codable, Sendable {
             name = try row.decodeIfPresent(String.self, forKey: .name)
             percent = try row.decodeIfPresent(
                 Double.self, forKey: .percent) ?? 0
+            paceDeltaPct = try row.decodeIfPresent(
+                Double.self, forKey: .paceDeltaPct)
+            sessionResetsIn = try row.decodeIfPresent(
+                String.self, forKey: .sessionResetsIn)
+            weekResetsIn = try row.decodeIfPresent(
+                String.self, forKey: .weekResetsIn)
             accent = try row.decodeIfPresent(String.self, forKey: .accent)
             layers = try row.decodeLossyArrayIfPresent(
                 Layer.self, forKey: .layers)
@@ -297,15 +321,20 @@ struct HeadroomWidgetSnapshot: Codable, Sendable {
                 title: "Claude",
                 name: "Claude",
                 percent: 42,
+                paceDeltaPct: 11,
+                sessionResetsIn: "1h 34m",
+                weekResetsIn: "5d 2h",
                 accent: "#D97757",
                 layers: [
                     Provider.Layer(
                         id: "session", name: "Session",
-                        percent: 42, pacePercent: 35
+                        percent: 42, pacePercent: 53,
+                        resetsIn: "1h 34m"
                     ),
                     Provider.Layer(
-                        id: "weekly", name: "Weekly",
-                        percent: 28, pacePercent: 31
+                        id: "week", name: "Weekly",
+                        percent: 28, pacePercent: 31,
+                        resetsIn: "5d 2h"
                     ),
                 ],
                 burndown: demoBurndown(remaining: 72, perDay: 16)
@@ -315,15 +344,20 @@ struct HeadroomWidgetSnapshot: Codable, Sendable {
                 title: "Codex",
                 name: "Codex",
                 percent: 28,
+                paceDeltaPct: 7,
+                sessionResetsIn: "2h 18m",
+                weekResetsIn: "5d 13h",
                 accent: "#10A37F",
                 layers: [
                     Provider.Layer(
                         id: "session", name: "Session",
-                        percent: 28, pacePercent: 35
+                        percent: 28, pacePercent: 35,
+                        resetsIn: "2h 18m"
                     ),
                     Provider.Layer(
-                        id: "weekly", name: "Weekly",
-                        percent: 18, pacePercent: 31
+                        id: "week", name: "Weekly",
+                        percent: 18, pacePercent: 31,
+                        resetsIn: "5d 13h"
                     ),
                 ],
                 burndown: demoBurndown(remaining: 82, perDay: 9)
