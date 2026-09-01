@@ -14,6 +14,46 @@ enum HeadroomCopy {
     static let summary = "Summary"
     static let quotas = "Quotas"
     static let codingQuotas = "Coding quotas"
+
+    /// One provider's answer under the overview rings. The reset uses the
+    /// reader's local clock, but stays deliberately compact and English:
+    /// "Claude: on pace. reset Sun 1pm, 11% to spare."
+    static func quotaOverviewSummary(
+        provider: String,
+        overPace: Bool,
+        resetEpoch: Double?,
+        deltaPct: Double?,
+        timeZone: TimeZone = .autoupdatingCurrent
+    ) -> String {
+        let pace = overPace ? "over pace" : "on pace"
+        var details: [String] = []
+
+        if let resetEpoch {
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = timeZone
+            let date = Date(timeIntervalSince1970: resetEpoch)
+            let components = calendar.dateComponents([.weekday, .hour], from: date)
+            if let weekday = components.weekday,
+               let hour = components.hour,
+               (1...7).contains(weekday) {
+                let weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+                let clockHour = (hour + 11) % 12 + 1
+                let meridiem = hour < 12 ? "am" : "pm"
+                details.append("reset \(weekdays[weekday - 1]) \(clockHour)\(meridiem)")
+            }
+        }
+
+        if let deltaPct, abs(deltaPct) >= 1 {
+            let rounded = Int(abs(deltaPct).rounded())
+            details.append(
+                deltaPct > 0 ? "\(rounded)% to spare" : "\(rounded)% over")
+        }
+
+        let answer = "\(provider): \(pace)."
+        guard !details.isEmpty else { return answer }
+        return "\(answer) \(details.joined(separator: ", "))."
+    }
+
     static let activity = "Activity"
     static let services = "Services"
     static let supabase = "Supabase"

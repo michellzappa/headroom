@@ -141,6 +141,70 @@ final class ContractTests: XCTestCase {
         )
     }
 
+    /// Catches the overview falling back to one global burndown headline
+    /// instead of naming each provider's own pace, reset, and slack.
+    func testQuotaOverviewSummariesNameEachProvider() throws {
+        let json = """
+        {
+          "providers": [
+            {"id": "claude", "title": "Claude", "enabled": true,
+             "headline": "week", "pools": {
+               "week": {"title": "Weekly", "pct": 10, "window_s": 604800,
+                        "ring": true}
+             }},
+            {"id": "codex", "title": "Codex", "enabled": true,
+             "headline": "week", "pools": {
+               "week": {"title": "Weekly", "pct": 12, "window_s": 604800,
+                        "ring": true}
+             }}
+          ],
+          "burndown": {
+            "claude": {"week": {
+              "provider": "claude", "pool": "week", "status": "ok",
+              "window_end": 1788094800, "window_s": 604800,
+              "delta_pct": 11
+            }},
+            "codex": {"week": {
+              "provider": "codex", "pool": "week", "status": "ok",
+              "window_end": 1788141600, "window_s": 604800,
+              "delta_pct": 7
+            }}
+          },
+          "burndown_primary": {
+            "provider": "claude", "pool": "week",
+            "headline": "This global line must not be used"
+          }
+        }
+        """
+        let snapshot = try JSONDecoder().decode(
+            UsageSnapshot.self, from: Data(json.utf8))
+
+        XCTAssertEqual(
+            QuotaOverviewSummary.lines(
+                for: snapshot,
+                timeZone: try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+            ),
+            [
+                "Claude: on pace. reset Sun 1pm, 11% to spare.",
+                "Codex: on pace. reset Mon 2am, 7% to spare.",
+            ]
+        )
+    }
+
+    /// A provider burning too quickly must not be described as on pace; the
+    /// signed distance also has to keep its "over" direction.
+    func testQuotaOverviewSummaryNamesOverPace() {
+        XCTAssertEqual(
+            HeadroomCopy.quotaOverviewSummary(
+                provider: "Claude",
+                overPace: true,
+                resetEpoch: nil,
+                deltaPct: -4
+            ),
+            "Claude: over pace. 4% over."
+        )
+    }
+
     func testEveryProviderMeterResolves() throws {
         let snapshot = try decodeDemo()
         for provider in snapshot.activeQuotaProviders {

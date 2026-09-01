@@ -58,6 +58,7 @@ is stated as a noun.
 | Form | Looks like | Where | Field |
 |---|---|---|---|
 | Clock | `Thu 14:00`, `tomorrow 04:18` | `headline`, anywhere with a full line | `_when()` |
+| Quota overview clock | `Sun 1pm` | Per-provider sentence under the macOS rings | `window_end` |
 | Duration | `4d 44m`, `3d` | menu bar, watch, board, `Resets 3d` captions | `resets_in`, `fmt_resets()` |
 
 One sentence gets one form. `58% left · 4d 44m. Out tomorrow 04:18` was two
@@ -65,9 +66,12 @@ time facts in two shapes on one line. The board's `verdict` is the documented
 exception — at ~25 bytes it takes duration form, and each of its branches
 returns only one time fact, so the two never meet.
 
-**Times are 24-hour, English (U.S.), not localized.** Every string is a literal;
-there is no `.strings` catalogue and `host/burndown.py` formats with `%H:%M`.
-That was decided by default rather than on purpose — record it here so the day
+**Host prose times are 24-hour, English (U.S.), not localized.** The macOS
+quota overview is the deliberate exception: its compact provider sentences use
+an unpadded 12-hour clock with lowercase `am` / `pm`, as in `reset Sun 1pm`.
+Every string is a literal; there is no `.strings` catalogue and
+`host/burndown.py` formats with `%H:%M`. The host form was decided by default
+rather than on purpose — record it here so the day
 it changes is a decision and not a surprise.
 
 **Provider names belong to other companies.** Claude, Codex, Cursor, Copilot,

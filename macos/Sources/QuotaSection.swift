@@ -3,6 +3,26 @@ import SwiftUI
 /// The quota half of the popover: the ring overview, the single-provider
 /// detail card, and the attention summary.
 
+enum QuotaOverviewSummary {
+    static func lines(
+        for snapshot: UsageSnapshot,
+        timeZone: TimeZone = .autoupdatingCurrent
+    ) -> [String] {
+        snapshot.codingQuotaProviders.compactMap { provider in
+            guard let burndown = snapshot.overviewBurndown(
+                forProviderID: provider.id
+            ) else { return nil }
+            return HeadroomCopy.quotaOverviewSummary(
+                provider: provider.displayTitle,
+                overPace: burndown.kind != .ok,
+                resetEpoch: burndown.windowEnd,
+                deltaPct: burndown.deltaPct,
+                timeZone: timeZone
+            )
+        }
+    }
+}
+
 struct QuotaOverviewCard: View {
     let snapshot: UsageSnapshot
     /// Tapping a ring jumps to that provider's detail tab.
@@ -77,11 +97,16 @@ struct QuotaOverviewCard: View {
                 }
                 .measuredWidth($rowWidth)
             }
-            if let primary = snapshot.burndownPrimary, let headline = primary.headline {
-                Text(headline)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+            let summaries = QuotaOverviewSummary.lines(for: snapshot)
+            if !summaries.isEmpty {
+                VStack(alignment: .leading, spacing: 3) {
+                    ForEach(Array(summaries.enumerated()), id: \.offset) { _, summary in
+                        Text(summary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
         }
         .cardStyle()
