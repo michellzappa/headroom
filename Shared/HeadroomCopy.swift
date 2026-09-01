@@ -296,10 +296,21 @@ enum HeadroomCopy {
 
     /// One mandatory small-widget reset row. Host durations are spaced for
     /// prose (`5d 2h`); the tile removes that internal whitespace (`5d2h`).
-    static func widgetReset(_ title: String, duration: String?) -> String {
+    static func widgetReset(
+        _ title: String,
+        duration: String?,
+        resetEpoch: Double? = nil,
+        timeZone: TimeZone = .autoupdatingCurrent
+    ) -> String {
         let compact = duration?.filter { !$0.isWhitespace }
         let reading = compact.flatMap { $0.isEmpty ? nil : $0 } ?? "—"
-        return "\(title) \(reading)"
+        var answer = "\(title): \(reading)"
+        if let clock = quotaOverviewClock(
+            resetEpoch: resetEpoch, timeZone: timeZone
+        ) {
+            answer += ", \(clock)"
+        }
+        return answer
     }
 
     /// "Empty Thu" — the forecast reaches zero before the pool renews.

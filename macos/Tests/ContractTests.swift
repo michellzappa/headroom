@@ -971,6 +971,7 @@ final class WidgetSnapshotSkewTests: XCTestCase {
         let current = try decode("""
         {"providers": [
             {"id": "claude", "title": "Claude", "percent": 16,
+             "weekResetsAt": 1788094800,
              "layers": [
                 {"id": "session", "name": "Session", "percent": 4,
                  "resetsIn": "1h 34m"},
@@ -980,8 +981,10 @@ final class WidgetSnapshotSkewTests: XCTestCase {
         ]}
         """)
         XCTAssertEqual(
-            current.providers.first?.widgetResetLabels,
-            ["5h 1h34m", "Weekly 5d2h"]
+            current.providers.first?.widgetResetLabels(
+                in: try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+            ),
+            ["5h: 1h34m", "1w: 5d2h, Sun 1pm"]
         )
 
         let older = try decode("""
@@ -991,7 +994,7 @@ final class WidgetSnapshotSkewTests: XCTestCase {
         """)
         XCTAssertEqual(
             older.providers.first?.widgetResetLabels,
-            ["5h —", "Weekly —"]
+            ["5h: —", "1w: —"]
         )
     }
 
@@ -1015,7 +1018,15 @@ final class WidgetSnapshotSkewTests: XCTestCase {
                     "pace_pct": 8, "resets_in": "1h 34m", "ring": true
                   }
                 }
-              }]
+              }],
+              "burndown": {
+                "claude": {
+                  "week": {
+                    "provider": "claude", "pool": "week",
+                    "window_end": 1788094800, "window_s": 604800
+                  }
+                }
+              }
             }
             """.utf8)
         )
@@ -1025,6 +1036,7 @@ final class WidgetSnapshotSkewTests: XCTestCase {
         XCTAssertEqual(provider.paceDeltaPct, 11)
         XCTAssertEqual(provider.sessionResetsIn, "1h 34m")
         XCTAssertEqual(provider.weekResetsIn, "5d 2h")
+        XCTAssertEqual(provider.weekResetsAt, 1788094800)
         XCTAssertEqual(
             provider.layers?.first { $0.id == "session" }?.resetsIn,
             "1h 34m"
@@ -1062,7 +1074,7 @@ final class WidgetSnapshotSkewTests: XCTestCase {
             HeadroomWidgetCache.save(usage).providers.first)
         XCTAssertEqual(
             provider.widgetResetLabels,
-            ["5h 1h34m", "Weekly 5d2h"]
+            ["5h: 1h34m", "1w: 5d2h"]
         )
     }
 

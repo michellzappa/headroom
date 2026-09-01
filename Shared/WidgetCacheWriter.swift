@@ -64,6 +64,9 @@ enum HeadroomWidgetCache {
                     paceDeltaPct: paceDeltaPct,
                     sessionResetsIn: provider.pools?["session"]?.resetsIn,
                     weekResetsIn: provider.pools?["week"]?.resetsIn,
+                    weekResetsAt: burndownRings.first {
+                        $0.pool == "week"
+                    }?.windowEnd,
                     accent: provider.accent,
                     layers: ringLayers.map {
                         HeadroomWidgetSnapshot.Provider.Layer(

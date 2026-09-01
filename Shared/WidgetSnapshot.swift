@@ -150,6 +150,9 @@ struct HeadroomWidgetSnapshot: Codable, Sendable {
         /// percentage worth drawing. Optional for older caches.
         var sessionResetsIn: String?
         var weekResetsIn: String?
+        /// Absolute weekly reset for the small widget's local weekday/clock.
+        /// Optional so caches written before the clock was added still decode.
+        var weekResetsAt: Double?
         var accent: String?
         /// Optional so widgets can still decode a cache written by an older app.
         var layers: [Layer]?
@@ -165,6 +168,7 @@ struct HeadroomWidgetSnapshot: Codable, Sendable {
             paceDeltaPct: Double? = nil,
             sessionResetsIn: String? = nil,
             weekResetsIn: String? = nil,
+            weekResetsAt: Double? = nil,
             accent: String? = nil,
             layers: [Layer]? = nil,
             burndown: Series? = nil
@@ -176,6 +180,7 @@ struct HeadroomWidgetSnapshot: Codable, Sendable {
             self.paceDeltaPct = paceDeltaPct
             self.sessionResetsIn = sessionResetsIn
             self.weekResetsIn = weekResetsIn
+            self.weekResetsAt = weekResetsAt
             self.accent = accent
             self.layers = layers
             self.burndown = burndown
@@ -197,6 +202,8 @@ struct HeadroomWidgetSnapshot: Codable, Sendable {
                 String.self, forKey: .sessionResetsIn)
             weekResetsIn = try row.decodeIfPresent(
                 String.self, forKey: .weekResetsIn)
+            weekResetsAt = try row.decodeIfPresent(
+                Double.self, forKey: .weekResetsAt)
             accent = try row.decodeIfPresent(String.self, forKey: .accent)
             layers = try row.decodeLossyArrayIfPresent(
                 Layer.self, forKey: .layers)
@@ -324,6 +331,9 @@ struct HeadroomWidgetSnapshot: Codable, Sendable {
                 paceDeltaPct: 11,
                 sessionResetsIn: "1h 34m",
                 weekResetsIn: "5d 2h",
+                weekResetsAt: Date.now.addingTimeInterval(
+                    5 * 24 * 60 * 60 + 2 * 60 * 60
+                ).timeIntervalSince1970,
                 accent: "#D97757",
                 layers: [
                     Provider.Layer(
@@ -347,6 +357,9 @@ struct HeadroomWidgetSnapshot: Codable, Sendable {
                 paceDeltaPct: 7,
                 sessionResetsIn: "2h 18m",
                 weekResetsIn: "5d 13h",
+                weekResetsAt: Date.now.addingTimeInterval(
+                    5 * 24 * 60 * 60 + 13 * 60 * 60
+                ).timeIntervalSince1970,
                 accent: "#10A37F",
                 layers: [
                     Provider.Layer(

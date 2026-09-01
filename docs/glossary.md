@@ -460,10 +460,11 @@ The medium widget names each provider with both remaining quota and pace:
 negative. The pace slot is always present; a cache written before that reading
 existed shows **— to spare** rather than dropping the words.
 
-The small widget always gives each provider two reset rows: **5h 1h34m** and
-**Weekly 5d2h**. Widget durations remove internal spaces to fit the tile. A
-missing or older-cache reading keeps the row as **5h —** or **Weekly —**;
-neither reset row is conditional.
+The small widget always gives each provider two reset rows: **5h: 1h34m** and
+**1w: 5d2h, Sun 1pm**. Widget durations remove internal spaces to fit the tile;
+the weekly row adds the reset weekday and local hour when the cache carries
+that instant. A missing or older-cache reading keeps the row as **5h: —** or
+**1w: —**; neither reset row is conditional.
 
 ### Menu bar icon
 

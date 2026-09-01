@@ -37,7 +37,7 @@ extension HeadroomWidgetSnapshot.Provider {
 
     /// Both rows are structural in the small widget. Missing layers and
     /// older caches keep their labels and show an explicit unknown countdown.
-    var widgetResetLabels: [String] {
+    func widgetResetLabels(in timeZone: TimeZone) -> [String] {
         // The layer fallback reads the first cache shape used while this field
         // was introduced; current writers keep resets independently of rings.
         let sessionReset = sessionResetsIn
@@ -46,8 +46,17 @@ extension HeadroomWidgetSnapshot.Provider {
             ?? layers?.first { $0.id == "week" }?.resetsIn
         return [
             HeadroomCopy.widgetReset("5h", duration: sessionReset),
-            HeadroomCopy.widgetReset("Weekly", duration: weeklyReset),
+            HeadroomCopy.widgetReset(
+                "1w",
+                duration: weeklyReset,
+                resetEpoch: weekResetsAt,
+                timeZone: timeZone
+            ),
         ]
+    }
+
+    var widgetResetLabels: [String] {
+        widgetResetLabels(in: .autoupdatingCurrent)
     }
 
     var ringLayers: [HeadroomRingLayer] {
