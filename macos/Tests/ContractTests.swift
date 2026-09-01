@@ -187,8 +187,8 @@ final class ContractTests: XCTestCase {
         XCTAssertEqual(
             columns.map { [$0.resetLine ?? "", $0.paceLine] },
             [
-                ["Reset: 5d1h, Sun 1pm.", "11% to Spare"],
-                ["Reset: 5d10h, Mon 2am.", "7% to Spare"],
+                ["Reset: 5d1h, Sun 1pm.", "11% to spare"],
+                ["Reset: 5d10h, Mon 2am.", "7% to spare"],
             ]
         )
     }
@@ -201,7 +201,7 @@ final class ContractTests: XCTestCase {
                 overPace: true,
                 deltaPct: -4
             ),
-            "4% Over"
+            "4% over"
         )
     }
 
@@ -222,7 +222,7 @@ final class ContractTests: XCTestCase {
 
         XCTAssertEqual(
             QuotaOverviewSummary.columns(for: snapshot).first?.paceLine,
-            "4% Over"
+            "4% over"
         )
     }
 

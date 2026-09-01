@@ -36,7 +36,7 @@ enum HeadroomCopy {
         return "Reset: \(readings.joined(separator: ", "))."
     }
 
-    /// "11% to Spare" / "4% Over" — standalone ring-column slack. When a
+    /// "11% to spare" / "4% over" — standalone ring-column slack. When a
     /// fit has no signed distance yet, retain the pace state without a number.
     static func quotaOverviewSlack(
         overPace: Bool,
@@ -46,7 +46,7 @@ enum HeadroomCopy {
             return overPace ? "Over Pace" : "On Pace"
         }
         let rounded = Int(abs(deltaPct).rounded())
-        return deltaPct > 0 ? "\(rounded)% to Spare" : "\(rounded)% Over"
+        return deltaPct > 0 ? "\(rounded)% to spare" : "\(rounded)% over"
     }
 
     private static func quotaOverviewClock(
