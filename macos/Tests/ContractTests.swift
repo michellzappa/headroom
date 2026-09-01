@@ -141,21 +141,21 @@ final class ContractTests: XCTestCase {
         )
     }
 
-    /// Catches the overview falling back to one global burndown headline
-    /// instead of naming each provider's own pace, reset, and slack.
-    func testQuotaOverviewSummariesNameEachProvider() throws {
+    /// Catches the overview falling back to detached provider sentences
+    /// instead of the two captions that belong under each provider's ring.
+    func testQuotaOverviewColumnsCarryEachProvidersResetAndPace() throws {
         let json = """
         {
           "providers": [
             {"id": "claude", "title": "Claude", "enabled": true,
              "headline": "week", "pools": {
                "week": {"title": "Weekly", "pct": 10, "window_s": 604800,
-                        "ring": true}
+                        "resets_in": "5d 1h", "ring": true}
              }},
             {"id": "codex", "title": "Codex", "enabled": true,
              "headline": "week", "pools": {
                "week": {"title": "Weekly", "pct": 12, "window_s": 604800,
-                        "ring": true}
+                        "resets_in": "5d 10h", "ring": true}
              }}
           ],
           "burndown": {
@@ -179,14 +179,16 @@ final class ContractTests: XCTestCase {
         let snapshot = try JSONDecoder().decode(
             UsageSnapshot.self, from: Data(json.utf8))
 
+        let columns = QuotaOverviewSummary.columns(
+            for: snapshot,
+            timeZone: try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        )
+        XCTAssertEqual(columns.map(\.providerID), ["claude", "codex"])
         XCTAssertEqual(
-            QuotaOverviewSummary.lines(
-                for: snapshot,
-                timeZone: try XCTUnwrap(TimeZone(secondsFromGMT: 0))
-            ),
+            columns.map { [$0.resetLine ?? "", $0.paceLine] },
             [
-                "Claude: on pace. reset Sun 1pm, 11% to spare.",
-                "Codex: on pace. reset Mon 2am, 7% to spare.",
+                ["Reset: 5d1h, Sun 1pm.", "11% to Spare"],
+                ["Reset: 5d10h, Mon 2am.", "7% to Spare"],
             ]
         )
     }
@@ -195,13 +197,11 @@ final class ContractTests: XCTestCase {
     /// signed distance also has to keep its "over" direction.
     func testQuotaOverviewSummaryNamesOverPace() {
         XCTAssertEqual(
-            HeadroomCopy.quotaOverviewSummary(
-                provider: "Claude",
+            HeadroomCopy.quotaOverviewSlack(
                 overPace: true,
-                resetEpoch: nil,
                 deltaPct: -4
             ),
-            "Claude: over pace. 4% over."
+            "4% Over"
         )
     }
 
@@ -221,8 +221,8 @@ final class ContractTests: XCTestCase {
             UsageSnapshot.self, from: Data(json.utf8))
 
         XCTAssertEqual(
-            QuotaOverviewSummary.lines(for: snapshot),
-            ["Claude: over pace. 4% over."]
+            QuotaOverviewSummary.columns(for: snapshot).first?.paceLine,
+            "4% Over"
         )
     }
 

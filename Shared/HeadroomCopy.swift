@@ -15,43 +15,57 @@ enum HeadroomCopy {
     static let quotas = "Quotas"
     static let codingQuotas = "Coding quotas"
 
-    /// One provider's answer under the overview rings. The reset uses the
-    /// reader's local clock, but stays deliberately compact and English:
-    /// "Claude: on pace. reset Sun 1pm, 11% to spare."
-    static func quotaOverviewSummary(
-        provider: String,
-        overPace: Bool,
+    /// "Reset: 5d1h, Sun 1pm." — the two reset readings already available
+    /// to the overview, combined into the caption directly below one ring.
+    static func quotaOverviewReset(
+        duration: String?,
         resetEpoch: Double?,
-        deltaPct: Double?,
         timeZone: TimeZone = .autoupdatingCurrent
+    ) -> String? {
+        var readings: [String] = []
+        if let compact = duration?.filter({ !$0.isWhitespace }),
+           !compact.isEmpty {
+            readings.append(compact)
+        }
+        if let clock = quotaOverviewClock(
+            resetEpoch: resetEpoch, timeZone: timeZone
+        ) {
+            readings.append(clock)
+        }
+        guard !readings.isEmpty else { return nil }
+        return "Reset: \(readings.joined(separator: ", "))."
+    }
+
+    /// "11% to Spare" / "4% Over" — standalone ring-column slack. When a
+    /// fit has no signed distance yet, retain the pace state without a number.
+    static func quotaOverviewSlack(
+        overPace: Bool,
+        deltaPct: Double?
     ) -> String {
-        let pace = overPace ? "over pace" : "on pace"
-        var details: [String] = []
-
-        if let resetEpoch {
-            var calendar = Calendar(identifier: .gregorian)
-            calendar.timeZone = timeZone
-            let date = Date(timeIntervalSince1970: resetEpoch)
-            let components = calendar.dateComponents([.weekday, .hour], from: date)
-            if let weekday = components.weekday,
-               let hour = components.hour,
-               (1...7).contains(weekday) {
-                let weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-                let clockHour = (hour + 11) % 12 + 1
-                let meridiem = hour < 12 ? "am" : "pm"
-                details.append("reset \(weekdays[weekday - 1]) \(clockHour)\(meridiem)")
-            }
+        guard let deltaPct, abs(deltaPct) >= 1 else {
+            return overPace ? "Over Pace" : "On Pace"
         }
+        let rounded = Int(abs(deltaPct).rounded())
+        return deltaPct > 0 ? "\(rounded)% to Spare" : "\(rounded)% Over"
+    }
 
-        if let deltaPct, abs(deltaPct) >= 1 {
-            let rounded = Int(abs(deltaPct).rounded())
-            details.append(
-                deltaPct > 0 ? "\(rounded)% to spare" : "\(rounded)% over")
-        }
-
-        let answer = "\(provider): \(pace)."
-        guard !details.isEmpty else { return answer }
-        return "\(answer) \(details.joined(separator: ", "))."
+    private static func quotaOverviewClock(
+        resetEpoch: Double?,
+        timeZone: TimeZone
+    ) -> String? {
+        guard let resetEpoch else { return nil }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let date = Date(timeIntervalSince1970: resetEpoch)
+        let components = calendar.dateComponents([.weekday, .hour], from: date)
+        guard let weekday = components.weekday,
+              let hour = components.hour,
+              (1...7).contains(weekday)
+        else { return nil }
+        let weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+        let clockHour = (hour + 11) % 12 + 1
+        let meridiem = hour < 12 ? "am" : "pm"
+        return "\(weekdays[weekday - 1]) \(clockHour)\(meridiem)"
     }
 
     static let activity = "Activity"
