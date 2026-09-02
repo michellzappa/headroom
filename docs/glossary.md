@@ -455,16 +455,18 @@ Say **top 3** in user-facing copy, not "focus" — that word is API vocabulary.
 
 ### Widgets
 
-The medium widget names each provider with both remaining quota and pace:
-**84% left · 11% to spare**. Use **N% over** when the signed pace slack is
-negative. The pace slot is always present; a cache written before that reading
-existed shows **— to spare** rather than dropping the words.
+The Mac medium widget gives each provider one line with identity, remaining
+quota and pace: **Claude: 89% left, 33% spare**. Use **N% over** when the signed
+pace slack is negative. The pace slot is always present; a cache written before
+that reading existed shows **— spare** rather than dropping the words. It never
+adds a separate **N% used** line.
 
-The small widget always gives each provider two reset rows: **5h: 1h34m** and
-**1w: 5d2h, Sun 1pm**. Widget durations remove internal spaces to fit the tile;
-the weekly row adds the reset weekday and local hour when the cache carries
-that instant. A missing or older-cache reading keeps the row as **5h: —** or
-**1w: —**; neither reset row is conditional.
+The Mac small widget gives Claude one reset row: **5h: 1h34m**. Codex gets no
+reset rows; its rings and percent are enough for this surface. Other providers
+keep the original **5h** and **1w** rows. Widget durations remove internal
+spaces to fit the tile, and a missing Claude reading stays visible as
+**5h: —**. These density exceptions are Mac-only; the iPhone widget keeps the
+shared two-row reset and three-row medium presentations.
 
 ### Menu bar icon
 

@@ -35,8 +35,35 @@ extension HeadroomWidgetSnapshot.Provider {
         HeadroomCopy.widgetPaceSlack(paceDeltaPct)
     }
 
-    /// Both rows are structural in the small widget. Missing layers and
-    /// older caches keep their labels and show an explicit unknown countdown.
+    #if os(macOS)
+    /// The Mac medium widget's only text row for this provider. Keeping
+    /// identity, quota and pace together buys the chart the height separate
+    /// rows spent without changing the iPhone widget's established layout.
+    var macWidgetMediumSummaryLabel: String {
+        let remaining = HeadroomCopy.percentLeft(100 - percent)
+        let pace = HeadroomCopy.macWidgetPaceSlack(paceDeltaPct)
+        return "\(title): \(remaining), \(pace)"
+    }
+
+    /// Mac small widgets only spend height on provider-specific reset clocks.
+    /// The shared pair remains intact for the iPhone widget and watch cache.
+    func macWidgetResetLabels(in timeZone: TimeZone) -> [String] {
+        let labels = widgetResetLabels(in: timeZone)
+        let baseID = id.split(separator: ":", maxSplits: 1)
+            .first.map(String.init)
+        if baseID == "claude" { return Array(labels.prefix(1)) }
+        if baseID == "codex" { return [] }
+        return labels
+    }
+
+    var macWidgetResetLabels: [String] {
+        macWidgetResetLabels(in: .autoupdatingCurrent)
+    }
+    #endif
+
+    /// Both rows are structural in the shared small-widget presentation.
+    /// Missing layers and older caches keep their labels and show an explicit
+    /// unknown countdown.
     func widgetResetLabels(in timeZone: TimeZone) -> [String] {
         // The layer fallback reads the first cache shape used while this field
         // was introduced; current writers keep resets independently of rings.

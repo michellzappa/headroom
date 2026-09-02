@@ -294,6 +294,15 @@ enum HeadroomCopy {
         return deltaPct >= 0 ? "\(rounded)% to spare" : "\(rounded)% over"
     }
 
+    #if os(macOS)
+    /// The Mac widget saves one word inside its single-line provider summary.
+    static func macWidgetPaceSlack(_ deltaPct: Double?) -> String {
+        guard let deltaPct else { return "— spare" }
+        let rounded = Int(abs(deltaPct).rounded())
+        return deltaPct >= 0 ? "\(rounded)% spare" : "\(rounded)% over"
+    }
+    #endif
+
     /// One mandatory small-widget reset row. Host durations are spaced for
     /// prose (`5d 2h`); the tile removes that internal whitespace (`5d2h`).
     static func widgetReset(

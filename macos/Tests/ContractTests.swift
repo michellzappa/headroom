@@ -932,45 +932,54 @@ final class WidgetSnapshotSkewTests: XCTestCase {
         XCTAssertEqual(provider.percent, 0)
     }
 
-    /// The medium widget's pace slot is required. A cache without the new
-    /// field gets an explicit unknown reading rather than losing the label.
-    func testWidgetPaceSlackAlwaysHasAReading() throws {
+    /// The medium widget spends one line per provider on the complete reading,
+    /// leaving the rest of the tile to the graph. A cache without pace still
+    /// keeps that one-line shape and says which part is unknown.
+    func testMacMediumWidgetUsesOneProviderSummaryLine() throws {
         let current = try decode("""
         {"providers": [
-            {"id": "claude", "title": "Claude", "percent": 16,
-             "paceDeltaPct": 11}
+            {"id": "claude", "title": "Claude", "percent": 11,
+             "paceDeltaPct": 33}
         ]}
         """)
         XCTAssertEqual(
             current.providers.first?.widgetPaceSlackLabel,
-            "11% to spare"
+            "33% to spare",
+            "shared iPhone/watch presentation stays unchanged"
+        )
+        XCTAssertEqual(
+            current.providers.first?.macWidgetMediumSummaryLabel,
+            "Claude: 89% left, 33% spare"
         )
 
         let older = try decode("""
         {"providers": [
-            {"id": "claude", "title": "Claude", "percent": 16}
+            {"id": "claude", "title": "Claude", "percent": 11}
         ]}
         """)
         XCTAssertEqual(
-            older.providers.first?.widgetPaceSlackLabel,
-            "— to spare"
+            older.providers.first?.macWidgetMediumSummaryLabel,
+            "Claude: 89% left, — spare"
         )
 
         let over = try decode("""
         {"providers": [
-            {"id": "codex", "title": "Codex", "percent": 64,
+            {"id": "codex", "title": "Codex", "percent": 14,
              "paceDeltaPct": -4}
         ]}
         """)
-        XCTAssertEqual(over.providers.first?.widgetPaceSlackLabel, "4% over")
+        XCTAssertEqual(
+            over.providers.first?.macWidgetMediumSummaryLabel,
+            "Codex: 86% left, 4% over"
+        )
     }
 
-    /// The small widget reserves both reset rows even when it reads a cache
-    /// written before reset countdowns were added.
-    func testWidgetResetRowsAreAlwaysPresent() throws {
-        let current = try decode("""
+    /// The small widget only spends reset rows on readings useful for that
+    /// provider: Claude gets its five-hour clock and Codex gets neither.
+    func testMacSmallWidgetUsesProviderSpecificResetRows() throws {
+        let claude = try decode("""
         {"providers": [
-            {"id": "claude", "title": "Claude", "percent": 16,
+            {"id": "claude:work", "title": "Work", "percent": 16,
              "weekResetsAt": 1788094800,
              "layers": [
                 {"id": "session", "name": "Session", "percent": 4,
@@ -981,19 +990,40 @@ final class WidgetSnapshotSkewTests: XCTestCase {
         ]}
         """)
         XCTAssertEqual(
-            current.providers.first?.widgetResetLabels(
+            claude.providers.first?.widgetResetLabels(
                 in: try XCTUnwrap(TimeZone(secondsFromGMT: 0))
             ),
-            ["5h: 1h34m", "1w: 5d2h, Sun 1pm"]
+            ["5h: 1h34m", "1w: 5d2h, Sun 1pm"],
+            "shared iPhone/watch presentation stays unchanged"
+        )
+        XCTAssertEqual(
+            claude.providers.first?.macWidgetResetLabels(
+                in: try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+            ),
+            ["5h: 1h34m"]
         )
 
-        let older = try decode("""
+        let codex = try decode("""
         {"providers": [
-            {"id": "codex", "title": "Codex", "percent": 9}
+            {"id": "codex:team", "title": "Team", "percent": 9,
+             "sessionResetsIn": "2h 54m", "weekResetsIn": "4d 13h"}
         ]}
         """)
         XCTAssertEqual(
-            older.providers.first?.widgetResetLabels,
+            codex.providers.first?.widgetResetLabels,
+            ["5h: 2h54m", "1w: 4d13h"],
+            "shared iPhone/watch presentation stays unchanged"
+        )
+        XCTAssertEqual(codex.providers.first?.macWidgetResetLabels, [])
+
+        // Providers not named by this density rule keep their existing rows.
+        let other = try decode("""
+        {"providers": [
+            {"id": "cursor", "title": "Cursor", "percent": 9}
+        ]}
+        """)
+        XCTAssertEqual(
+            other.providers.first?.macWidgetResetLabels,
             ["5h: —", "1w: —"]
         )
     }
@@ -1114,6 +1144,10 @@ final class WidgetSnapshotSkewTests: XCTestCase {
         XCTAssertEqual(provider.percent, 80)
         XCTAssertNil(provider.paceDeltaPct)
         XCTAssertEqual(provider.widgetPaceSlackLabel, "— to spare")
+        XCTAssertEqual(
+            provider.macWidgetMediumSummaryLabel,
+            "Claude: 20% left, — spare"
+        )
     }
 
     func testAnAbsentBurndownCurveIsEmptyNotAFailure() throws {

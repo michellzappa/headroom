@@ -162,7 +162,7 @@ struct HeadroomWidgetView: View {
                 Text(HeadroomCopy.percentUsed(solo.percent))
                     .font(.caption2.monospacedDigit())
                     .foregroundStyle(.secondary)
-                ForEach(solo.widgetResetLabels, id: \.self) { label in
+                ForEach(smallResetLabels(for: solo), id: \.self) { label in
                     Text(label)
                         .font(.caption2.monospacedDigit())
                         .foregroundStyle(.secondary)
@@ -175,8 +175,7 @@ struct HeadroomWidgetView: View {
                     diameter: providers.count > 2
                         ? (entry.snapshot.isStale ? 32 : 38)
                         : (entry.snapshot.isStale ? 38 : 50),
-                    showsResets: true,
-                    showsPace: false
+                    showsMediumSummary: false
                 )
             }
             staleNote
@@ -199,8 +198,7 @@ struct HeadroomWidgetView: View {
             ) {
                 ringRow(
                     diameter: entry.snapshot.isStale ? 40 : 54,
-                    showsResets: false,
-                    showsPace: true
+                    showsMediumSummary: true
                 )
                 Text(HeadroomCopy.noHistoryYet)
                     .font(.caption2)
@@ -217,13 +215,12 @@ struct HeadroomWidgetView: View {
         }
     }
 
-    /// One cell per source: its rings, its name, and its readings. The small
-    /// family reserves both reset rows; the medium fallback reserves pace,
-    /// matching the chart legend even before history arrives.
+    /// One cell per source. Small widgets name the source and keep only its
+    /// useful reset clocks; medium fallbacks put the entire reading on one
+    /// line, matching the chart legend even before history arrives.
     private func ringRow(
         diameter: CGFloat,
-        showsResets: Bool,
-        showsPace: Bool
+        showsMediumSummary: Bool
     ) -> some View {
         HStack(alignment: .top, spacing: providers.count > 2 ? 4 : 8) {
             ForEach(providers) { provider in
@@ -236,6 +233,34 @@ struct HeadroomWidgetView: View {
                         layers: provider.ringLayers, tint: provider.tint
                     )
                     .frame(width: diameter, height: diameter)
+                    #if os(macOS)
+                    if showsMediumSummary {
+                        Text(provider.macWidgetMediumSummaryLabel)
+                            .font(.caption2.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
+                    } else {
+                        Text(provider.title)
+                            .font(.caption2)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
+                        Text(HeadroomCopy.percentUsed(provider.percent))
+                            .font(.caption2.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                        ForEach(
+                            provider.macWidgetResetLabels, id: \.self
+                        ) { label in
+                            Text(label)
+                                .font(.caption2.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.5)
+                        }
+                    }
+                    #else
                     Text(provider.title)
                         .font(.caption2)
                         .lineLimit(1)
@@ -245,14 +270,13 @@ struct HeadroomWidgetView: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
-                    if showsPace {
+                    if showsMediumSummary {
                         Text(provider.widgetPaceSlackLabel)
                             .font(.caption2.monospacedDigit())
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                             .minimumScaleFactor(0.6)
-                    }
-                    if showsResets {
+                    } else {
                         ForEach(provider.widgetResetLabels, id: \.self) { label in
                             Text(label)
                                 .font(.caption2.monospacedDigit())
@@ -261,6 +285,7 @@ struct HeadroomWidgetView: View {
                                 .minimumScaleFactor(0.5)
                         }
                     }
+                    #endif
                 }
                 .frame(
                     maxWidth: providers.count > 1 ? .infinity : nil,
@@ -281,6 +306,19 @@ struct HeadroomWidgetView: View {
     private var legend: some View {
         HStack(alignment: .top, spacing: 8) {
             ForEach(providers) { provider in
+                Group {
+                #if os(macOS)
+                HStack(spacing: 4) {
+                    Capsule()
+                        .fill(provider.burndownTint)
+                        .frame(width: 10, height: 2.5)
+                    Text(provider.macWidgetMediumSummaryLabel)
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
+                }
+                #else
                 VStack(alignment: .leading, spacing: 1) {
                     HStack(spacing: 4) {
                         Capsule()
@@ -299,6 +337,8 @@ struct HeadroomWidgetView: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
+                #endif
+                }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .layoutPriority(1)
             }
@@ -310,6 +350,16 @@ struct HeadroomWidgetView: View {
             }
         }
         .minimumScaleFactor(0.75)
+    }
+
+    private func smallResetLabels(
+        for provider: HeadroomWidgetSnapshot.Provider
+    ) -> [String] {
+        #if os(macOS)
+        provider.macWidgetResetLabels
+        #else
+        provider.widgetResetLabels
+        #endif
     }
 
     private var emptyLine: some View {
