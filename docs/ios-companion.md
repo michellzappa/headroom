@@ -59,7 +59,7 @@ Mac on its own — the phone forwards what it fetched. See
     widget remains a static definition so tiles placed before the picker was
     introduced keep receiving timelines. WidgetKit stores a tile's
     configuration system with its kind and cannot migrate that tile in place,
-    so the configurable widget deliberately has a new kind.
+    so the editable widget deliberately has a new kind.
     The Providers pane still decides which providers exist and in what order,
     and the host still serves the top 3; the tile decides which of those it
     spends its space on, which is a question two tiles on one screen answer
@@ -69,9 +69,15 @@ Mac on its own — the phone forwards what it fetched. See
     provider on its own. "All providers" is a choice in the Provider widget
     and is also what the compatibility widget keeps doing. A provider that
     leaves the top 3 leaves the tile drawing the rest, never an empty box.
-    App Intents strings are literals in that file on purpose — the metadata extractor
-    reads them out of the source at build time, so a `HeadroomCopy` constant
-    would reach the picker as nothing.
+    App Intents strings are literals in that file on purpose — the metadata
+    extractor reads them out of the source at build time, so a `HeadroomCopy`
+    constant would reach the picker as nothing.
+    - **One intermediate cohort cannot migrate in place.** Versions 2.0.6–2.1.0
+      briefly shipped the editable configuration under the original static
+      kind. A widget added in that window may freeze again when the static
+      definition is restored; remove it and add **Headroom — Provider** to
+      retain provider selection. There is no WidgetKit representation that
+      preserves both configuration systems under the same kind.
 - Best-effort iOS background refresh.
 - Pull-to-refresh, including the existing LAN-safe `POST /sync/refresh`.
 - iPhone and iPad layouts from one target.

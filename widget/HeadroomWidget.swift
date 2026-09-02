@@ -75,7 +75,7 @@ struct HeadroomWidgetProvider: AppIntentTimelineProvider {
 /// `HeadroomWidget`. WidgetKit does not migrate an existing tile when the same
 /// kind changes configuration systems; it leaves the tile on its last render
 /// instead. Keeping that exact static definition lets WidgetKit resume asking
-/// for timelines, while configurable tiles use a new identity below.
+/// for timelines, while editable tiles use a new identity below.
 struct HeadroomLegacyWidgetProvider: TimelineProvider {
     func placeholder(in context: Context) -> HeadroomWidgetEntry {
         HeadroomWidgetEntry(date: .now, snapshot: .placeholder)
@@ -461,8 +461,8 @@ private enum HeadroomWidgetGallery {
     }
 }
 
-/// The original, all-provider widget. Its definition is retained because its
-/// kind and configuration type are part of every tile WidgetKit already saved.
+/// The original all-provider widget. Its definition stays because its kind
+/// and configuration type are part of every tile WidgetKit already saved.
 struct HeadroomLegacyStatusWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(
@@ -482,7 +482,7 @@ struct HeadroomLegacyStatusWidget: Widget {
 struct HeadroomStatusWidget: Widget {
     var body: some WidgetConfiguration {
         AppIntentConfiguration(
-            kind: HeadroomWidgetIdentity.configurableKind,
+            kind: HeadroomWidgetIdentity.editableKind,
             intent: HeadroomWidgetConfiguration.self,
             provider: HeadroomWidgetProvider()
         ) { entry in
