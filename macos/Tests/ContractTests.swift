@@ -879,19 +879,69 @@ final class WidgetSnapshotSkewTests: XCTestCase {
             HeadroomWidgetSnapshot.self, from: Data(json.utf8))
     }
 
-    func testWidgetKindsStayDistinctAndStable() {
-        // WidgetKit cannot migrate an already-placed StaticConfiguration to
-        // AppIntentConfiguration. Reusing this identity strands the old tile
-        // on its last snapshot; the configurable widget must be a new kind.
+    func testStaticAndEditableWidgetsHaveStableDistinctKinds() {
+        // WidgetKit persists both the kind and configuration system for a
+        // placed tile. The original static definition has to keep the kind
+        // shipped before provider selection, while the editable definition
+        // needs a different identity so it cannot strand those tiles.
         XCTAssertEqual(HeadroomWidgetIdentity.legacyKind, "HeadroomWidget")
         XCTAssertEqual(
-            HeadroomWidgetIdentity.configurableKind,
+            HeadroomWidgetIdentity.editableKind,
             "HeadroomWidget.Configurable"
         )
         XCTAssertNotEqual(
-            HeadroomWidgetIdentity.configurableKind,
-            HeadroomWidgetIdentity.legacyKind
+            HeadroomWidgetIdentity.legacyKind,
+            HeadroomWidgetIdentity.editableKind
         )
+    }
+
+    func testWidgetBundleKeepsBothConfigurationSystems() throws {
+        // The strings above only protect persisted identity. This protects the
+        // wiring that uses it: dropping the compatibility widget, or putting
+        // the old kind on the App Intent definition again, recreates the
+        // indefinitely frozen tiles this migration exists to recover.
+        let testFile = URL(fileURLWithPath: #filePath)
+        let sourceURL = testFile
+            .deletingLastPathComponent()  // Tests
+            .deletingLastPathComponent()  // macos
+            .deletingLastPathComponent()  // repo root
+            .appendingPathComponent("widget/HeadroomWidget.swift")
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+
+        func section(from start: String, to end: String?) throws -> Substring {
+            let startRange = try XCTUnwrap(source.range(of: start))
+            let suffix = source[startRange.lowerBound...]
+            guard let end else { return suffix }
+            let endRange = try XCTUnwrap(suffix.range(of: end))
+            return suffix[..<endRange.lowerBound]
+        }
+        func compact(_ value: Substring) -> String {
+            value.filter { !$0.isWhitespace }
+        }
+
+        let bundle = try section(
+            from: "struct HeadroomWidgetBundle",
+            to: "private enum HeadroomWidgetGallery"
+        )
+        XCTAssertTrue(bundle.contains("HeadroomLegacyStatusWidget()"))
+        XCTAssertTrue(bundle.contains("HeadroomStatusWidget()"))
+
+        let legacy = compact(try section(
+            from: "struct HeadroomLegacyStatusWidget",
+            to: "struct HeadroomStatusWidget"
+        ))
+        XCTAssertTrue(legacy.contains(
+            "StaticConfiguration(kind:HeadroomWidgetIdentity.legacyKind,"
+                + "provider:HeadroomLegacyWidgetProvider()"
+        ))
+
+        let editable = compact(try section(
+            from: "struct HeadroomStatusWidget", to: nil))
+        XCTAssertTrue(editable.contains(
+            "AppIntentConfiguration(kind:HeadroomWidgetIdentity.editableKind,"
+                + "intent:HeadroomWidgetConfiguration.self,"
+                + "provider:HeadroomWidgetProvider()"
+        ))
     }
 
     func testAnEmptyObjectStillDecodes() throws {
@@ -1252,7 +1302,7 @@ final class WidgetSnapshotSkewTests: XCTestCase {
         ]}
         """)
         XCTAssertEqual(snapshot.showing("codex").providers.map(\.id), ["codex"])
-        // The default, and every widget placed before the picker existed.
+        // The editable widget's explicit All providers/absent-parameter path.
         XCTAssertEqual(
             snapshot.showing(nil).providers.map(\.id), ["claude", "codex"])
     }
