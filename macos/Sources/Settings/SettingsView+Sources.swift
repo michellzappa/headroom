@@ -7,6 +7,7 @@ extension SettingsView {
             SettingsSourcesPane(
                 sources: sources,
                 usage: usageProviders,
+                claudeStatus: claudeStatus,
                 accountProviders: accountProviders,
                 detected: detectedSources,
                 busyID: togglingSourceID,
@@ -82,7 +83,7 @@ extension SettingsView {
     /// The wire order stays account-level; the pane reorders services.
     var aiServiceBlocks: [(id: String, rowIDs: [String])] {
         SourceService.services(from: sources)
-            .filter { $0.group == .ai }
+            .filter { $0.group == .ai && $0.id != "claude-status" }
             .map { ($0.id, $0.rows.map(\.id)) }
     }
 
@@ -286,6 +287,7 @@ extension SettingsView {
         do {
             let snapshot = try await client.fetchUsage()
             sources = snapshot.sources ?? []
+            claudeStatus = snapshot.claudeStatusIfEnabled
             usageProviders = Dictionary(
                 (snapshot.providers ?? []).map { ($0.id, $0) },
                 uniquingKeysWith: { first, _ in first })

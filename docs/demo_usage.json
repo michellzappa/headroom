@@ -1244,7 +1244,7 @@
       "id": "claude-status",
       "title": "Claude Status",
       "kind": "activity",
-      "group": "ai",
+      "group": "devtools",
       "enabled": true,
       "ok": true,
       "configured": true,

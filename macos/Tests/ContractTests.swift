@@ -303,14 +303,27 @@ final class ContractTests: XCTestCase {
         XCTAssertEqual(grouped.map(\.group), [.ai, .devtools])
         XCTAssertEqual(
             grouped.first { $0.group == .ai }?.sources.map(\.id),
-            ["claude", "codex", "cursor", "openrouter", "ai-gateway", "claude-status"])
+            ["claude", "codex", "cursor", "openrouter", "ai-gateway"])
         let ai = try XCTUnwrap(grouped.first { $0.group == .ai })
-        XCTAssertEqual(
-            ai.sources.first { $0.id == "claude-status" }?.kind, "activity")
         let devtools = try XCTUnwrap(grouped.first { $0.group == .devtools })
         XCTAssertTrue(devtools.sources.contains { $0.id == "plausible" })
         XCTAssertTrue(devtools.sources.contains { $0.id == "posthog" })
         XCTAssertFalse(devtools.sources.contains { $0.kind == "quota" })
+        XCTAssertEqual(
+            devtools.sources.first { $0.id == "claude-status" }?.kind,
+            "activity")
+    }
+
+    func testClaudeStatusAttachesOnlyWhenItsCheckIsEnabled() throws {
+        var snapshot = try decodeDemo()
+        XCTAssertNotNil(snapshot.claudeStatusIfEnabled)
+
+        var sources = try XCTUnwrap(snapshot.sources)
+        let index = try XCTUnwrap(
+            sources.firstIndex { $0.id == "claude-status" })
+        sources[index].enabled = false
+        snapshot.sources = sources
+        XCTAssertNil(snapshot.claudeStatusIfEnabled)
     }
 
     func testSourceGroupFallsBackToKindOnOlderHosts() {

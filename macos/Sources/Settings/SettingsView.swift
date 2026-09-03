@@ -38,6 +38,8 @@ struct SettingsView: View {
     @State var dropTargetID: String?
     /// Live usage by account id — feeds the Active card's bars.
     @State var usageProviders: [String: QuotaProviderInfo] = [:]
+    /// Public Claude service health, shown on Claude's provider row.
+    @State var claudeStatus: ClaudeStatus?
     /// Activity panel pin order from the host (legacy).
     @State var servicesOrder: [String] = IntegrationWatch.activityBlocks(from: nil)
         .map(\.rawValue)

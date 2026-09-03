@@ -113,6 +113,9 @@ struct DashboardView: View {
                                         meter: meter,
                                         subscriptionPricing: provider?
                                             .subscriptionPricing,
+                                        claudeStatus: providerID == "claude"
+                                            ? store.snapshot.claudeStatusIfEnabled
+                                            : nil,
                                         todayBurn: store.snapshot.byDay?
                                             .last?
                                             .burn(forProviderID: providerID),

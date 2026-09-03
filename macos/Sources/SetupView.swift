@@ -307,9 +307,12 @@ struct SetupSourcesList: View {
     @Binding var rows: [SetupSourceRow]
     var enabled: Bool
 
+    /// Claude Status is a child health check, not a source the user adds.
     private var grouped: [(group: SourceGroup, rows: [SetupSourceRow])] {
         SourceGroup.allCases.compactMap { group in
-            let matching = rows.filter { $0.sourceGroup == group }
+            let matching = rows.filter {
+                $0.sourceGroup == group && $0.id != "claude-status"
+            }
             return matching.isEmpty ? nil : (group, matching)
         }
     }

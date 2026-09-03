@@ -324,6 +324,9 @@ class QuotaRegistryTests(unittest.TestCase):
             ai_ids & {"plausible", "posthog", "supabase", "github", "vercel",
                       "git", "local"},
             set())
+        devtool_ids = {s.id for s in sources_config.sources_in_group(
+            sources_config.GROUP_DEVTOOLS)}
+        self.assertIn("claude-status", devtool_ids)
 
     def test_group_travels_on_both_payloads(self):
         """Mac Settings reads /usage, onboarding reads /setup — same split."""
@@ -334,6 +337,8 @@ class QuotaRegistryTests(unittest.TestCase):
             by_id["plausible"]["group"], sources_config.GROUP_DEVTOOLS)
         self.assertEqual(
             by_id["posthog"]["group"], sources_config.GROUP_DEVTOOLS)
+        self.assertEqual(
+            by_id["claude-status"]["group"], sources_config.GROUP_DEVTOOLS)
 
         setup = sources_config.detection_payload()
         setup_by_id = {row["id"]: row for row in setup["sources"]}

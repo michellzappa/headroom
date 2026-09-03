@@ -76,6 +76,8 @@ struct SettingsSourcesPane: View {
     let sources: [SyncSource]
     /// Live usage by account id, for the bars — `providers[]` off `/usage`.
     let usage: [String: QuotaProviderInfo]
+    /// Claude's public service health, attached to the Claude provider row.
+    let claudeStatus: ClaudeStatus?
     /// Multi-account capability + current extra logins, from `/accounts`.
     let accountProviders: [AccountProvider]
     /// Credential detection by source id, from `/setup`. Empty when the
@@ -102,8 +104,10 @@ struct SettingsSourcesPane: View {
         SourceService.services(from: sources)
     }
 
-    /// Active: AI providers in pinned order. Paused services (configured,
-    /// switched off, not dismissed) stay in this list.
+    /// Active: AI providers in pinned order. Claude Status is an internal
+    /// health check attached to Claude, so it never becomes its own row.
+    /// Paused services (configured, switched off, not dismissed) stay in this
+    /// list.
     ///
     /// Dev tools are deliberately absent. They used to sit below the AI rows
     /// here *and* have a leaf under Integrations, which made one list read as
@@ -113,11 +117,15 @@ struct SettingsSourcesPane: View {
     /// "how is it connected", and owns the on/off for anything that needs a
     /// credential. See `SettingsIntegration`.
     private var activeServices: [SourceService] {
-        services.filter { $0.isListed && $0.group == .ai }
+        services.filter {
+            $0.isListed && $0.group == .ai && $0.id != "claude-status"
+        }
     }
 
     private var libraryServices: [SourceService] {
-        services.filter { !$0.isListed && $0.group == .ai }
+        services.filter {
+            !$0.isListed && $0.group == .ai && $0.id != "claude-status"
+        }
     }
 
     /// Menu-bar slots: the first three enabled quota accounts in pinned
@@ -180,6 +188,9 @@ struct SettingsSourcesPane: View {
                     ActiveServiceRow(
                         service: service,
                         usage: usage,
+                        claudeStatus: service.id == "claude"
+                            ? claudeStatus
+                            : nil,
                         badgeSlots: focusSlots[service.id] ?? [],
                         isBusy: isBusy(service),
                         isDropTarget: dropTargetID == service.id,
@@ -329,6 +340,7 @@ struct SettingsSourcesPane: View {
 private struct ActiveServiceRow: View {
     let service: SourceService
     let usage: [String: QuotaProviderInfo]
+    let claudeStatus: ClaudeStatus?
     let badgeSlots: [Int]
     let isBusy: Bool
     let isDropTarget: Bool
@@ -409,6 +421,9 @@ private struct ActiveServiceRow: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     titleLine
+                    if let claudeStatus {
+                        ClaudeStatusLine(status: claudeStatus)
+                    }
                     if let account = inlineAccount {
                         if let email = accountEmail(account) {
                             Text(email)

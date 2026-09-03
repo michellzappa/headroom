@@ -28,6 +28,9 @@ struct QuotaOverviewCard: View {
                                 from: snapshot.burndown?[provider.id]
                             ),
                             subscriptionPricing: provider.subscriptionPricing,
+                            claudeStatus: provider.id == "claude"
+                                ? snapshot.claudeStatusIfEnabled
+                                : nil,
                             todayBurn: snapshot.byDay?
                                 .last?
                                 .burn(forProviderID: provider.id)
@@ -39,7 +42,10 @@ struct QuotaOverviewCard: View {
                                 meter: snapshot.meter(for: provider),
                                 burndown: provider.orderedBurndown(
                                     from: snapshot.burndown?[provider.id]
-                                )
+                                ),
+                                claudeStatus: provider.id == "claude"
+                                    ? snapshot.claudeStatusIfEnabled
+                                    : nil
                             )
                             Image(systemName: "chevron.right")
                                 .font(.caption.weight(.semibold))
@@ -63,6 +69,7 @@ private struct ProviderSummaryRow: View {
     let meter: ProviderMeter
     /// The provider's burndown pools, for the pace dots. Empty is fine.
     var burndown: [Burndown] = []
+    var claudeStatus: ClaudeStatus? = nil
 
     var body: some View {
         HStack(spacing: 16) {
@@ -87,6 +94,9 @@ private struct ProviderSummaryRow: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                }
+                if provider.id == "claude", let claudeStatus {
+                    ClaudeStatusLine(status: claudeStatus, showsLink: false)
                 }
                 ForEach(
                     Array(meter.displayableWindows.prefix(3).enumerated()),
@@ -181,6 +191,7 @@ private struct ProviderQuotaDetail: View {
     let subscriptionPricing: SubscriptionPricing?
     /// Headline-meter points burned today (`by_day`), same as the board.
     var todayBurn: Double? = nil
+    var claudeStatus: ClaudeStatus? = nil
 
     /// "Connected" is a claim about right now, and a provider whose numbers
     /// stopped arriving is in no position to make it. `ok` alone would let it.
@@ -253,6 +264,10 @@ private struct ProviderQuotaDetail: View {
                                 .multilineTextAlignment(.trailing)
                         }
                         .font(.subheadline)
+                    }
+
+                    if provider.id == "claude", let claudeStatus {
+                        ClaudeStatusLine(status: claudeStatus)
                     }
 
                     ForEach(

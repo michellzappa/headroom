@@ -913,7 +913,7 @@ BASE_SOURCES = (
     # with the other activity sources so SOURCE_IDS stays in rollup order.
     Source("claude-status", "Claude Status", "status.claude.com — incidents, not your quota", 60,
            claude_status.fetch, _detail_claude_status, _summary_claude_status,
-           _blank_claude_status, kind="activity", group=GROUP_AI),
+           _blank_claude_status, kind="activity", group=GROUP_DEVTOOLS),
     Source("vercel", "Vercel", "Vercel CLI login", 60,
            vercel_builds.fetch_deployments, _detail_vercel, _summary_vercel,
            _blank_vercel, login_hint="run `vercel login`"),

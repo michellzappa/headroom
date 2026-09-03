@@ -391,7 +391,7 @@ undifferentiated pile of toggles:
 | `zed` | Zed | `ai` |
 | `openrouter` | OpenRouter | `ai` |
 | `ai-gateway` | AI Gateway | `ai` |
-| `claude-status` | Claude Status | `ai` |
+| `claude-status` | Claude Status (attached to Claude) | `devtools` |
 | `vercel` | Vercel | `devtools` |
 | `git` | Git | `devtools` |
 | `github` | GitHub Actions | `devtools` |
@@ -426,7 +426,7 @@ served as `sources[].group`). Section titles are chrome and live in
 
 | Term | Meaning | Surfaces |
 |---|---|---|
-| **AI coding tools** | Claude / Codex / Cursor / Copilot / … — plan left; OpenRouter and AI Gateway are prepaid balances with a pasted key; Claude Status watches status.claude.com | macOS Settings + onboarding, iOS Settings |
+| **AI coding tools** | Claude / Codex / Cursor / Copilot / … — plan left; OpenRouter and AI Gateway are prepaid balances with a pasted key. Claude Status is an attached health check, shown on Claude when enabled rather than as its own provider | macOS Settings + onboarding, iOS Settings |
 | **Dev tools** | Vercel, Git, Actions, Supabase, Plausible, PostHog, Sentry, Datadog, Axiom, local servers / builds | Integrations catalog on both platforms |
 | **API balances** | OpenRouter and Vercel AI Gateway prepaid credits — paste a key on the Mac; account use paints on Activity | Integrations catalog · Activity |
 
