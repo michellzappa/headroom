@@ -109,11 +109,11 @@ next person can find it.
   emitting a firmware header, a Swift file and a Python module. `boot_max.h`
   and the `HostVersion` golden vector are the two precedents already in the
   repo.
-- **Decide the transport for `agents`.** Approving a command that runs on the
-  Mac still rides a plaintext bearer token with Face ID enforced only by the
-  client. `/agents/tasks` accepts any private-range caller holding the `agents`
-  grant; `_is_private()` already separates Tailscale CGNAT from RFC1918, so
-  option 1 in [trust.md](trust.md) remains one predicate.
+- **Harden remote agent answers.** Approving a command that runs on the Mac
+  still rides a plaintext bearer token with Face ID enforced only by the
+  client. `/attention/events/{id}/respond` is the remaining mobile agent
+  control route; `_is_private()` already separates Tailscale CGNAT from
+  RFC1918, so option 1 in [trust.md](trust.md) remains one predicate.
 - **A clear-history control.** The ledger prunes at 30 days
   (`agent_events.RETENTION_S`), which was the urgent half. The remaining half
   is a button — deleting a SQLite file with the host stopped is not a thing to

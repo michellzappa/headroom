@@ -266,8 +266,7 @@ struct MobileHeadroomClient: Sendable {
     func respond(
         to event: AgentAttentionEvent,
         action: AgentAttentionAction,
-        idempotencyKey: String,
-        text: String? = nil
+        idempotencyKey: String
     ) async throws -> AgentAttentionEvent {
         let url = try base()
             .appending(path: "attention")
@@ -278,34 +277,12 @@ struct MobileHeadroomClient: Sendable {
             revision: event.revision,
             action: action.id,
             idempotencyKey: idempotencyKey,
-            text: text
+            text: nil
         ))
         let data = try await send(url: url, method: "POST", body: body)
         return try JSONDecoder()
             .decode(AgentAttentionResponse.self, from: data)
             .event
-    }
-
-    func taskSurface() async throws -> AgentTaskSurface {
-        let url = try base()
-            .appending(path: "agents")
-            .appending(path: "tasks")
-        return try JSONDecoder().decode(
-            AgentTaskSurface.self, from: try await send(url: url, method: "GET"))
-    }
-
-    @discardableResult
-    func startTask(
-        provider: String, cwd: String, prompt: String
-    ) async throws -> AgentStartTaskResponse {
-        let url = try base()
-            .appending(path: "agents")
-            .appending(path: "tasks")
-        let body = try JSONEncoder().encode(AgentStartTaskRequest(
-            provider: provider, cwd: cwd, prompt: prompt))
-        return try JSONDecoder().decode(
-            AgentStartTaskResponse.self,
-            from: try await send(url: url, method: "POST", body: body))
     }
 
     func setSources(_ enabled: [String: Bool]) async throws -> [String: Bool] {

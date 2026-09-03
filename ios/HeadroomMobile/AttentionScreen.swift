@@ -12,7 +12,6 @@ struct AttentionScreen: View {
     @Binding var focusedEventID: String?
     @Binding var showsSettings: Bool
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @State private var showsStartTask = false
 
     var body: some View {
         // Both halves of the queue are the store's to decide: dismissing a row
@@ -112,48 +111,8 @@ struct AttentionScreen: View {
                 }
                 .labelStyle(.iconOnly)
             }
-            if store.mobilePermissions.agents {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(HeadroomCopy.startTask, systemImage: "plus") {
-                        showsStartTask = true
-                    }
-                    .labelStyle(.iconOnly)
-                }
-            }
-        }
-        .sheet(isPresented: $showsStartTask) {
-            NavigationStack {
-                Group {
-                    if let surface = store.agentTaskSurface {
-                        StartAgentTaskView(
-                            surface: surface,
-                            tint: { id in
-                                (store.snapshot.providers ?? [])
-                                    .accentTint(forProvider: id)
-                            },
-                            start: { provider, cwd, prompt in
-                                await store.startTask(
-                                    provider: provider, cwd: cwd, prompt: prompt)
-                            }
-                        )
-                        .padding()
-                    } else {
-                        ProgressView()
-                            .task { await store.loadTaskSurface() }
-                    }
-                }
-                .navigationTitle(HeadroomCopy.startTask)
-                .navigationBarTitleDisplayMode(.inline)
-            }
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
         }
         .refreshable { await store.refresh(forceServerSync: true) }
-        .task {
-            // refresh() also loads the surface once permissions are known;
-            // this covers a revisit when the store already has agents on.
-            await store.loadTaskSurface()
-        }
     }
 
     /// The feed rows this screen claims off `ActivityScreen`. One definition,
@@ -338,8 +297,8 @@ struct AttentionScreen: View {
                             || store.isStale
                             || store.respondingAgentEventID != nil,
                         responding: store.respondingAgentEventID == event.id
-                    ) { action, text in
-                        Task { await store.answer(event, with: action, text: text) }
+                    ) { action in
+                        Task { await store.answer(event, with: action) }
                     }
                 }
                 if event.actions.contains(where: { $0.id == "approve_always" }),

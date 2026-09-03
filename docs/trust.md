@@ -47,8 +47,12 @@ ever.
 
 `/accounts`, `/github/watch`, `/config/git`, `/config/vercel`,
 `/config/supabase`, `/agents/config`, `/agents/claude/config`,
-`/machines/config`, `/machines/sync`, and the three Claude hook endpoints
+`/agents/tasks`, `/machines/config`, `/machines/sync`, and the three Claude hook endpoints
 (`/agents/hooks/claude/{permission,question,event}`).
+
+`/agents/tasks` is here because its read response names folders on this Mac and
+its write response starts a local executable. Both methods are loopback-only;
+the phone never uses this route.
 
 The hook endpoints are in this class for a different reason than the rest:
 they are how a coding agent on this Mac *asks* Headroom for a decision. A

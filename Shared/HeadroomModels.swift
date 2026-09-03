@@ -3100,79 +3100,12 @@ struct AgentAttentionEventsResponse: Codable, Sendable {
     }
 }
 
-/// What a client needs to offer "start a task" without guessing: which
-/// providers can take work right now, and which folders the Mac has used.
-/// A phone cannot browse the Mac's disk, so it picks from that list.
-struct AgentTaskSurface: Codable, Sendable {
-    var ok: Bool
-    var providers: [AgentTaskProvider]
-    var folders: [String]
-
-    var startable: [AgentTaskProvider] {
-        providers.filter { $0.canStart && $0.connection == "ready" }
-    }
-}
-
-struct AgentTaskProvider: Codable, Sendable, Identifiable, Equatable {
-    var provider: String
-    var canStart: Bool
-    var connection: String?
-
-    var id: String { provider }
-
-    /// Gateway providers name the adapter; the palette and marks are keyed by
-    /// the tool. Same mapping an event row uses.
-    var iconID: String { provider == "claude-code" ? "claude" : provider }
-
-    var title: String { provider == "claude-code" ? "Claude Code" : "Codex" }
-
-    enum CodingKeys: String, CodingKey {
-        case provider, connection
-        case canStart = "can_start"
-    }
-}
-
-/// What the host says came of a start. Both providers return `ok`, so a
-/// silent success was indistinguishable from nothing happening at all —
-/// which is what it looked like.
-struct AgentStartTaskResponse: Codable, Sendable {
-    var ok: Bool
-    var provider: String
-    var task: AgentStartedTask
-}
-
-struct AgentStartedTask: Codable, Sendable {
-    var cwd: String?
-    var pid: Int?
-    var threadID: String?
-    var turnID: String?
-
-    enum CodingKeys: String, CodingKey {
-        case cwd, pid
-        case threadID = "thread_id"
-        case turnID = "turn_id"
-    }
-}
-
-/// The result of asking an agent to start, in words a person can read.
-struct AgentTaskOutcome: Sendable, Equatable {
-    var ok: Bool
-    var message: String
-}
-
-struct AgentStartTaskRequest: Codable, Sendable {
-    var provider: String
-    var cwd: String
-    var prompt: String
-}
-
 struct AgentAttentionResponseRequest: Codable, Sendable {
     var revision: Int
     var action: String
     var idempotencyKey: String
-    /// Words typed on the phone. The adapter decides what they mean — a reply
-    /// to a permission request is Claude's "tell it what to do differently",
-    /// and a reply to a question is the answer itself.
+    /// Optional provider-specific text. The iPhone deliberately leaves this
+    /// nil: it offers bounded attention responses rather than a chat surface.
     var text: String?
 
     enum CodingKeys: String, CodingKey {

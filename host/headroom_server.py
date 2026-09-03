@@ -2016,9 +2016,12 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(200, _accounts_payload())
             return
         if path == "/agents/tasks":
-            if not self._is_loopback() and not self._mobile_permission_allowed(
-                    "agents"):
-                self._send_json(403, {"ok": False, "error": "not allowed"})
+            # Starting work runs a local executable and accepts arbitrary
+            # prompt text. It is a Mac-local convenience, not a mobile agent
+            # client capability; the phone only answers existing attention
+            # events below.
+            if not self._is_loopback():
+                self._send_json(403, {"ok": False, "error": "localhost only"})
                 return
             self._send_json(200, agent_gateway.get().task_surface())
             return
@@ -2217,12 +2220,11 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json(403, {"ok": False, "error": "localhost only"})
                 return
         elif path == "/agents/tasks":
-            # Starting work runs a local executable with your words, so it
-            # rides the same Mac-granted permission that lets a phone answer
-            # an approval — off by default, and never open to the LAN at large.
-            if not self._is_loopback() and not self._mobile_permission_allowed(
-                    "agents"):
-                self._send_json(403, {"ok": False, "error": "not allowed"})
+            # Starting work runs a local executable and accepts arbitrary
+            # prompt text. Keep it on the Mac; mobile is an attention surface,
+            # not an agent client.
+            if not self._is_loopback():
+                self._send_json(403, {"ok": False, "error": "localhost only"})
                 return
         elif path in ("/agents/claude/config", "/agents/codex/tasks",
                       "/agents/codex/steer"):

@@ -1,16 +1,10 @@
 import SwiftUI
 
-/// Give an agent a folder and a prompt.
+/// Give a Mac-local agent a folder and a prompt.
 ///
-/// The same control on both platforms, because starting work is the same act
-/// on both. The Mac can add a folder with a picker; a phone cannot browse the
-/// Mac's disk, so it chooses from the folders the Mac has already used —
-/// which is why the host remembers them.
-///
-/// Only providers that can actually take work are offered. Claude is started
-/// headless with `claude -p`, and its hooks report back exactly as they do for
-/// a session you start in a terminal. Codex needs a thread of Headroom's own,
-/// because a terminal session cannot reach Headroom's App Server.
+/// This control belongs to the Mac because it starts local executables and
+/// can browse the Mac's disk. The iPhone only answers requests from work that
+/// already exists.
 struct StartAgentTaskView: View {
     let surface: AgentTaskSurface
     let tint: (String) -> Color
@@ -106,8 +100,6 @@ struct StartAgentTaskView: View {
     @ViewBuilder
     private var folderPicker: some View {
         if surface.folders.isEmpty {
-            // Nothing remembered yet, so there is nothing to choose between.
-            // The Mac can fix that; a phone has to wait for it to.
             if addFolder != nil {
                 Button(HeadroomCopy.chooseFolder) { addFolder?() }
                     .font(.subheadline)

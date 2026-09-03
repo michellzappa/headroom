@@ -412,10 +412,6 @@ enum HeadroomCopy {
     /// Shown beside an always-allow answer. A durable grant made from a phone
     /// should say exactly what it will write before you tap it.
     static let agentWouldSaveRule = "Saves the rule"
-    /// The free-text answer. None of the fixed buttons is ever quite the
-    /// thing you want to say, so every request that has a channel for words
-    /// offers one.
-    static let agentReplyPlaceholder = "Reply to the agent…"
     /// A question shows in both places and is answered where it was asked.
     static let answerInTheTerminal = "Answer in the terminal"
 

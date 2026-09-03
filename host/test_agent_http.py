@@ -67,7 +67,8 @@ class AgentHTTPTests(unittest.TestCase):
     def tearDown(self):
         self.patcher.stop()
 
-    def request(self, method, path, body=None):
+    def request(self, method, path, body=None, peer=("127.0.0.1", 12345),
+                headers=None):
         server_socket, client_socket = socket.socketpair()
         try:
             payload = json.dumps(body).encode() if body is not None else b""
@@ -75,6 +76,9 @@ class AgentHTTPTests(unittest.TestCase):
                 f"{method} {path} HTTP/1.0",
                 "Host: localhost",
             ]
+            lines.extend(
+                f"{name}: {value}" for name, value in (headers or {}).items()
+            )
             if body is not None:
                 lines.extend([
                     "Content-Type: application/json",
@@ -84,7 +88,7 @@ class AgentHTTPTests(unittest.TestCase):
             client_socket.sendall(raw)
             client_socket.shutdown(socket.SHUT_WR)
             headroom_server.Handler(
-                server_socket, ("127.0.0.1", 12345),
+                server_socket, peer,
                 SimpleNamespace(server_port=8737))
             server_socket.close()
             response = b""
@@ -170,6 +174,26 @@ class AgentHTTPTests(unittest.TestCase):
         })
         self.assertEqual(status, 404)
         self.assertEqual(result["error"], "attention event not found")
+
+    @mock.patch("headroom_server.auth.authorized_mobile", return_value=True)
+    def test_mobile_cannot_read_or_start_mac_local_tasks(self, _authorized):
+        headers = {
+            "X-Headroom-Client": "ios",
+            "X-Headroom-Token": "mobile-token",
+        }
+        status, result = self.request(
+            "GET", "/agents/tasks", peer=("192.168.1.20", 12345),
+            headers=headers)
+        self.assertEqual(status, 403)
+        self.assertEqual(result["error"], "localhost only")
+
+        status, result = self.request(
+            "POST", "/agents/tasks", {"provider": "codex", "cwd": "/tmp",
+                                        "prompt": "run tests"},
+            peer=("192.168.1.20", 12345), headers=headers)
+        self.assertEqual(status, 403)
+        self.assertEqual(result["error"], "localhost only")
+        self.assertEqual(self.gateway.calls, [])
 
     def test_claude_permission_hook_returns_provider_decision(self):
         payload = {

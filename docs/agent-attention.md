@@ -169,6 +169,10 @@ tested against synthetic messages and is correct; it simply has no live source.
 
 **Slice 2 is now built, and it works.** Headroom starts the thread itself:
 
+This is a Mac-local capability. The iPhone deliberately has no task launcher:
+it can answer a request raised by an existing session, but it cannot create a
+session, send an arbitrary prompt, or steer a live turn.
+
 ```bash
 curl -s -X POST localhost:8737/agents/codex/tasks \
   -H 'Content-Type: application/json' \
