@@ -7,6 +7,26 @@ are not tracked here because they move on every commit.
 Add a section here before cutting a tag. `scripts/cut-release.sh` refuses to
 tag a version that has no entry.
 
+## 2.1.1 — 2026-09-03
+
+### Fixed
+
+- **GitHub review requests and assignments stopped ageing out of Attention.**
+  An open issue keeps the status word `assigned` for as long as it is open, so
+  a request nobody answered a year ago sat in the queue with the same weight as
+  one from this morning. Dismissing it lasted until the next launch, because
+  dismissal is per-run memory and the row came straight back out of the search.
+  Inbox rows now leave Attention after 14 days untouched, the same way a failed
+  Actions run leaves after 24 hours. They keep their word and stay in the
+  Activity feed, so nothing disappears. They stop lighting the pip.
+
+### Changed
+
+- The host now says per row whether it belongs on Attention
+  (`activity[].needs_attention`), rather than every client working it out from
+  the status word. Older hosts do not send the key and behave exactly as
+  before. See [`docs/contract.md`](docs/contract.md).
+
 ## 2.1.0 — 2026-08-26
 
 ### Changed
