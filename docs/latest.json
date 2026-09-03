@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "version": "2.1.0",
-  "published": "2026-08-26T18:52:35Z",
-  "url": "https://github.com/michellzappa/headroom/releases/download/v2.1.0/Headroom-macOS.zip",
-  "sha256": "8a54b7570522734bbda66e4407331e048947c511f188836bafed43ac6eff37fe",
-  "size": 6214640,
+  "version": "2.1.1",
+  "published": "2026-09-03T06:38:48Z",
+  "url": "https://github.com/michellzappa/headroom/releases/download/v2.1.1/Headroom-macOS.zip",
+  "sha256": "861642f270ef976743b6c6c4202ea4a27e409df6ec0bc7d07c242d867a991707",
+  "size": 6214456,
   "min_macos": "14.0",
-  "notes_md": "### Changed\n\n- **The desk board no longer dims at night.** It followed local solar times\n  and a fixed 22:00 bedtime, and stepped the panel to 30% after sunset and\n  10% after bedtime. It now holds one level all day and all night.\n  `PANEL_BRIGHTNESS` in `firmware/src/config.h` sets that level and replaces\n  the `BRIGHTNESS_*` set. An existing `config.h` keeps building.\n- Agent docs record the rotated-grant trap behind the 2.0.9 fix."
+  "notes_md": "### Fixed\n\n- **GitHub review requests and assignments stopped ageing out of Attention.**\n  An open issue keeps the status word `assigned` for as long as it is open, so\n  a request nobody answered a year ago sat in the queue with the same weight as\n  one from this morning. Dismissing it lasted until the next launch, because\n  dismissal is per-run memory and the row came straight back out of the search.\n  Inbox rows now leave Attention after 14 days untouched, the same way a failed\n  Actions run leaves after 24 hours. They keep their word and stay in the\n  Activity feed, so nothing disappears. They stop lighting the pip.\n\n### Changed\n\n- The host now says per row whether it belongs on Attention\n  (`activity[].needs_attention`), rather than every client working it out from\n  the status word. Older hosts do not send the key and behave exactly as\n  before. See [`docs/contract.md`](docs/contract.md)."
 }
