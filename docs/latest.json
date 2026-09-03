@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "version": "2.1.1",
-  "published": "2026-09-03T06:38:48Z",
-  "url": "https://github.com/michellzappa/headroom/releases/download/v2.1.1/Headroom-macOS.zip",
-  "sha256": "861642f270ef976743b6c6c4202ea4a27e409df6ec0bc7d07c242d867a991707",
-  "size": 6214456,
+  "version": "2.1.2",
+  "published": "2026-09-03T06:48:38Z",
+  "url": "https://github.com/michellzappa/headroom/releases/download/v2.1.2/Headroom-macOS.zip",
+  "sha256": "30316381dc4068a3e0ed7897ad5bd92b3c643a54b62518e2e3ab5a4e4ec08aaa",
+  "size": 6293755,
   "min_macos": "14.0",
-  "notes_md": "### Fixed\n\n- **GitHub review requests and assignments stopped ageing out of Attention.**\n  An open issue keeps the status word `assigned` for as long as it is open, so\n  a request nobody answered a year ago sat in the queue with the same weight as\n  one from this morning. Dismissing it lasted until the next launch, because\n  dismissal is per-run memory and the row came straight back out of the search.\n  Inbox rows now leave Attention after 14 days untouched, the same way a failed\n  Actions run leaves after 24 hours. They keep their word and stay in the\n  Activity feed, so nothing disappears. They stop lighting the pip.\n\n### Changed\n\n- The host now says per row whether it belongs on Attention\n  (`activity[].needs_attention`), rather than every client working it out from\n  the status word. Older hosts do not send the key and behave exactly as\n  before. See [`docs/contract.md`](docs/contract.md)."
+  "notes_md": "### Added\n\n- **Settings shows the menu bar glyph before you pick it.** General draws a\n  Preview strip above the icon picker, using the same renderer the status item\n  uses at the same size, on a dimmed strip with a wifi glyph, a battery and a\n  clock. Switching between Remaining and Pace, or flipping Invert, changes the\n  mark in front of you instead of sending you up to the menu bar and back. It\n  draws your own top three. With no coding provider on it falls back to sample\n  numbers and says so: the glyph is real, the numbers in it are not."
 }
