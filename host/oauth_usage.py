@@ -29,6 +29,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import threading
 import time
 import urllib.error
@@ -551,6 +552,48 @@ def _keychain_services(account=None):
     return services
 
 
+# Every hint below used to end in "run `claude /login`", which assumes a
+# `claude` on the machine. Headroom reads the OAuth blob the Claude Code CLI
+# writes; the desktop app authenticates its own session and writes nothing
+# here. So on a desktop-app-only Mac the one instruction we gave was
+# `command not found`, and the row stayed on Needs sign-in with no way out.
+CLI_NAME = "claude"
+# Not on the LaunchAgent's PATH, and both are default install locations.
+CLI_EXTRA_PATHS = (
+    "~/.claude/local/claude",
+    "~/.local/bin/claude",
+)
+CLI_CACHE_TTL_S = 60
+_cli_cache = {"t": 0.0, "found": False}
+
+
+def cli_installed():
+    """Whether a `claude` binary exists for a hint to point at.
+
+    Cached for a minute: this is read on every failing fetch, and an install
+    that lands mid-poll is worth noticing without stat-ing the disk per row.
+    """
+    now = time.time()
+    if now - _cli_cache["t"] < CLI_CACHE_TTL_S:
+        return _cli_cache["found"]
+    found = bool(shutil.which(CLI_NAME))
+    if not found:
+        found = any(os.access(os.path.expanduser(path), os.X_OK)
+                    for path in CLI_EXTRA_PATHS)
+    _cli_cache.update(t=now, found=found)
+    return found
+
+
+def login_instruction(*, after_update=False):
+    """The remedy to print after a Claude credential problem."""
+    if not cli_installed():
+        return ("install the Claude Code CLI and run `claude /login` "
+                "(Headroom reads the CLI's login, not the desktop app's)")
+    if after_update:
+        return "run `claude /login` if this followed an update"
+    return "run `claude /login`"
+
+
 def _credentials_hint(account=None):
     path = _creds_file(account)
     owned = _headroom_path(account)
@@ -576,7 +619,7 @@ def _shape_hint(store, blob):
     else:
         found = f"a bare {type(blob).__name__}"
     return (f"{store} has no claudeAiOauth.accessToken (found: {found}) — "
-            "run `claude /login` if this followed an update")
+            f"{login_instruction(after_update=True)}")
 
 
 def _expires_at_s(oauth):
@@ -620,7 +663,7 @@ def _refresh(oauth, store, blob, account=None):
     refresh = oauth.get("refreshToken")
     if not refresh:
         raise OAuthLoginRequired(
-            "no refreshToken — run `claude /login`")
+            f"no refreshToken — {login_instruction()}")
     best = None
 
     def note(rank, msg):
@@ -647,7 +690,8 @@ def _refresh(oauth, store, blob, account=None):
                 # next URL can only replace a clear answer with a worse one.
                 _bury_grant(refresh, account)
                 raise OAuthLoginRequired(
-                    detail or "Claude sign-in expired — run `claude /login`")
+                    detail
+                    or f"Claude sign-in expired — {login_instruction()}")
             if e.code == 404:
                 note(_ERR_ROUTE_GONE, f"HTTP 404 from {url}")
             elif detail:
@@ -848,7 +892,7 @@ def fetch_quota(force=False, account=None):
         if not store:
             return _keep_stale(
                 f"no Claude credentials in {_credentials_hint(account)} "
-                "— run `claude /login`",
+                f"— {login_instruction()}",
                 auth_required=True)
         if not oauth:
             return _keep_stale(_shape_hint(store, blob), auth_required=True)

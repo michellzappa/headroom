@@ -6,7 +6,7 @@ release.
 Last reviewed 2026-08-26, against 2.1.0. Every line count and every claim
 below was re-measured on that pass. Two items were finished; their outcomes
 are recorded under the section they left, where the next person would
-otherwise re-open them.
+otherwise re-open them. One item was added 2026-09-03, under Product.
 
 ## The one decision that reorders this list
 
@@ -146,6 +146,18 @@ optional.
   `detect_sources.suggested_enabled()` turns *all* quota sources on when it
   detects none, deliberately, so the UI can show sign-in errors. Someone who
   has none of them sees three errors and no explanation.
+- **Claude without the CLI.** Headroom reads the OAuth blob the Claude Code
+  **CLI** writes; Claude.app authenticates its own account session and leaves
+  nothing behind that the host can read. Nothing anywhere says so — the row
+  reads Not found or Needs sign-in for ever, and 2.1.1 only got as far as
+  making the hint say to install the CLI instead of naming a command that is
+  not there (`oauth_usage.login_instruction`). Desktop-app-only is not an
+  exotic setup, and Claude is the provider the app is named for. Two ways out,
+  and the cheap one is not obviously wrong: teach Providers to say plainly
+  that the Claude ring needs the CLI, before someone enables the row and waits
+  for it to fill; or find a readable signal from the desktop app and stop
+  requiring the CLI at all. Nobody has looked at whether the second is
+  possible.
 - **Board reconnect.** Wi-Fi to USB CDC failover works and the copy improved:
   the board keeps the HTTP reason when USB also fails, and says
   `no wi-fi, no usb host` rather than one blank cause. What is still thin is
