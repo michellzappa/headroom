@@ -7,6 +7,18 @@ are not tracked here because they move on every commit.
 Add a section here before cutting a tag. `scripts/cut-release.sh` refuses to
 tag a version that has no entry.
 
+## 2.1.2 — 2026-09-03
+
+### Added
+
+- **Settings shows the menu bar glyph before you pick it.** General draws a
+  Preview strip above the icon picker, using the same renderer the status item
+  uses at the same size, on a dimmed strip with a wifi glyph, a battery and a
+  clock. Switching between Remaining and Pace, or flipping Invert, changes the
+  mark in front of you instead of sending you up to the menu bar and back. It
+  draws your own top three. With no coding provider on it falls back to sample
+  numbers and says so: the glyph is real, the numbers in it are not.
+
 ## 2.1.1 — 2026-09-03
 
 ### Fixed
