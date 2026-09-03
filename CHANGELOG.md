@@ -7,6 +7,15 @@ are not tracked here because they move on every commit.
 Add a section here before cutting a tag. `scripts/cut-release.sh` refuses to
 tag a version that has no entry.
 
+## 2.1.2 — 2026-09-03
+
+### Changed
+
+- **Claude Status is no longer a standalone provider.** The public service
+  health check is hidden from provider/setup lists and appears as a compact
+  status line on Claude's quota card when the check is enabled. Major outages
+  still flow into Attention.
+
 ## 2.1.1 — 2026-09-03
 
 ### Fixed
