@@ -286,6 +286,7 @@ extension SettingsView {
         do {
             let snapshot = try await client.fetchUsage()
             sources = snapshot.sources ?? []
+            menuBarPreviewSnapshot = snapshot
             usageProviders = Dictionary(
                 (snapshot.providers ?? []).map { ($0.id, $0) },
                 uniquingKeysWith: { first, _ in first })

@@ -115,6 +115,11 @@ enum HeadroomCopy {
     static let menuBarIconRemaining = "Remaining"
     static let menuBarIconPace = "Pace"
     static let menuBarIconInvert = "Invert"
+    /// General's preview strip. "Sample" is the honest word when no coding
+    /// provider is on: the glyph is real, the numbers in it are not.
+    static let menuBarIconPreview = "Preview"
+    static let menuBarIconPreviewSample =
+        "Sample numbers. Turn on a coding provider and this shows your own."
     static let menuBarIconHint =
         "①②③ follow Providers order. Remaining fills each slot by what’s left. Pace places a mark above or below even spend — small gaps move more than big ones. Invert flips either reading (used instead of left, under instead of over)."
 

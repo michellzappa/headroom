@@ -458,6 +458,12 @@ toggle that flips whichever style is active.
 Do not name the Pace option after the game metaphor in chrome — **Pace** is
 the glossary word; the midline-and-dot shape is just how it draws.
 
+A **Preview** strip sits above the picker, drawn by the same renderer the
+status item uses at the same 18pt, so the two styles can be compared without
+looking up at the menu bar. It draws the live top 3. When no coding provider
+is on it falls back to sample numbers and says so — the glyph is real, the
+numbers in it are not.
+
 The ESP32 glance takes the same two words for its upper half, with **Rings**
 in place of Remaining — the board's default paints used, not left, so calling
 it Remaining would be a second meaning for one word. Held on the board, not

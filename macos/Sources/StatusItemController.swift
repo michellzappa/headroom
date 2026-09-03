@@ -197,16 +197,44 @@ enum MeterIconRenderer {
         style: MenuBarIconStyle = .current,
         invert: Bool = MenuBarIconStyle.invert
     ) -> NSImage {
+        // Settings subset only — never invent Claude/Codex/Cursor when
+        // every quota source is off. The host picks which 3 (pinned
+        // order, enabled only); icon geometry is sized for that same
+        // hard limit.
+        let windows = snapshot.focusProviders().map {
+            snapshot.meter(for: $0).menuBarWindow
+        }
+        return render(
+            windows: windows,
+            healthy: healthy,
+            attentionLevel: attentionLevel,
+            style: style,
+            invert: invert,
+            accessibilityDescription: accessibilityLabel(
+                snapshot: snapshot,
+                style: style,
+                invert: invert
+            )
+        )
+    }
+
+    /// Draw from prepared long-window tanks rather than a document. Settings
+    /// draws its preview strip through here so the picker shows the real
+    /// glyph, with sample numbers on a Mac whose sources are all off.
+    static func render(
+        windows: [MeterWindow],
+        healthy: Bool,
+        attentionLevel: String? = nil,
+        style: MenuBarIconStyle = .current,
+        invert: Bool = MenuBarIconStyle.invert,
+        accessibilityDescription: String? = nil
+    ) -> NSImage {
         let size = NSSize(width: 18, height: 18)
         let warning = attentionLevel == "warn" || attentionLevel == "critical"
         let image = NSImage(size: size, flipped: false) { _ in
-            // Settings subset only — never invent Claude/Codex/Cursor when
-            // every quota source is off. The host picks which 3 (pinned
-            // order, enabled only); icon geometry is sized for that same
-            // hard limit. While the first poll is still out (or nothing is
-            // enabled), draw that many empty slots so the slot is never blank.
-            let visibleProviders = snapshot.focusProviders()
-            let barCount = visibleProviders.isEmpty ? 3 : visibleProviders.count
+            // While the first poll is still out (or nothing is enabled),
+            // draw three empty slots so the icon is never blank.
+            let barCount = windows.isEmpty ? 3 : windows.count
             let barWidthPixels = 6
             let barHeightPixels = 30
             let gapPixels = 5
@@ -215,32 +243,20 @@ enum MeterIconRenderer {
                 + max(0, barCount - 1) * gapPixels
             let groupX = (canvasPixels - groupWidth) / 2
             let barY = (canvasPixels - barHeightPixels) / 2
+            let slotRect: (Int) -> PixelRect = { index in
+                PixelRect(
+                    x: groupX + index * (barWidthPixels + gapPixels),
+                    y: barY,
+                    width: barWidthPixels,
+                    height: barHeightPixels
+                )
+            }
 
             let slots: [(PixelRect, MeterWindow?)] = {
-                if visibleProviders.isEmpty {
-                    return (0..<barCount).map { index in
-                        (
-                            PixelRect(
-                                x: groupX + index * (barWidthPixels + gapPixels),
-                                y: barY,
-                                width: barWidthPixels,
-                                height: barHeightPixels
-                            ),
-                            nil
-                        )
-                    }
+                if windows.isEmpty {
+                    return (0..<barCount).map { (slotRect($0), nil) }
                 }
-                return visibleProviders.enumerated().map { index, provider in
-                    (
-                        PixelRect(
-                            x: groupX + index * (barWidthPixels + gapPixels),
-                            y: barY,
-                            width: barWidthPixels,
-                            height: barHeightPixels
-                        ),
-                        snapshot.meter(for: provider).menuBarWindow
-                    )
-                }
+                return windows.enumerated().map { (slotRect($0.offset), $0.element) }
             }()
 
             switch style {
@@ -268,22 +284,27 @@ enum MeterIconRenderer {
         }
         // Template icons can't show the colored warning pip.
         image.isTemplate = !warning
+        image.accessibilityDescription = accessibilityDescription
+        return image
+    }
+
+    private static func accessibilityLabel(
+        snapshot: UsageSnapshot,
+        style: MenuBarIconStyle,
+        invert: Bool
+    ) -> String {
         let active = snapshot.codingQuotaProviders
         if active.isEmpty {
-            image.accessibilityDescription = "Headroom — no coding providers enabled"
-        } else {
-            let labels = active.map(\.displayTitle).joined(separator: ", ")
-            switch style {
-            case .remaining:
-                let reading = invert ? "used" : "remaining"
-                image.accessibilityDescription =
-                    "\(labels) long-window quota \(reading)"
-            case .pace:
-                image.accessibilityDescription =
-                    "\(labels) long-window pace"
-            }
+            return "Headroom — no coding providers enabled"
         }
-        return image
+        let labels = active.map(\.displayTitle).joined(separator: ", ")
+        switch style {
+        case .remaining:
+            let reading = invert ? "used" : "remaining"
+            return "\(labels) long-window quota \(reading)"
+        case .pace:
+            return "\(labels) long-window pace"
+        }
     }
 
     private static func drawPaceGlyph(

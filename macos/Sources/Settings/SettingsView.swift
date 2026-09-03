@@ -38,6 +38,10 @@ struct SettingsView: View {
     @State var dropTargetID: String?
     /// Live usage by account id — feeds the Active card's bars.
     @State var usageProviders: [String: QuotaProviderInfo] = [:]
+    /// Last document read here, for General's menu-bar preview strip. Settings
+    /// is its own scene and holds no `UsageStore`, so the preview draws off
+    /// the snapshot `reloadSources()` already fetched.
+    @State var menuBarPreviewSnapshot: UsageSnapshot?
     /// Activity panel pin order from the host (legacy).
     @State var servicesOrder: [String] = IntegrationWatch.activityBlocks(from: nil)
         .map(\.rawValue)
