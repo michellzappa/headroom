@@ -474,6 +474,42 @@ class GrantedResetTests(unittest.TestCase):
         self.assertEqual(got["ideal"][-1][0], got["window_end"])
 
 
+class InPlaceResetTests(unittest.TestCase):
+    """A provider reset the counter without moving its scheduled window."""
+
+    RESET_AT = int(NOW - 6 * 3600)
+
+    def _rows(self):
+        return [
+            {"t": self.RESET_AT - 3600, "provider": "claude",
+             "pool": "week", "pct": 39.0, "window_s": WEEK_S,
+             "resets_in_s": 3 * DAY_S + 3600,
+             "window_start": WINDOW_START},
+            {"t": self.RESET_AT, "provider": "claude", "pool": "week",
+             "pct": 0.0, "window_s": WEEK_S,
+             "resets_in_s": 3 * DAY_S,
+             "window_start": WINDOW_START},
+            {"t": NOW - 3 * 3600, "provider": "claude", "pool": "week",
+             "pct": 15.0, "window_s": WEEK_S,
+             "resets_in_s": 3 * DAY_S - 3 * 3600,
+             "window_start": WINDOW_START},
+            {"t": NOW, "provider": "claude", "pool": "week",
+             "pct": 30.0, "window_s": WEEK_S,
+             "resets_in_s": RESETS,
+             "window_start": WINDOW_START},
+        ]
+
+    def test_fit_starts_after_in_place_reset(self):
+        got = burndown.compute(
+            "claude", "week", payload(30.0), now=NOW, tz=TZ,
+            rows=self._rows())
+        self.assertEqual(got["window_start"], WINDOW_START)
+        self.assertEqual(got["actual"][0][0], self.RESET_AT)
+        self.assertEqual(got["boundaries"], [self.RESET_AT])
+        self.assertAlmostEqual(got["burn_rate_pct"], 120.0, delta=1.0)
+        self.assertLess(got["projected"][-1][1], got["projected"][0][1])
+
+
 class VerdictTests(unittest.TestCase):
     """One short phrase per state, sitting above a stat row rather than
     restating it. Every surface renders the same words."""
