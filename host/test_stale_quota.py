@@ -219,11 +219,22 @@ class CredentialSearchTests(unittest.TestCase):
         oauth_usage.rearm_keychain()
         self.assertFalse(oauth_usage._is_keychain_denied(service))
 
-    def test_credentials_present_does_not_touch_keychain(self):
+    def test_credentials_present_never_prompts(self):
+        """Presence reads the shape fail-closed; the blob path is untouched.
+
+        `_read_keychain_blob` is the path that can pop SecurityAgent and the
+        path a sticky Deny guards. Detection goes straight to Keychain with
+        `allow_ui=False` instead, so a Keychain-stored Claude Code login is
+        found without a prompt and a gated one cannot raise it.
+        """
         with patch.object(oauth_usage, "_read_keychain_blob") as read_kc, \
+             patch.object(keychain, "get_generic_password",
+                          return_value=(keychain.ERR_SEC_ITEM_NOT_FOUND,
+                                        None)) as read, \
              patch.object(oauth_usage, "CREDS_FILE", "/nonexistent/creds"):
             self.assertFalse(oauth_usage.credentials_present())
         read_kc.assert_not_called()
+        self.assertFalse(read.call_args_list[0].kwargs.get("allow_ui", True))
 
     def test_oauth_mem_skips_reread_until_expiry(self):
         path = oauth_usage._headroom_path()

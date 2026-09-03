@@ -328,13 +328,26 @@ struct SetupSourcesList: View {
 
                 ForEach(section.rows) { row in
                     Toggle(isOn: binding(for: row.id)) {
-                        HStack {
-                            Text(row.title)
-                            Spacer()
-                            Text(row.detected ? "Detected" : "Not found")
-                                .font(.caption2)
-                                .foregroundStyle(
-                                    row.detected ? HeadroomPalette.green : .secondary)
+                        // The hint is the only thing on the row that says what
+                        // is being probed. Without it "Claude Status ·
+                        // Detected" sitting under "Claude · Not found" reads
+                        // as one provider contradicting itself, and a ticked
+                        // Copilot looks like a claim about a seat.
+                        VStack(alignment: .leading, spacing: 1) {
+                            HStack {
+                                Text(row.title)
+                                Spacer()
+                                Text(row.detected ? "Detected" : "Not found")
+                                    .font(.caption2)
+                                    .foregroundStyle(
+                                        row.detected ? HeadroomPalette.green : .secondary)
+                            }
+                            if let hint = row.hint, !hint.isEmpty {
+                                Text(hint)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
                         }
                     }
                     .disabled(!enabled)

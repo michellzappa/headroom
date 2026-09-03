@@ -818,7 +818,7 @@ _ZED_SUBSCRIPTION_PRICES = (
 )
 
 BASE_SOURCES = (
-    Source("claude", "Claude", "~/.headroom/oauth (imports Claude login)", 120,
+    Source("claude", "Claude", "Claude Code login — Keychain or ~/.claude", 120,
            oauth_usage.fetch_quota,
            kind="quota", group=GROUP_AI, pools=_CLAUDE_POOLS,
            headline=("week", "session"), accent="#D97757",
@@ -852,7 +852,7 @@ BASE_SOURCES = (
            subscription_prices=_CURSOR_SUBSCRIPTION_PRICES,
            subscription_pricing_url="https://cursor.com/pricing",
            login_hint="sign in to Cursor"),
-    Source("copilot", "Copilot", "GitHub token / `gh auth`", 60,
+    Source("copilot", "Copilot", "Copilot sign-in on this Mac", 60,
            copilot_usage.fetch_quota,
            kind="quota", group=GROUP_AI, pools=_COPILOT_POOLS,
            headline=("premium", "chat"), accent="#A371F7",
@@ -909,7 +909,7 @@ BASE_SOURCES = (
            accent="#111111"),
     # Non-quota rows are appended after quotas in ordered_sources(); keep this
     # with the other activity sources so SOURCE_IDS stays in rollup order.
-    Source("claude-status", "Claude Status", "status.claude.com", 60,
+    Source("claude-status", "Claude Status", "status.claude.com — incidents, not your quota", 60,
            claude_status.fetch, _detail_claude_status, _summary_claude_status,
            _blank_claude_status, kind="activity", group=GROUP_AI),
     Source("vercel", "Vercel", "Vercel CLI login", 60,

@@ -183,9 +183,7 @@ def rearm_keychain(account=None):
     Bound to a user-initiated refresh in the UI — background polls must not
     clear this, or Deny becomes a 20s modal loop again.
     """
-    services = [_keychain_service(account)]
-    if account is None:
-        services.append(KEYCHAIN_SERVICE)
+    services = _keychain_services(account)
     with _deny_lock:
         for service in services:
             _keychain_denied.pop(service, None)
@@ -497,15 +495,60 @@ def _live_oauth(blob):
 def credentials_present(account=None):
     """Whether this config directory has a usable Claude OAuth token.
 
-    Checks Headroom's file and the Claude credential file without touching
-    Keychain, so detection / seeding never pops SecurityAgent. Keychain is
-    only consulted on a real fetch (and only when Headroom has no copy yet).
+    Files first, then the Keychain item's *existence* — attributes only, with
+    `kSecUseAuthenticationUIFail`, so detection still never pops SecurityAgent
+    and a sticky Deny cannot turn into a modal loop. A real fetch is still the
+    only thing that reads the secret.
+
+    Skipping Keychain entirely was the safer-looking version and it was wrong:
+    Claude Code stores credentials there by default on macOS and writes
+    `~/.claude/.credentials.json` only in the file-store configuration, so the
+    two file checks below miss the common Mac. First run then offered "Claude —
+    Not found" to people running Claude Code at that moment, and seeding turns
+    on what it detects, so the provider the app exists for arrived switched off.
     """
     if _oauth_block(_read_file_blob(_headroom_path(account))):
         return True
     if _oauth_block(_read_file_blob(_creds_file(account))):
         return True
-    return False
+    return any(_keychain_oauth_present(service)
+               for service in _keychain_services(account))
+
+
+def _keychain_oauth_present(service):
+    """Whether one Keychain service holds a Claude *login*, quietly.
+
+    Existence alone is not the question. The item Claude Code owns is a JSON
+    blob that also carries unrelated grants — a Mac that has only ever
+    authorized an MCP server has `mcpOAuth` in there and no `claudeAiOauth`,
+    and calling that "Detected" trades the old false negative for a new false
+    positive: a row that seeds itself on and then only ever says Needs sign-in.
+
+    So read the shape, with `allow_ui=False` — a probe still must not prompt.
+    An item this process cannot read without interaction is the one case with
+    no answer; fall back to its existence there, since a gated item under
+    Claude Code's service is far more likely a login than not.
+    """
+    try:
+        status, raw = keychain.get_generic_password(service, allow_ui=False)
+    except keychain.KeychainError:
+        return False
+    if status == keychain.ERR_SEC_INTERACTION_NOT_ALLOWED:
+        return keychain.generic_password_exists(service)
+    if status != keychain.ERR_SEC_SUCCESS or not raw:
+        return False
+    try:
+        return bool(_oauth_block(json.loads(raw)))
+    except (json.JSONDecodeError, TypeError):
+        return False
+
+
+def _keychain_services(account=None):
+    """Keychain services that may hold this login, newest layout first."""
+    services = [_keychain_service(account)]
+    if account is None:
+        services.append(KEYCHAIN_SERVICE)
+    return services
 
 
 def _credentials_hint(account=None):
