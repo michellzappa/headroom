@@ -196,6 +196,17 @@ enum ActivityGrouping {
 }
 
 extension ActivityItem {
+    /// Does this row belong on Attention?
+    ///
+    /// Status decides it for everything the host can describe in one word.
+    /// Where it cannot — an assignment that is still `assigned` but a year
+    /// old — the host sends its own verdict and that wins. Every surface
+    /// asks here, so the Attention queue and the "everything else" feed can
+    /// never both drop the same row.
+    var needsAttention: Bool {
+        hostNeedsAttention ?? ActivityStatusStyle.resolve(status).needsAttention
+    }
+
     /// "Review · web · @alice · #42" / "Failed · headroom · Release · main ·
     /// 1901f54" — state first, then the coordinates. Mac and iOS both call
     /// this so Attention and Activity stay word-for-word across appearances.

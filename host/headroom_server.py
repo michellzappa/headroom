@@ -297,6 +297,9 @@ def _build_activity(vercel, git, supabase=None, github=None,
             "id": f"github-inbox:{item.get('id')}",
             "kind": "github",
             "status": reason,
+            # Aged rows keep their status word in the feed and stop counting
+            # as Attention — the status vocabulary alone cannot say that.
+            "needs_attention": item.get("needs_attention", True),
             "subject": item.get("title") or "GitHub",
             "repo": item.get("repo"),
             "project": None,
@@ -1180,8 +1183,10 @@ def _build_attention(doc):
 
     # Incoming review requests / assignments on the watched list — warn, not
     # critical: they are yours to answer, but they are not a red CI.
-    inbox = github.get("inbox") or []
-    inbox_count = int(github.get("inbox_count") or len(inbox) or 0)
+    # Only rows inside ATTENTION_INBOX_MAX_AGE_S count here. An assignment
+    # nobody has touched in two weeks stays in the feed and stops paging.
+    inbox = github_actions.attention_inbox(github.get("inbox") or [])
+    inbox_count = len(inbox)
     if github.get("configured") and inbox_count > 0:
         summary = github_actions.attention_inbox_summary(inbox) or (
             f"{inbox_count} GitHub inbox"

@@ -508,6 +508,34 @@ final class ContractTests: XCTestCase {
         XCTAssertEqual(
             row.caption(label: style.label),
             "\(HeadroomCopy.activityReviewRequest) · web · @alice · #42")
+        // No verdict on the wire: status decides, same as every older host.
+        XCTAssertTrue(row.needsAttention)
+    }
+
+    func testAnAgedInboxRowKeepsItsWordAndLeavesAttention() throws {
+        // A year-old assignment is still `assigned` — the word is right and
+        // the row belongs in the feed. Only the host knows it stopped being
+        // attention, so it says so per row.
+        let row = try JSONDecoder().decode(
+            ActivityItem.self,
+            from: Data("""
+                {
+                  "id":"github-inbox:100",
+                  "kind":"github",
+                  "status":"assigned",
+                  "subject":"Limit headline to 200 chars",
+                  "repo":"acme/core",
+                  "needs_attention":false,
+                  "ago":"371d"
+                }
+                """.utf8
+            )
+        )
+        XCTAssertFalse(row.needsAttention)
+        XCTAssertTrue(ActivityStatusStyle.resolve(row.status).needsAttention)
+        XCTAssertEqual(
+            row.caption(label: ActivityStatusStyle.resolve(row.status).label),
+            "\(HeadroomCopy.activityAssigned) · core")
     }
 
     func testARateLimitedProviderSaysPausedNotNotUpdating() throws {

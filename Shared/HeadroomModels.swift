@@ -1981,10 +1981,14 @@ struct GitHubInboxItem: Decodable, Identifiable, Sendable {
     var url: String?
     var isPr: Bool?
     var ago: String?
+    /// See `ActivityItem.hostNeedsAttention` — false once the row is older
+    /// than the host's inbox attention window.
+    var hostNeedsAttention: Bool?
 
     enum CodingKeys: String, CodingKey {
         case id, reason, repo, number, title, author, url, ago
         case isPr = "is_pr"
+        case hostNeedsAttention = "needs_attention"
     }
 }
 
@@ -2049,12 +2053,18 @@ struct ActivityItem: Decodable, Identifiable, Sendable {
     var errorMessage: String?
     var url: String?
     var inspectorURL: String?
+    /// Host verdict on whether this row belongs on Attention, overriding the
+    /// status vocabulary. Sent only where status cannot carry the answer —
+    /// an aged GitHub assignment is still "assigned" and still belongs in the
+    /// feed. Absent on older hosts, so `needsAttention` falls back to status.
+    var hostNeedsAttention: Bool?
 
     enum CodingKeys: String, CodingKey {
         case id, kind, status, subject, repo, project, branch, sha, target, author, number, ago, url
         case shortSHA = "short_sha"
         case errorMessage = "error_message"
         case inspectorURL = "inspector_url"
+        case hostNeedsAttention = "needs_attention"
     }
 }
 

@@ -756,6 +756,7 @@
         "author": "alice",
         "url": "https://github.com/acme/web/pull/42",
         "is_pr": true,
+        "needs_attention": true,
         "ago": "12m"
       }
     ],

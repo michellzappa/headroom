@@ -28,6 +28,13 @@ Policy that already lives next to the code (do not turn these into prefs):
 - GitHub inbox on watched repos is review requests, assignments, and
   @mentions (warn). Mentions stay scoped to the watch list — not every
   @you on GitHub — so the pip stays useful for CI and review oversight.
+- Inbox rows age out at `ATTENTION_INBOX_MAX_AGE_S` (14 days, untouched),
+  the same posture as Actions failures on their 24h clock. An assignment
+  nobody has answered in two weeks is debt: it stays in Activity, and the
+  host says so per row with `needs_attention` because the status word
+  cannot ([`contract.md`](contract.md)). Before the gate these rows came
+  back on every relaunch — dismissal is per-run memory, so an item that
+  never leaves the search never leaves the queue.
 
 **Dismiss all** clears the queue on this surface and acks the current
 fingerprint until reasons change. Ack state (`attention_ack_fingerprint` in

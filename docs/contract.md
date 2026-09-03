@@ -134,6 +134,17 @@ thinning: a two-hour ramp where the chart should read as a step.
 exactly what it was. Clients read it through `historyRisers`, which falls back
 to `resets` for a host that predates the key.
 
+`activity[].needs_attention` is a third shape: a key that exists to overrule
+a client-side derivation. Every surface used to decide the Attention queue
+from `status` alone, which works while one word can carry the answer. It
+cannot for the GitHub inbox — an assignment a year old is still `assigned`,
+still belongs in the feed, and stopped being attention months ago. The host
+now states the verdict and the clients read
+`hostNeedsAttention ?? ActivityStatusStyle.resolve(status).needsAttention`,
+so a host that predates the key keeps the old behaviour. Absent means "ask
+status", not `false` — which is why the field is optional in Swift and
+defaulted at the use site rather than at the decoder.
+
 The board is the exception the deprecation window above describes. Its `gpts`
 key had one writer and zero readers, so it was replaced outright by `hist` /
 `rsts` rather than carried: there was no shipped firmware to break.

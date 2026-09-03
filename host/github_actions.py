@@ -39,6 +39,11 @@ UA = "Headroom/1"
 # Only failures this fresh light Attention. Older runs still appear in the
 # activity feed, but a 100-day-old red CI on some other repo shouldn't nag.
 ATTENTION_FAIL_MAX_AGE_S = 24 * 3600
+# Same rule for the inbox, on the longer clock a human review or assignment
+# deserves. An issue nobody has touched in two weeks is aged debt, not
+# attention: it kept coming back on every relaunch and taught people to
+# ignore the queue. Aged rows stay in the feed and stop lighting the pip.
+ATTENTION_INBOX_MAX_AGE_S = 14 * 24 * 3600
 # Bot / advisory workflows — show in the feed if useful later, but don't
 # inflate Attention fail counts (same PR often fans out into many of these).
 NOISE_WORKFLOW_NAMES = {
@@ -370,6 +375,29 @@ def attention_fail_count(rows, now=None):
     })
 
 
+def inbox_is_fresh(item, now=None):
+    """Does this inbox row still belong on Attention?
+
+    Rows without a timestamp stay fresh, same as failures — unknown age is
+    never a reason to hide something.
+    """
+    if not isinstance(item, dict):
+        return False
+    updated = item.get("created_at")
+    if updated is None:
+        return True
+    try:
+        age = (now if now is not None else time.time()) - float(updated)
+    except (TypeError, ValueError):
+        return True
+    return age <= ATTENTION_INBOX_MAX_AGE_S
+
+
+def attention_inbox(items, now=None):
+    """Inbox rows fresh enough to light the Attention pip."""
+    return [item for item in (items or []) if inbox_is_fresh(item, now=now)]
+
+
 def _repo_slug_from_api_url(url):
     """`https://api.github.com/repos/acme/web` → `acme/web`."""
     if not isinstance(url, str) or not url:
@@ -398,6 +426,9 @@ def _flatten_inbox_item(item, reason):
     return {
         "id": str(item.get("id") or f"{repo}#{number}"),
         "reason": reason,
+        # Host verdict, so every client draws the same queue without each one
+        # re-deriving the age rule. See docs/contract.md.
+        "needs_attention": inbox_is_fresh({"created_at": created}),
         "repo": repo,
         "number": number,
         "title": title,
