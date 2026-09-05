@@ -40,6 +40,12 @@ enum HeadroomWidgetCache {
                     forProviderID: provider.id
                 )
                 let ringLayers = provider.ringLayers(burndown: burndownRings)
+                let headlineBurndown = snapshot.overviewBurndown(
+                    forProviderID: provider.id
+                )
+                let headlinePoolID =
+                    headlineBurndown?.pool
+                    ?? snapshot.meter(for: provider).headline.id
                 let bindingPool = provider.visiblePools
                     .compactMap { entry -> (id: String, percent: Double, pace: Double?)? in
                         guard let percent = entry.pool.pct else { return nil }
@@ -48,10 +54,13 @@ enum HeadroomWidgetCache {
                         }?.pacePercent
                         return (entry.id, percent, sampledPace ?? entry.pool.pacePct)
                     }
-                    .max { $0.percent < $1.percent }
+                    .first { $0.id == headlinePoolID }
                 let percent = bindingPool?.percent ?? 0
                 let paceDeltaPct = bindingPool.flatMap { pool in
-                    pool.pace.map { $0 - pool.percent }
+                    if let pace = pool.pace {
+                        return pace - pool.percent
+                    }
+                    return headlineBurndown?.deltaPct
                 }
                 return HeadroomWidgetSnapshot.Provider(
                     id: provider.id,

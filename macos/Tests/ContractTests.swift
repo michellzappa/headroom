@@ -1091,11 +1091,13 @@ final class WidgetSnapshotSkewTests: XCTestCase {
                 "pools": {
                   "week": {
                     "title": "Weekly", "rank": 0, "pct": 16,
-                    "pace_pct": 27, "resets_in": "5d 2h", "ring": true
+                    "pace_pct": 27, "resets_in": "5d 2h",
+                    "window_s": 604800, "ring": true
                   },
                   "session": {
-                    "title": "Session", "rank": 1, "pct": 4,
-                    "pace_pct": 8, "resets_in": "1h 34m", "ring": true
+                    "title": "Session", "rank": 1, "pct": 44,
+                    "pace_pct": 53, "resets_in": "1h 34m",
+                    "window_s": 18000, "ring": true
                   }
                 }
               }],
@@ -1113,6 +1115,7 @@ final class WidgetSnapshotSkewTests: XCTestCase {
 
         let cached = HeadroomWidgetCache.save(usage)
         let provider = try XCTUnwrap(cached.providers.first)
+        XCTAssertEqual(provider.percent, 16)
         XCTAssertEqual(provider.paceDeltaPct, 11)
         XCTAssertEqual(provider.sessionResetsIn, "1h 34m")
         XCTAssertEqual(provider.weekResetsIn, "5d 2h")
@@ -1191,12 +1194,12 @@ final class WidgetSnapshotSkewTests: XCTestCase {
 
         let provider = try XCTUnwrap(
             HeadroomWidgetCache.save(usage).providers.first)
-        XCTAssertEqual(provider.percent, 80)
-        XCTAssertNil(provider.paceDeltaPct)
-        XCTAssertEqual(provider.widgetPaceSlackLabel, "— to spare")
+        XCTAssertEqual(provider.percent, 20)
+        XCTAssertEqual(provider.paceDeltaPct, 10)
+        XCTAssertEqual(provider.widgetPaceSlackLabel, "10% to spare")
         XCTAssertEqual(
             provider.macWidgetMediumSummaryLabel,
-            "Claude: 20% left, — spare"
+            "Claude: 80% left, 10% spare"
         )
     }
 
