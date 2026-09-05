@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "version": "2.1.2",
-  "published": "2026-09-03T06:48:38Z",
-  "url": "https://github.com/michellzappa/headroom/releases/download/v2.1.2/Headroom-macOS.zip",
-  "sha256": "30316381dc4068a3e0ed7897ad5bd92b3c643a54b62518e2e3ab5a4e4ec08aaa",
-  "size": 6293755,
+  "version": "2.1.3",
+  "published": "2026-09-05T09:03:55Z",
+  "url": "https://github.com/michellzappa/headroom/releases/download/v2.1.3/Headroom-macOS.zip",
+  "sha256": "f4025d3e0fafb20cef4076837c7d138954070f85e0566ff41ab2416551421424",
+  "size": 6417030,
   "min_macos": "14.0",
-  "notes_md": "### Added\n\n- **Settings shows the menu bar glyph before you pick it.** General draws a\n  Preview strip above the icon picker, using the same renderer the status item\n  uses at the same size, on a dimmed strip with a wifi glyph, a battery and a\n  clock. Switching between Remaining and Pace, or flipping Invert, changes the\n  mark in front of you instead of sending you up to the menu bar and back. It\n  draws your own top three. With no coding provider on it falls back to sample\n  numbers and says so: the glyph is real, the numbers in it are not."
+  "notes_md": "### Added\n\n- **Settings → Desk display.** The ESP32 board's panel settings now live on\n  the Mac, beside iPhone and Other Macs. Brightness in four steps (25, 50, 75,\n  100%), Dim at night (10% from 22:00 to 07:00 in the host's time zone),\n  Celebrate quota resets, Boot animation, and which of the Vercel, Git and\n  Local servers pages the BOOT button cycles through. The pane also shows the\n  firmware stamp the board reports, how it is connected, and when it last\n  polled. The host stores the answers in `~/.headroom/config.json`, ships them\n  to the board as an additive `display` block in the device view, and the board\n  applies them on its next poll and keeps them in NVS, so a cold boot without\n  the host comes up the same way. A host older than this leaves the pane\n  read-only; a board flashed before this ignores the block. `PANEL_BRIGHTNESS`\n  in the firmware config is now only the first-boot level. Rings/Pace and the\n  lower pane stay on-board gestures. Needs a reflash to take effect on the\n  board."
 }
