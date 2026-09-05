@@ -934,10 +934,14 @@ struct DeskDisplayConfiguration: Decodable, Sendable {
     var brightnessPct = 75
     var brightnessSteps = [25, 50, 75, 100]
     var dimAtNight = false
+    var dimStartHour = 22
+    var dimEndHour = 7
+    var dimBrightnessPct = 10
+    var dimRampMinutes = 30
     var dimmedNow = false
-    var nightStartHour = 22
-    var nightEndHour = 7
-    var nightBrightnessPct = 10
+    /// What the host is serving right now: the chosen level, the dim level,
+    /// or a point on the fade between them.
+    var brightnessNowPct = 75
     var celebrateResets = true
     var bootSplash = true
     /// Page id → shown, for the pages the board can hide (`vercel`, `git`,
@@ -952,10 +956,12 @@ struct DeskDisplayConfiguration: Decodable, Sendable {
         case brightnessPct = "brightness_pct"
         case brightnessSteps = "brightness_steps"
         case dimAtNight = "dim_at_night"
+        case dimStartHour = "dim_start_hour"
+        case dimEndHour = "dim_end_hour"
+        case dimBrightnessPct = "dim_brightness_pct"
+        case dimRampMinutes = "dim_ramp_minutes"
         case dimmedNow = "dimmed_now"
-        case nightStartHour = "night_start_hour"
-        case nightEndHour = "night_end_hour"
-        case nightBrightnessPct = "night_brightness_pct"
+        case brightnessNowPct = "brightness_now_pct"
         case celebrateResets = "celebrate_resets"
         case bootSplash = "boot_splash"
         case pages, board
@@ -966,10 +972,12 @@ struct DeskDisplayConfiguration: Decodable, Sendable {
         brightnessPct = try c.decodeIfPresent(Int.self, forKey: .brightnessPct) ?? brightnessPct
         brightnessSteps = try c.decodeIfPresent([Int].self, forKey: .brightnessSteps) ?? brightnessSteps
         dimAtNight = try c.decodeIfPresent(Bool.self, forKey: .dimAtNight) ?? dimAtNight
+        dimStartHour = try c.decodeIfPresent(Int.self, forKey: .dimStartHour) ?? dimStartHour
+        dimEndHour = try c.decodeIfPresent(Int.self, forKey: .dimEndHour) ?? dimEndHour
+        dimBrightnessPct = try c.decodeIfPresent(Int.self, forKey: .dimBrightnessPct) ?? dimBrightnessPct
+        dimRampMinutes = try c.decodeIfPresent(Int.self, forKey: .dimRampMinutes) ?? dimRampMinutes
         dimmedNow = try c.decodeIfPresent(Bool.self, forKey: .dimmedNow) ?? dimmedNow
-        nightStartHour = try c.decodeIfPresent(Int.self, forKey: .nightStartHour) ?? nightStartHour
-        nightEndHour = try c.decodeIfPresent(Int.self, forKey: .nightEndHour) ?? nightEndHour
-        nightBrightnessPct = try c.decodeIfPresent(Int.self, forKey: .nightBrightnessPct) ?? nightBrightnessPct
+        brightnessNowPct = try c.decodeIfPresent(Int.self, forKey: .brightnessNowPct) ?? brightnessPct
         celebrateResets = try c.decodeIfPresent(Bool.self, forKey: .celebrateResets) ?? celebrateResets
         bootSplash = try c.decodeIfPresent(Bool.self, forKey: .bootSplash) ?? bootSplash
         pages = try c.decodeIfPresent([String: Bool].self, forKey: .pages) ?? pages
@@ -979,15 +987,30 @@ struct DeskDisplayConfiguration: Decodable, Sendable {
 
 /// What the board reported on its last poll: the firmware stamp
 /// (`build.commit[-dirty]`, see firmware/version.py), which transport carried
-/// it (`wifi` / `usb`) and how long ago.
+/// it (`wifi` / `usb`), how long ago, and the cadence the host has observed
+/// between polls (absent until it has seen two).
 struct DeskDisplayBoard: Decodable, Sendable {
     var firmware: String?
     var via: String?
     var ageS: Int?
+    var pollS: Int?
 
     enum CodingKeys: String, CodingKey {
         case firmware, via
         case ageS = "age_s"
+        case pollS = "poll_s"
+    }
+
+    /// Liveness, judged against the board's own cadence. With no cadence yet
+    /// the host's 60 s default poll stands in.
+    enum Liveness { case live, late, lost }
+
+    var liveness: Liveness {
+        guard let ageS else { return .lost }
+        let cadence = Double(pollS ?? 60)
+        if Double(ageS) <= cadence * 2.5 { return .live }
+        if Double(ageS) <= cadence * 6 { return .late }
+        return .lost
     }
 }
 
@@ -996,6 +1019,8 @@ struct DeskDisplayBoard: Decodable, Sendable {
 enum DeskDisplayChange: Sendable {
     case brightnessPct(Int)
     case dimAtNight(Bool)
+    case dimStartHour(Int)
+    case dimEndHour(Int)
     case celebrateResets(Bool)
     case bootSplash(Bool)
     case page(String, shown: Bool)
@@ -1004,6 +1029,8 @@ enum DeskDisplayChange: Sendable {
         switch self {
         case .brightnessPct(let pct): return ["brightness_pct": pct]
         case .dimAtNight(let on): return ["dim_at_night": on]
+        case .dimStartHour(let hour): return ["dim_start_hour": hour]
+        case .dimEndHour(let hour): return ["dim_end_hour": hour]
         case .celebrateResets(let on): return ["celebrate_resets": on]
         case .bootSplash(let on): return ["boot_splash": on]
         case .page(let id, let shown): return ["pages": [id: shown]]

@@ -252,9 +252,10 @@ poll, not a second source of usage data. `device_effect` is a command envelope:
 older firmware ignores it and flashed firmware consumes each id once. `display`
 is the panel settings Mac Settings → Desk display holds — brightness in panel
 units, whether resets are celebrated, whether the boot animation plays, and
-which source pages BOOT cycles through. The values are *effective*: night
-dimming is decided on the host, so a dimmed brightness arrives already dimmed
-and the board never learns why. Firmware that predates the block never asks
+which source pages BOOT cycles through. The values are *effective*: scheduled
+dimming is decided on the host, and so is the thirty-minute fade into and out
+of it, so a dimmed or mid-fade brightness arrives as a number and the board
+never learns why. Firmware that predates the block never asks
 for the key; firmware that has it mirrors the block to NVS and keeps the last
 answer when a host stops sending one. Rings/Pace and the lower pane are not in
 it on purpose — they are board-side gestures, and a setting with two owners

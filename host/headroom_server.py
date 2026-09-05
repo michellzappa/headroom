@@ -1603,7 +1603,12 @@ def _providers_payload(state, burndowns=None):
 # the question "is the ROM on my desk the build I flashed" should not have a
 # Wi-Fi answer and a cable answer.
 _device_lock = threading.Lock()
-_device = {"firmware": None, "seen": 0.0, "via": None}
+# `gaps` holds the last few intervals between polls; their median is the
+# board's cadence as observed, which is the only place it can be observed —
+# POLL_INTERVAL_S lives in the board's config.h and never travels. A forced
+# sync or a backoff retry lands one odd gap; the median shrugs it off.
+_device = {"firmware": None, "seen": 0.0, "via": None, "gaps": []}
+_DEVICE_GAP_SAMPLES = 5
 _device_effect_lock = threading.Lock()
 _device_effect = {"id": 0, "kind": None, "provider": None}
 
@@ -1621,21 +1626,34 @@ def _note_device(query, via):
         return
     if not firmware:
         return
+    now = time.time()
     with _device_lock:
         if _device["firmware"] != firmware:
             print(f"device firmware {firmware} (via {via})", flush=True)
-        _device.update(firmware=firmware[:64], seen=time.time(), via=via)
+        if _device["seen"] > 0:
+            gap = now - _device["seen"]
+            # Sub-second doubles (one poll, two transports) say nothing about
+            # cadence; anything longer is a real interval, odd or not.
+            if gap >= 1.0:
+                _device["gaps"] = (_device["gaps"] + [gap])[-_DEVICE_GAP_SAMPLES:]
+        _device.update(firmware=firmware[:64], seen=now, via=via)
 
 
 def _device_payload(now):
     with _device_lock:
         if not _device["firmware"]:
             return None
-        return {
+        payload = {
             "firmware": _device["firmware"],
             "via": _device["via"],
             "age_s": int(max(0, now - _device["seen"])),
         }
+        gaps = sorted(_device["gaps"])
+        if gaps:
+            # Median of the observed intervals, so one forced sync or one
+            # backoff retry does not move it. Absent until a second poll.
+            payload["poll_s"] = int(round(gaps[len(gaps) // 2]))
+        return payload
 
 
 def _device_effect_payload():
@@ -2553,6 +2571,8 @@ class Handler(BaseHTTPRequestHandler):
                 app_config.set_display(
                     brightness_pct=payload.get("brightness_pct"),
                     dim_at_night=payload.get("dim_at_night"),
+                    dim_start_hour=payload.get("dim_start_hour"),
+                    dim_end_hour=payload.get("dim_end_hour"),
                     celebrate_resets=payload.get("celebrate_resets"),
                     boot_splash=payload.get("boot_splash"),
                     pages=payload.get("pages"),

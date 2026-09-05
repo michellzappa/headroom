@@ -73,6 +73,10 @@ DEFAULTS = {
     # One board talks to one host, so none of this is in SHARED_CONFIG_KEYS.
     "display_brightness_pct": 75,
     "display_dim_at_night": False,
+    # Local hours (0-23) in the configured time zone. Equal hours mean no
+    # window; a window may cross midnight.
+    "display_dim_start_hour": 22,
+    "display_dim_end_hour": 7,
     "display_celebrate_resets": True,
     "display_boot_splash": True,
     # Pages the BOOT button cycles through, on top of the source being enabled
@@ -202,13 +206,14 @@ def set_timezone(value):
 # within a few units of the 200 the firmware shipped with as a compile-time
 # constant, so a board that has never been told anything looks the same.
 DISPLAY_BRIGHTNESS_STEPS = (25, 50, 75, 100)
-# Night dimming is one toggle, not a schedule. The window and the level are
-# product judgment (docs/product.md, "What earns a Setting"): the board sat at
-# 10% after a fixed 22:00 bedtime before dimming was removed in 2.0.9, and the
-# same numbers come back here as an opt-in.
-DISPLAY_NIGHT_START_HOUR = 22
-DISPLAY_NIGHT_END_HOUR = 7
-DISPLAY_NIGHT_BRIGHTNESS_PCT = 10
+# Scheduled dimming: one toggle plus a start and an end hour. The level it
+# fades to and how long the fade takes are product judgment (docs/product.md,
+# "What earns a Setting"): 10% is what the board sat at after bedtime before
+# dimming was removed in 2.0.9. The fade is served, not flashed — the host
+# interpolates the brightness it hands the board, and a board polling once a
+# minute sees about thirty steps of a few panel units each.
+DISPLAY_DIM_BRIGHTNESS_PCT = 10
+DISPLAY_DIM_RAMP_MIN = 30
 # Pages the board can hide. Slots are the host's `focus` and stay out of this:
 # an empty slot is a page that does not exist, not one that is hidden.
 DISPLAY_PAGE_IDS = ("vercel", "git", "local")
@@ -232,6 +237,23 @@ def display_dim_at_night():
     return _display_bool("display_dim_at_night")
 
 
+def _display_hour(key):
+    value = get(key, DEFAULTS[key])
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        return DEFAULTS[key]
+    return value if 0 <= value <= 23 else DEFAULTS[key]
+
+
+def display_dim_start_hour():
+    return _display_hour("display_dim_start_hour")
+
+
+def display_dim_end_hour():
+    return _display_hour("display_dim_end_hour")
+
+
 def display_celebrate_resets():
     return _display_bool("display_celebrate_resets")
 
@@ -252,23 +274,51 @@ def display_pages():
     return pages
 
 
-def display_night_now(now=None):
-    """True while the local clock, in the configured zone, is inside the night window."""
+def _display_minute_of_day(now):
     if now is None:
         now = time.time()
     try:
         zone = ZoneInfo(timezone_name())
     except Exception:
         zone = ZoneInfo("UTC")
-    hour = datetime.fromtimestamp(now, zone).hour
-    start, end = DISPLAY_NIGHT_START_HOUR, DISPLAY_NIGHT_END_HOUR
-    if start > end:  # crosses midnight
-        return hour >= start or hour < end
-    return start <= hour < end
+    local = datetime.fromtimestamp(now, zone)
+    return local.hour * 60 + local.minute + local.second / 60.0
+
+
+def display_dim_fraction(now=None):
+    """0.0 at the chosen level, 1.0 fully dimmed, in between during a fade.
+
+    Minutes since the start hour and since the end hour are both taken modulo
+    a day, so a window that crosses midnight needs no special case. Inside the
+    window the first DISPLAY_DIM_RAMP_MIN minutes fade down; after the window
+    the same span fades back. Equal hours are no window.
+    """
+    if not display_dim_at_night():
+        return 0.0
+    start = display_dim_start_hour() * 60
+    end = display_dim_end_hour() * 60
+    length = (end - start) % 1440
+    if length == 0:
+        return 0.0
+    t = _display_minute_of_day(now)
+    since_start = (t - start) % 1440
+    since_end = (t - end) % 1440
+    ramp = float(DISPLAY_DIM_RAMP_MIN)
+    if since_start < length:
+        return min(1.0, since_start / ramp)
+    if since_end < ramp:
+        return 1.0 - since_end / ramp
+    return 0.0
 
 
 def display_dimmed_now(now=None):
-    return display_dim_at_night() and display_night_now(now)
+    return display_dim_fraction(now) > 0.0
+
+
+def display_effective_brightness_pct(now=None):
+    base = display_brightness_pct()
+    fraction = display_dim_fraction(now)
+    return int(round(base + (DISPLAY_DIM_BRIGHTNESS_PCT - base) * fraction))
 
 
 def display_settings(now=None):
@@ -277,10 +327,12 @@ def display_settings(now=None):
         "brightness_pct": display_brightness_pct(),
         "brightness_steps": list(DISPLAY_BRIGHTNESS_STEPS),
         "dim_at_night": display_dim_at_night(),
+        "dim_start_hour": display_dim_start_hour(),
+        "dim_end_hour": display_dim_end_hour(),
+        "dim_brightness_pct": DISPLAY_DIM_BRIGHTNESS_PCT,
+        "dim_ramp_minutes": DISPLAY_DIM_RAMP_MIN,
         "dimmed_now": display_dimmed_now(now),
-        "night_start_hour": DISPLAY_NIGHT_START_HOUR,
-        "night_end_hour": DISPLAY_NIGHT_END_HOUR,
-        "night_brightness_pct": DISPLAY_NIGHT_BRIGHTNESS_PCT,
+        "brightness_now_pct": display_effective_brightness_pct(now),
         "celebrate_resets": display_celebrate_resets(),
         "boot_splash": display_boot_splash(),
         "pages": display_pages(),
@@ -291,11 +343,11 @@ def display_projection(now=None):
     """The `display` block the board reads from `/usage?view=device`.
 
     Effective values only: the board applies `brightness` as panel units and
-    never learns whether it is dimmed because of a schedule. Deciding is the
-    host's job (docs/contract.md — the board is a render target).
+    never learns whether it is dimmed because of a schedule, or mid-fade.
+    Deciding is the host's job (docs/contract.md — the board is a render
+    target), and so is the fade.
     """
-    pct = (DISPLAY_NIGHT_BRIGHTNESS_PCT if display_dimmed_now(now)
-           else display_brightness_pct())
+    pct = display_effective_brightness_pct(now)
     return {
         "brightness": max(1, min(255, round(255 * pct / 100))),
         "celebrate_resets": display_celebrate_resets(),
@@ -304,10 +356,24 @@ def display_projection(now=None):
     }
 
 
-def set_display(brightness_pct=None, dim_at_night=None, celebrate_resets=None,
-                boot_splash=None, pages=None):
+def set_display(brightness_pct=None, dim_at_night=None, dim_start_hour=None,
+                dim_end_hour=None, celebrate_resets=None, boot_splash=None,
+                pages=None):
     """Persist the desk display settings. Omitted arguments are left alone."""
     updates = {}
+    for key, value in (("display_dim_start_hour", dim_start_hour),
+                       ("display_dim_end_hour", dim_end_hour)):
+        if value is None:
+            continue
+        if isinstance(value, bool):
+            raise ValueError(f"{key[len('display_'):]} must be an hour, 0-23")
+        try:
+            hour = int(value)
+        except (TypeError, ValueError):
+            raise ValueError(f"{key[len('display_'):]} must be an hour, 0-23")
+        if not 0 <= hour <= 23:
+            raise ValueError(f"{key[len('display_'):]} must be an hour, 0-23")
+        updates[key] = hour
     if brightness_pct is not None:
         try:
             value = int(brightness_pct)

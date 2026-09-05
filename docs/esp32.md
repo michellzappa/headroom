@@ -178,15 +178,19 @@ mirrors them to NVS — a cold boot without the host comes up the same way.
 | Setting | What it does | Default |
 |---|---|---|
 | **Brightness** | 25 / 50 / 75 / 100% of the panel's range | 75% |
-| **Dim at night** | Holds 10% from 22:00 to 07:00 in the host's time zone (Settings → General → Day boundaries). The window and level are fixed, not settings | off |
+| **Dim on a schedule** | From and Until hours in the host's time zone (Settings → General → Day boundaries). The host fades the served brightness to 10% over 30 minutes after the start hour and back after the end hour; the board just applies what arrives each poll, so it sees about thirty small steps. Level and fade length are fixed, not settings | off, 22:00 to 07:00 |
 | **Celebrate quota resets** | The confetti burst below, and the remote test command | on |
 | **Boot animation** | The four-second title sequence on power-up. Off, the board goes straight to the amber checklist | on |
 | **Pages** | Which of Vercel, Git and Local servers the BOOT button cycles through. A page also needs its source on under Integrations | all on |
 
 The pane also shows what the board last reported: firmware stamp
-(`build.commit`, see `firmware/version.py`), transport and how long ago. A
-board that has never polled this host leaves that section empty, and a host
-that predates the pane makes it read-only.
+(`build.commit`, see `firmware/version.py`), transport, how long ago, and the
+poll cadence the host has measured between its requests. A dot beside Last
+seen is green within two and a half polls, orange within six, red after that.
+A board that has never polled this host leaves that section empty, and a host
+that predates the pane makes it read-only. Pages are offered one to one with
+the sources the host lists: a source that is off under Integrations shows as
+off here and cannot be switched on from this pane.
 
 Rings/Pace and the lower pane are **not** in the pane. They stay board-side
 gestures (hold a slot, tap the header) so no setting has two owners.
