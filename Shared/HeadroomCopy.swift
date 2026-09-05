@@ -59,6 +59,46 @@ enum HeadroomCopy {
     static let balanceLeft = "left"
     static let settingsConnection = "Connection"
     static let settingsPermissions = "Permissions"
+
+    // MARK: Desk display (Settings → Desk display; the ESP32 board)
+    //
+    // Host-owned settings for the panel. Nothing here talks to the board; the
+    // host ships the answers in the device projection and the board applies
+    // them on its next poll (docs/esp32.md, "Settings").
+
+    static let settingsDeskDisplay = "Desk display"
+    static let deskDisplayBoard = "Board"
+    static let deskDisplayFirmware = "Firmware"
+    static let deskDisplayConnection = "Connection"
+    static let deskDisplayLastSeen = "Last seen"
+    static let deskDisplayNoBoard =
+        "No board has reported in yet. One appears here after its first poll of this host."
+    static let deskDisplayBoardHint =
+        "Firmware is the build number and commit running on the board. Changes below reach it on its next poll, within about a minute."
+    static let deskDisplayPanel = "Panel"
+    static let deskDisplayBrightness = "Brightness"
+    static let deskDisplayDimAtNight = "Dim at night"
+    static let deskDisplayDimmedNow = "Dimmed now"
+    /// Footer under Dim at night. The window and level are the host's, so the
+    /// sentence is built from what it reports rather than typed here.
+    static func deskDisplayDimHint(from start: Int, to end: Int, pct: Int) -> String {
+        let clock = { (hour: Int) in String(format: "%02d:00", hour) }
+        return "The panel drops to \(pct)% from \(clock(start)) to \(clock(end)), host time zone, and comes back to the level above in the morning."
+    }
+    static let deskDisplayEffects = "Effects"
+    static let deskDisplayCelebrateResets = "Celebrate quota resets"
+    static let deskDisplayCelebrateResetsHint =
+        "A short burst in the provider’s colour when a quota window rolls over."
+    static let deskDisplayBootSplash = "Boot animation"
+    static let deskDisplayBootSplashHint =
+        "The four-second title sequence on power-up. Off, the board goes straight to its startup checklist."
+    static let deskDisplayPages = "Pages"
+    static let deskDisplayPagesHint =
+        "What the BOOT button cycles through after the glance. A page also needs its source on under Integrations."
+    static let deskDisplayReadOnly =
+        "This host predates Desk display settings. Update the host to change them."
+    static let deskDisplayWiFi = "Wi-Fi"
+    static let deskDisplayUSB = "USB"
     /// General pane: row-count steppers for what this Mac draws.
     /// LabeledContent title on every integration detail Status row.
     static let settingsStatus = "Status"

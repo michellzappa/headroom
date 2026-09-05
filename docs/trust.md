@@ -46,7 +46,7 @@ Loopback only. Not the phone, not with the host token, not on the LAN, not
 ever.
 
 `/accounts`, `/github/watch`, `/config/git`, `/config/vercel`,
-`/config/supabase`, `/agents/config`, `/agents/claude/config`,
+`/config/supabase`, `/config/display`, `/agents/config`, `/agents/claude/config`,
 `/machines/config`, `/machines/sync`, and the three Claude hook endpoints
 (`/agents/hooks/claude/{permission,question,event}`).
 

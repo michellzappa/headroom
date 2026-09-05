@@ -118,7 +118,7 @@ still powers the device off. Long-press sync remains available through touch.
 
 The upper half has the two readings the macOS menu-bar icon has, and the board
 keeps its own choice in NVS — the Mac's Settings → General picker does not
-travel here.
+travel here, and neither does Settings → Desk display (see Settings below).
 
 | Style | What each slot shows |
 |---|---|
@@ -163,16 +163,37 @@ curl -sS -X POST \
 
 The command is picked up on the board's next normal poll. Omit `provider` to
 use the first selected model's accent. The endpoint is token-authenticated and
-private-network-only.
+private-network-only. With **Celebrate quota resets** off in Settings → Desk
+display the board consumes the command and draws nothing.
 
-## Brightness
+## Settings
 
-The panel holds one level, all day and all night. `PANEL_BRIGHTNESS` in
-`firmware/src/config.h` sets it (see `config_example.h`); panel units 0-255,
-default 200.
+The board has no settings screen. Its buttons differ per SKU and every touch
+gesture is spoken for, so the settings live where the rest of Headroom's do:
+**Mac Settings → Desk display**. The host stores the answers in
+`~/.headroom/config.json`, ships them in `/usage?view=device` as `display`
+([contract.md](contract.md)), and the board applies them on its next poll and
+mirrors them to NVS — a cold boot without the host comes up the same way.
 
-There is no night dimming. The board followed solar times and a bedtime up to
-2.0.9 and no longer does.
+| Setting | What it does | Default |
+|---|---|---|
+| **Brightness** | 25 / 50 / 75 / 100% of the panel's range | 75% |
+| **Dim at night** | Holds 10% from 22:00 to 07:00 in the host's time zone (Settings → General → Day boundaries). The window and level are fixed, not settings | off |
+| **Celebrate quota resets** | The confetti burst below, and the remote test command | on |
+| **Boot animation** | The four-second title sequence on power-up. Off, the board goes straight to the amber checklist | on |
+| **Pages** | Which of Vercel, Git and Local servers the BOOT button cycles through. A page also needs its source on under Integrations | all on |
+
+The pane also shows what the board last reported: firmware stamp
+(`build.commit`, see `firmware/version.py`), transport and how long ago. A
+board that has never polled this host leaves that section empty, and a host
+that predates the pane makes it read-only.
+
+Rings/Pace and the lower pane are **not** in the pane. They stay board-side
+gestures (hold a slot, tap the header) so no setting has two owners.
+
+`PANEL_BRIGHTNESS` in `firmware/src/config.h` is now only the first-boot level
+for a board that has never been told anything (see `config_example.h`; panel
+units 0-255, default 200).
 
 ## Token
 

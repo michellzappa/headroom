@@ -19,6 +19,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+import app_config
 import device_view
 import headroom_server
 import sources_config
@@ -108,6 +109,11 @@ EMITTABLE = (
     | {("providers",)}
     | {("device_effect",), ("device_effect", "id"),
        ("device_effect", "kind"), ("device_effect", "provider")}
+    # Host-owned panel settings (Settings → Desk display). Whole subtree: the
+    # board applies what arrives and keeps no opinion about it.
+    | {("display",), ("display", "brightness"), ("display", "celebrate_resets"),
+       ("display", "boot_splash"), ("display", "pages")}
+    | {("display", "pages", page_id) for page_id in app_config.DISPLAY_PAGE_IDS}
     | {("burndown",)}
     | {("burndown", provider) for provider in sources_config.BURN_SOURCE_IDS}
     | {("burndown", provider, key)
@@ -125,6 +131,18 @@ class DeviceViewContractTests(unittest.TestCase):
             "firmware/src/main.cpp usageFilter() wants keys device_view.py "
             "never emits — one side was renamed without the other",
         )
+
+    def test_display_block_rides_along_only_when_the_host_supplies_one(self):
+        bare = device_view.build(_demo_doc())
+        self.assertNotIn("display", bare)
+        device = device_view.build(_demo_doc(), display={
+            "brightness": 191, "celebrate_resets": False, "boot_splash": True,
+            "pages": {"vercel": True, "git": False, "local": True},
+        })
+        self.assertEqual(device["display"], {
+            "brightness": 191, "celebrate_resets": False, "boot_splash": True,
+            "pages": {"vercel": True, "git": False, "local": True},
+        })
 
     def test_device_view_survives_a_fully_populated_document(self):
         device = device_view.build(_demo_doc())

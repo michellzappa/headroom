@@ -652,6 +652,31 @@ struct HeadroomClient: Sendable {
         return try JSONDecoder().decode(TimezoneConfiguration.self, from: data)
     }
 
+    func fetchDeskDisplayConfiguration() async throws -> DeskDisplayConfiguration {
+        let url = try base()
+            .appendingPathComponent("config")
+            .appendingPathComponent("display")
+        let data = try await send(request(url, timeout: 8))
+        return try JSONDecoder().decode(DeskDisplayConfiguration.self, from: data)
+    }
+
+    /// Persist one desk display setting. The host validates (brightness must
+    /// be one of its steps, a page id must be one the board has) and answers
+    /// 400 otherwise; it also rebuilds the device projection at once, so the
+    /// board picks the change up on its next poll rather than the one after.
+    @discardableResult
+    func setDeskDisplayConfiguration(
+        _ change: DeskDisplayChange
+    ) async throws -> DeskDisplayConfiguration {
+        let url = try base()
+            .appendingPathComponent("config")
+            .appendingPathComponent("display")
+        let body = try JSONSerialization.data(withJSONObject: change.payload)
+        let data = try await send(request(
+            url, method: "POST", body: body, timeout: 10))
+        return try JSONDecoder().decode(DeskDisplayConfiguration.self, from: data)
+    }
+
     func fetchPostHogConfiguration() async throws -> PostHogConfiguration {
         let url = try base()
             .appendingPathComponent("config")
@@ -900,6 +925,90 @@ struct PlausibleConfiguration: Decodable, Sendable {
 struct TimezoneConfiguration: Decodable, Sendable {
     var ok: Bool?
     var timezone: String?
+}
+
+/// `/config/display`: the ESP32 panel settings the host owns, plus what the
+/// board last said about itself. Every field defaults so a host that grows a
+/// key later, or drops one, still decodes.
+struct DeskDisplayConfiguration: Decodable, Sendable {
+    var brightnessPct = 75
+    var brightnessSteps = [25, 50, 75, 100]
+    var dimAtNight = false
+    var dimmedNow = false
+    var nightStartHour = 22
+    var nightEndHour = 7
+    var nightBrightnessPct = 10
+    var celebrateResets = true
+    var bootSplash = true
+    /// Page id → shown, for the pages the board can hide (`vercel`, `git`,
+    /// `local`). Absent means shown.
+    var pages: [String: Bool] = [:]
+    /// Nil until a board has polled this host.
+    var board: DeskDisplayBoard?
+
+    init() {}
+
+    enum CodingKeys: String, CodingKey {
+        case brightnessPct = "brightness_pct"
+        case brightnessSteps = "brightness_steps"
+        case dimAtNight = "dim_at_night"
+        case dimmedNow = "dimmed_now"
+        case nightStartHour = "night_start_hour"
+        case nightEndHour = "night_end_hour"
+        case nightBrightnessPct = "night_brightness_pct"
+        case celebrateResets = "celebrate_resets"
+        case bootSplash = "boot_splash"
+        case pages, board
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        brightnessPct = try c.decodeIfPresent(Int.self, forKey: .brightnessPct) ?? brightnessPct
+        brightnessSteps = try c.decodeIfPresent([Int].self, forKey: .brightnessSteps) ?? brightnessSteps
+        dimAtNight = try c.decodeIfPresent(Bool.self, forKey: .dimAtNight) ?? dimAtNight
+        dimmedNow = try c.decodeIfPresent(Bool.self, forKey: .dimmedNow) ?? dimmedNow
+        nightStartHour = try c.decodeIfPresent(Int.self, forKey: .nightStartHour) ?? nightStartHour
+        nightEndHour = try c.decodeIfPresent(Int.self, forKey: .nightEndHour) ?? nightEndHour
+        nightBrightnessPct = try c.decodeIfPresent(Int.self, forKey: .nightBrightnessPct) ?? nightBrightnessPct
+        celebrateResets = try c.decodeIfPresent(Bool.self, forKey: .celebrateResets) ?? celebrateResets
+        bootSplash = try c.decodeIfPresent(Bool.self, forKey: .bootSplash) ?? bootSplash
+        pages = try c.decodeIfPresent([String: Bool].self, forKey: .pages) ?? pages
+        board = try c.decodeIfPresent(DeskDisplayBoard.self, forKey: .board)
+    }
+}
+
+/// What the board reported on its last poll: the firmware stamp
+/// (`build.commit[-dirty]`, see firmware/version.py), which transport carried
+/// it (`wifi` / `usb`) and how long ago.
+struct DeskDisplayBoard: Decodable, Sendable {
+    var firmware: String?
+    var via: String?
+    var ageS: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case firmware, via
+        case ageS = "age_s"
+    }
+}
+
+/// One edit to `/config/display`. Sent alone, so a toggle that fails leaves
+/// the others as they were.
+enum DeskDisplayChange: Sendable {
+    case brightnessPct(Int)
+    case dimAtNight(Bool)
+    case celebrateResets(Bool)
+    case bootSplash(Bool)
+    case page(String, shown: Bool)
+
+    var payload: [String: Any] {
+        switch self {
+        case .brightnessPct(let pct): return ["brightness_pct": pct]
+        case .dimAtNight(let on): return ["dim_at_night": on]
+        case .celebrateResets(let on): return ["celebrate_resets": on]
+        case .bootSplash(let on): return ["boot_splash": on]
+        case .page(let id, let shown): return ["pages": [id: shown]]
+        }
+    }
 }
 
 struct PlausibleSiteOption: Decodable, Sendable, Identifiable, Hashable {

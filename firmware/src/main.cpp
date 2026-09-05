@@ -716,6 +716,90 @@ static void effectSave() {
   prefs.end();
 }
 
+// Desk display settings. Host-owned: Mac Settings → Desk display writes them,
+// the host ships effective values in `/usage?view=device` → `display`, and the
+// board applies what arrives and mirrors it to NVS so a cold boot without the
+// host comes up the same way. PANEL_BRIGHTNESS (config.h) is only what a board
+// that has never been told anything uses. A missing block is an older host:
+// keep what NVS has. Rings/Pace and the lower pane stay board-side gestures on
+// purpose, so no setting has two owners.
+static const char *PREF_DISP_BRIGHT = "disp_bright";
+static const char *PREF_DISP_CELEB = "disp_celeb";
+static const char *PREF_DISP_SPLASH = "disp_splash";
+static const char *PREF_DISP_PAGES = "disp_pages";
+static const uint8_t DISP_PAGE_VERCEL = 1 << 0;
+static const uint8_t DISP_PAGE_GIT = 1 << 1;
+static const uint8_t DISP_PAGE_LOCAL = 1 << 2;
+static const uint8_t DISP_PAGES_ALL =
+    DISP_PAGE_VERCEL | DISP_PAGE_GIT | DISP_PAGE_LOCAL;
+static uint8_t displayBrightness = PANEL_BRIGHTNESS;
+static bool displayCelebrate = true;
+static bool displayBootSplash = true;
+static uint8_t displayPages = DISP_PAGES_ALL;
+
+static void displayLoad() {
+  if (!prefs.begin(PREFS_NS, true)) return;
+  displayBrightness = prefs.getUChar(PREF_DISP_BRIGHT, PANEL_BRIGHTNESS);
+  displayCelebrate = prefs.getBool(PREF_DISP_CELEB, true);
+  displayBootSplash = prefs.getBool(PREF_DISP_SPLASH, true);
+  displayPages = prefs.getUChar(PREF_DISP_PAGES, DISP_PAGES_ALL) & DISP_PAGES_ALL;
+  prefs.end();
+  if (displayBrightness == 0) displayBrightness = PANEL_BRIGHTNESS;
+}
+
+static void displaySave() {
+  if (!prefs.begin(PREFS_NS, false)) return;
+  prefs.putUChar(PREF_DISP_BRIGHT, displayBrightness);
+  prefs.putBool(PREF_DISP_CELEB, displayCelebrate);
+  prefs.putBool(PREF_DISP_SPLASH, displayBootSplash);
+  prefs.putUChar(PREF_DISP_PAGES, displayPages);
+  prefs.end();
+}
+
+static inline bool displayPageShown(uint8_t bit) {
+  return (displayPages & bit) != 0;
+}
+
+// Apply the host's `display` block. Only a change touches NVS or the panel:
+// this runs every poll, and neither is free.
+static void applyDisplayDoc(JsonObject disp) {
+  if (disp.isNull()) return;
+  bool changed = false;
+  const int bright = disp["brightness"] | 0;
+  if (bright > 0 && bright <= 255 && (uint8_t)bright != displayBrightness) {
+    displayBrightness = (uint8_t)bright;
+    panel->setBrightness(displayBrightness);
+    changed = true;
+  }
+  const bool celebrate = disp["celebrate_resets"] | true;
+  if (celebrate != displayCelebrate) {
+    displayCelebrate = celebrate;
+    changed = true;
+  }
+  const bool splash = disp["boot_splash"] | true;
+  if (splash != displayBootSplash) {
+    displayBootSplash = splash;
+    changed = true;
+  }
+  JsonObject pages = disp["pages"].as<JsonObject>();
+  if (!pages.isNull()) {
+    uint8_t mask = 0;
+    if (pages["vercel"] | true) mask |= DISP_PAGE_VERCEL;
+    if (pages["git"] | true) mask |= DISP_PAGE_GIT;
+    if (pages["local"] | true) mask |= DISP_PAGE_LOCAL;
+    if (mask != displayPages) {
+      displayPages = mask;
+      changed = true;
+    }
+  }
+  if (changed) {
+    displaySave();
+    Serial.printf("display: brightness %u celebrate %d splash %d pages 0x%02x\n",
+                  displayBrightness, (int)displayCelebrate,
+                  (int)displayBootSplash, displayPages);
+  }
+}
+
 // Shared Sources panel state (same payload Mac Settings reads/writes).
 static const uint8_t MAX_SOURCES = 8;
 struct SourceRow {
@@ -1188,6 +1272,8 @@ static bool usageFilterReady(JsonDocument **out) {
   filter["spend"]["days"] = true;
   filter["spend"]["avg"] = true;
   filter["device_effect"] = true;
+  // Host-owned panel settings; whole subtree, it is four scalars and a map.
+  filter["display"] = true;
 
   // Leave `built` false on overflow so the next fetch retries the build once
   // PSRAM frees up, rather than latching a filter that silently eats providers.
@@ -1479,6 +1565,8 @@ static bool applyUsageDoc(JsonDocument &doc) {
                     provider[0] ? provider : "default");
     }
   }
+
+  applyDisplayDoc(doc["display"].as<JsonObject>());
 
   // Vercel deployments
   vercelOk = false;
@@ -2315,6 +2403,7 @@ static void maxSplash() {
 // watching, and the dev loop shouldn't pay four seconds for the show. Holding
 // BOOT at power-on skips it too.
 static bool wantMaxSplash() {
+  if (!displayBootSplash) return false;
   if (digitalRead(BTN_BOOT) == LOW) return false;
   const esp_reset_reason_t why = esp_reset_reason();
   return why == ESP_RST_POWERON || why == ESP_RST_BROWNOUT;
@@ -5308,9 +5397,14 @@ static bool pageEnabled(Page p) {
     case PAGE_SLOT0:  return slotN > 0;
     case PAGE_SLOT1:  return slotN > 1;
     case PAGE_SLOT2:  return slotN > 2;
-    case PAGE_VERCEL: return sourceEnabled("vercel");
-    case PAGE_GIT:    return sourceEnabled("git");
-    case PAGE_LOCAL:  return sourceEnabled("local");
+    // A source page needs the source on (Integrations) and the page shown
+    // (Desk display); either switch alone takes it out of the cycle.
+    case PAGE_VERCEL:
+      return sourceEnabled("vercel") && displayPageShown(DISP_PAGE_VERCEL);
+    case PAGE_GIT:
+      return sourceEnabled("git") && displayPageShown(DISP_PAGE_GIT);
+    case PAGE_LOCAL:
+      return sourceEnabled("local") && displayPageShown(DISP_PAGE_LOCAL);
     default: return true;
   }
 }
@@ -5337,11 +5431,14 @@ static void forceSyncFromDesk() {
   yield();
   esp_task_wdt_reset();
   if (fetchUsage(USB_TIMEOUT_SYNC_MS)) {
+    if (!pageEnabled(page)) page = PAGE_GLANCE;
     drawDashboard();
     if (pendingCelebration) {
       pendingCelebration = false;
-      playResetCelebration(pendingCelebrationAccent);
-      drawDashboard();
+      if (displayCelebrate) {
+        playResetCelebration(pendingCelebrationAccent);
+        drawDashboard();
+      }
     }
   } else {
     drawStatus(ok ? "synced" : "sync failed", ok ? COL_GREEN : COL_RED);
@@ -5589,6 +5686,7 @@ void setup() {
   homeModeLoad();   // before the first home paint
   glanceStyleLoad();
   effectLoad();
+  displayLoad();
 
   bool pok = panel->begin();
   Serial.printf("panel->begin: %s\n", pok ? "ok" : "FAIL");
@@ -5608,7 +5706,7 @@ void setup() {
   // which is the green line that used to flash along the bottom edge.
   panel->fillScreen(COL_BLACK);
   sealNativeEdges(COL_BLACK);
-  panel->setBrightness(PANEL_BRIGHTNESS);
+  panel->setBrightness(displayBrightness);
 
   // Panel already started — skip nested begin inside the canvas.
   bool cok = gfx->begin(GFX_SKIP_OUTPUT_BEGIN);
@@ -5835,11 +5933,16 @@ void loop() {
     lastPoll = millis();
     if (fetchUsage()) {
       fetchFails = 0;
+      // Settings can hide the page on screen; land on the glance rather than
+      // keep drawing a page BOOT can no longer reach.
+      if (!pageEnabled(page)) page = PAGE_GLANCE;
       drawDashboard();
       if (pendingCelebration) {
         pendingCelebration = false;
-        playResetCelebration(pendingCelebrationAccent);
-        drawDashboard();
+        if (displayCelebrate) {
+          playResetCelebration(pendingCelebrationAccent);
+          drawDashboard();
+        }
       }
     } else {
       if (fetchFails < FETCH_BACKOFF_MAX) fetchFails++;

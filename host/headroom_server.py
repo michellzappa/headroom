@@ -1091,7 +1091,8 @@ def publish():
     doc = _compute_doc()
     usage = json.dumps(doc).encode()
     device = json.dumps(
-        device_view.build(doc, effect=_device_effect_payload()),
+        device_view.build(doc, effect=_device_effect_payload(),
+                          display=app_config.display_projection()),
         separators=(",", ":")).encode()
     with _cache_lock:
         _cache.update(doc=doc, usage=usage, device=device, built=time.time())
@@ -1737,6 +1738,14 @@ def _timezone_config_payload():
     }
 
 
+def _display_config_payload():
+    """Settings → Desk display: the knobs plus what the board last reported."""
+    payload = {"ok": True}
+    payload.update(app_config.display_settings())
+    payload["board"] = _device_payload(time.time())
+    return payload
+
+
 def _posthog_config_payload():
     listing = posthog_usage.available_projects()
     return {
@@ -1966,7 +1975,7 @@ class Handler(BaseHTTPRequestHandler):
                         "/config/git", "/config/vercel", "/config/supabase",
                         "/config/plausible", "/config/posthog",
                         "/config/sentry", "/config/datadog", "/config/axiom",
-                        "/config/timezone",
+                        "/config/timezone", "/config/display",
                         "/agents/capabilities", "/agents/config",
                         "/agents/claude/config", "/agents/codex/task",
                         "/agents/tasks",
@@ -1987,7 +1996,7 @@ class Handler(BaseHTTPRequestHandler):
         if path in ("/config/git", "/config/vercel", "/config/supabase",
                     "/config/plausible", "/config/posthog",
                     "/config/sentry", "/config/datadog", "/config/axiom",
-                    "/config/timezone"):
+                    "/config/timezone", "/config/display"):
             # Names folders on this disk and the teams / projects / sites a
             # login can reach — Mac-local, same class as /github/watch.
             if not self._is_loopback():
@@ -2009,6 +2018,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json(200, _datadog_config_payload())
             elif path == "/config/timezone":
                 self._send_json(200, _timezone_config_payload())
+            elif path == "/config/display":
+                self._send_json(200, _display_config_payload())
             else:
                 self._send_json(200, _axiom_config_payload())
             return
@@ -2156,6 +2167,7 @@ class Handler(BaseHTTPRequestHandler):
             "/config/datadog",
             "/config/axiom",
             "/config/timezone",
+            "/config/display",
             "/accounts",
             "/agents/config",
             "/agents/claude/config",
@@ -2534,6 +2546,24 @@ class Handler(BaseHTTPRequestHandler):
             # document is answering the old question until it is rebuilt.
             publish()
             self._send_json(200, _timezone_config_payload())
+            return
+
+        if path == "/config/display":
+            try:
+                app_config.set_display(
+                    brightness_pct=payload.get("brightness_pct"),
+                    dim_at_night=payload.get("dim_at_night"),
+                    celebrate_resets=payload.get("celebrate_resets"),
+                    boot_splash=payload.get("boot_splash"),
+                    pages=payload.get("pages"),
+                )
+            except ValueError as error:
+                self._send_json(400, {"ok": False, "error": str(error)})
+                return
+            # The board reads the cached device projection, so rebuild it now
+            # rather than on the next refresh tick.
+            publish()
+            self._send_json(200, _display_config_payload())
             return
 
         if path == "/config/posthog":

@@ -247,9 +247,18 @@ Two rules keep it a projection rather than a fork:
   identically. A null that survives into the device view is a field the board
   will silently read as zero.
 
-The one non-usage field is the additive `device_effect` command envelope. It
-is host control state for the board's next poll, not a second source of usage
-data; older firmware ignores it and flashed firmware consumes each id once.
+The two non-usage fields are additive host control state for the board's next
+poll, not a second source of usage data. `device_effect` is a command envelope:
+older firmware ignores it and flashed firmware consumes each id once. `display`
+is the panel settings Mac Settings → Desk display holds — brightness in panel
+units, whether resets are celebrated, whether the boot animation plays, and
+which source pages BOOT cycles through. The values are *effective*: night
+dimming is decided on the host, so a dimmed brightness arrives already dimmed
+and the board never learns why. Firmware that predates the block never asks
+for the key; firmware that has it mirrors the block to NVS and keeps the last
+answer when a host stops sending one. Rings/Pace and the lower pane are not in
+it on purpose — they are board-side gestures, and a setting with two owners
+snaps back sixty seconds after you change it.
 
 The board also never picks anything. The host chooses which three providers are
 in `focus`, in pinned order, enabled only — so the desk, the menu bar and the

@@ -176,6 +176,14 @@ struct SettingsView: View {
     @State var hostHasLaunchAgent = HostController.hasLaunchAgent
     @State var hostRemoveConfirming = false
     @State var usbFallbackEnabled = HeadroomUSB.isEnabled
+    /// Settings → Desk display. Loaded by the pane's own `.task`, like the
+    /// time zone, so opening Settings for something else does not pay for it.
+    @State var deskDisplay = DeskDisplayConfiguration()
+    @State var deskDisplayMessage: String?
+    /// False when the host predates /config/display, so the controls do not
+    /// take edits that can never be saved.
+    @State var deskDisplayEditable = true
+    @State var savingDeskDisplay = false
     @State var usbTransportBusy = false
     @State var usbTransportMessage: String?
     @State var selection: SettingsDestination? = .general
@@ -302,6 +310,8 @@ struct SettingsView: View {
             generalPane
         case .otherMacs:
             otherMacsPane
+        case .deskDisplay:
+            deskDisplayPane
         case .sources:
             sourcesPane
         case .codingAgents:
