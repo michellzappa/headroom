@@ -7,6 +7,30 @@ are not tracked here because they move on every commit.
 Add a section here before cutting a tag. `scripts/cut-release.sh` refuses to
 tag a version that has no entry.
 
+## 2.1.4 — 2026-09-05
+
+### Changed
+
+- **Desk display dims on a schedule you set, and fades instead of stepping.**
+  Dim at night becomes Dim on a schedule with From and Until hour pickers in
+  the host's time zone. The host fades the brightness it serves to 10% over
+  thirty minutes after the start hour and back after the end hour, so a board
+  polling once a minute sees about thirty small steps rather than one jump.
+  The pane shows the level the panel holds right now while a fade or the dim
+  level is in effect. No reflash needed; the board applies what arrives.
+- **Desk display pages follow the sources.** Each page row takes its source's
+  title from the host, and a source that is off under Integrations shows as
+  off here and cannot be switched on from the pane, so a toggle never names
+  a page the board cannot draw.
+
+### Added
+
+- **The Desk display pane shows whether the board is still polling.** The host
+  measures the median gap between the board's polls and reports it beside
+  Last seen ("12 sec. ago · every 60 s"), with a dot that is green within two
+  and a half polls, orange within six, and red after that. The section
+  refreshes itself every fifteen seconds while open.
+
 ## 2.1.3 — 2026-09-05
 
 ### Added
