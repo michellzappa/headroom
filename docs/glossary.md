@@ -58,16 +58,26 @@ is stated as a noun.
 | Form | Looks like | Where | Field |
 |---|---|---|---|
 | Clock | `Thu 14:00`, `tomorrow 04:18` | `headline`, anywhere with a full line | `_when()` |
+| Quota overview reset | `Reset: 5d1h, Sun 1pm.` | Per-provider caption under the macOS rings | `resets_in` + `window_end` |
 | Duration | `4d 44m`, `3d` | menu bar, watch, board, `Resets 3d` captions | `resets_in`, `fmt_resets()` |
 
-One sentence gets one form. `58% left · 4d 44m. Out tomorrow 04:18` was two
+One sentence usually gets one form. `58% left · 4d 44m. Out tomorrow 04:18` was two
 time facts in two shapes on one line. The board's `verdict` is the documented
 exception — at ~25 bytes it takes duration form, and each of its branches
 returns only one time fact, so the two never meet.
 
-**Times are 24-hour, English (U.S.), not localized.** Every string is a literal;
-there is no `.strings` catalogue and `host/burndown.py` formats with `%H:%M`.
-That was decided by default rather than on purpose — record it here so the day
+The macOS quota overview is the other deliberate exception: its ring caption
+puts the compact countdown and local clock together as
+**Reset: 5d1h, Sun 1pm.**, followed by signed slack on its own line:
+**11% to spare** or **4% over**.
+
+**Host prose times are 24-hour, English (U.S.), not localized.** The macOS
+quota overview is the deliberate exception: its compact ring captions use
+an unpadded 12-hour clock with lowercase `am` / `pm`, as in
+`Reset: 5d1h, Sun 1pm.`.
+Every string is a literal; there is no `.strings` catalogue and
+`host/burndown.py` formats with `%H:%M`. The host form was decided by default
+rather than on purpose — record it here so the day
 it changes is a decision and not a surprise.
 
 **Provider names belong to other companies.** Claude, Codex, Cursor, Copilot,
@@ -443,6 +453,21 @@ the ESP32 glance slots. Picked host-side from the pinned order (enabled only,
 computes its own top-N. Drag to reorder under Mac Settings → Providers.
 
 Say **top 3** in user-facing copy, not "focus" — that word is API vocabulary.
+
+### Widgets
+
+The Mac medium widget gives each provider one line with identity, remaining
+quota and pace: **Claude: 89% left, 33% spare**. Use **N% over** when the signed
+pace slack is negative. The pace slot is always present; a cache written before
+that reading existed shows **— spare** rather than dropping the words. It never
+adds a separate **N% used** line.
+
+The Mac small widget gives Claude one reset row: **5h: 1h34m**. Codex gets no
+reset rows; its rings and percent are enough for this surface. Other providers
+keep the original **5h** and **1w** rows. Widget durations remove internal
+spaces to fit the tile, and a missing Claude reading stays visible as
+**5h: —**. These density exceptions are Mac-only; the iPhone widget keeps the
+shared two-row reset and three-row medium presentations.
 
 ### Menu bar icon
 

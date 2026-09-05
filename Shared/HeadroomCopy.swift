@@ -14,6 +14,60 @@ enum HeadroomCopy {
     static let summary = "Summary"
     static let quotas = "Quotas"
     static let codingQuotas = "Coding quotas"
+
+    /// "Reset: 5d1h, Sun 1pm." — the two reset readings already available
+    /// to the overview, combined into the caption directly below one ring.
+    static func quotaOverviewReset(
+        duration: String?,
+        resetEpoch: Double?,
+        timeZone: TimeZone = .autoupdatingCurrent
+    ) -> String? {
+        var readings: [String] = []
+        if let compact = duration?.filter({ !$0.isWhitespace }),
+           !compact.isEmpty {
+            readings.append(compact)
+        }
+        if let clock = quotaOverviewClock(
+            resetEpoch: resetEpoch, timeZone: timeZone
+        ) {
+            readings.append(clock)
+        }
+        guard !readings.isEmpty else { return nil }
+        return "Reset: \(readings.joined(separator: ", "))."
+    }
+
+    /// "11% to spare" / "4% over" — standalone ring-column slack. When a
+    /// fit has no signed distance yet, retain the pace state without a number.
+    static func quotaOverviewSlack(
+        overPace: Bool,
+        deltaPct: Double?
+    ) -> String {
+        guard let deltaPct, abs(deltaPct) >= 1 else {
+            return overPace ? "Over Pace" : "On Pace"
+        }
+        let rounded = Int(abs(deltaPct).rounded())
+        return deltaPct > 0 ? "\(rounded)% to spare" : "\(rounded)% over"
+    }
+
+    private static func quotaOverviewClock(
+        resetEpoch: Double?,
+        timeZone: TimeZone
+    ) -> String? {
+        guard let resetEpoch else { return nil }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let date = Date(timeIntervalSince1970: resetEpoch)
+        let components = calendar.dateComponents([.weekday, .hour], from: date)
+        guard let weekday = components.weekday,
+              let hour = components.hour,
+              (1...7).contains(weekday)
+        else { return nil }
+        let weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+        let clockHour = (hour + 11) % 12 + 1
+        let meridiem = hour < 12 ? "am" : "pm"
+        return "\(weekdays[weekday - 1]) \(clockHour)\(meridiem)"
+    }
+
     static let activity = "Activity"
     static let services = "Services"
     static let supabase = "Supabase"
@@ -280,6 +334,43 @@ enum HeadroomCopy {
     /// itself.
     static func percentLeft(_ percent: Double) -> String {
         "\(Int(percent.rounded()))% left"
+    }
+
+    /// The medium widget's compact pace reading. The slot is deliberate even
+    /// when an older cache has no pace value: losing the words would make the
+    /// legend jump between layouts and hide that the reading is unavailable.
+    static func widgetPaceSlack(_ deltaPct: Double?) -> String {
+        guard let deltaPct else { return "— to spare" }
+        let rounded = Int(abs(deltaPct).rounded())
+        return deltaPct >= 0 ? "\(rounded)% to spare" : "\(rounded)% over"
+    }
+
+    #if os(macOS)
+    /// The Mac widget saves one word inside its single-line provider summary.
+    static func macWidgetPaceSlack(_ deltaPct: Double?) -> String {
+        guard let deltaPct else { return "— spare" }
+        let rounded = Int(abs(deltaPct).rounded())
+        return deltaPct >= 0 ? "\(rounded)% spare" : "\(rounded)% over"
+    }
+    #endif
+
+    /// One mandatory small-widget reset row. Host durations are spaced for
+    /// prose (`5d 2h`); the tile removes that internal whitespace (`5d2h`).
+    static func widgetReset(
+        _ title: String,
+        duration: String?,
+        resetEpoch: Double? = nil,
+        timeZone: TimeZone = .autoupdatingCurrent
+    ) -> String {
+        let compact = duration?.filter { !$0.isWhitespace }
+        let reading = compact.flatMap { $0.isEmpty ? nil : $0 } ?? "—"
+        var answer = "\(title): \(reading)"
+        if let clock = quotaOverviewClock(
+            resetEpoch: resetEpoch, timeZone: timeZone
+        ) {
+            answer += ", \(clock)"
+        }
+        return answer
     }
 
     /// "Empty Thu" — the forecast reaches zero before the pool renews.

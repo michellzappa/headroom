@@ -29,6 +29,63 @@ extension HeadroomWidgetSnapshot.Provider {
     /// than the `name` key wrote, and the same string it already draws.
     var spokenTitle: String { name ?? title }
 
+    /// Always present in the medium widget's legend. An older cache provides
+    /// no value, but still gets the required unknown-state copy.
+    var widgetPaceSlackLabel: String {
+        HeadroomCopy.widgetPaceSlack(paceDeltaPct)
+    }
+
+    #if os(macOS)
+    /// The Mac medium widget's only text row for this provider. Keeping
+    /// identity, quota and pace together buys the chart the height separate
+    /// rows spent without changing the iPhone widget's established layout.
+    var macWidgetMediumSummaryLabel: String {
+        let remaining = HeadroomCopy.percentLeft(100 - percent)
+        let pace = HeadroomCopy.macWidgetPaceSlack(paceDeltaPct)
+        return "\(title): \(remaining), \(pace)"
+    }
+
+    /// Mac small widgets only spend height on provider-specific reset clocks.
+    /// The shared pair remains intact for the iPhone widget and watch cache.
+    func macWidgetResetLabels(in timeZone: TimeZone) -> [String] {
+        let labels = widgetResetLabels(in: timeZone)
+        let baseID = id.split(separator: ":", maxSplits: 1)
+            .first.map(String.init)
+        if baseID == "claude" { return Array(labels.prefix(1)) }
+        if baseID == "codex" { return [] }
+        return labels
+    }
+
+    var macWidgetResetLabels: [String] {
+        macWidgetResetLabels(in: .autoupdatingCurrent)
+    }
+    #endif
+
+    /// Both rows are structural in the shared small-widget presentation.
+    /// Missing layers and older caches keep their labels and show an explicit
+    /// unknown countdown.
+    func widgetResetLabels(in timeZone: TimeZone) -> [String] {
+        // The layer fallback reads the first cache shape used while this field
+        // was introduced; current writers keep resets independently of rings.
+        let sessionReset = sessionResetsIn
+            ?? layers?.first { $0.id == "session" }?.resetsIn
+        let weeklyReset = weekResetsIn
+            ?? layers?.first { $0.id == "week" }?.resetsIn
+        return [
+            HeadroomCopy.widgetReset("5h", duration: sessionReset),
+            HeadroomCopy.widgetReset(
+                "1w",
+                duration: weeklyReset,
+                resetEpoch: weekResetsAt,
+                timeZone: timeZone
+            ),
+        ]
+    }
+
+    var widgetResetLabels: [String] {
+        widgetResetLabels(in: .autoupdatingCurrent)
+    }
+
     var ringLayers: [HeadroomRingLayer] {
         if let layers, !layers.isEmpty {
             return layers.map {

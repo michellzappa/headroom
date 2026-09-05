@@ -69,6 +69,43 @@ struct HeadroomWidgetProvider: AppIntentTimelineProvider {
     }
 }
 
+/// Keeps every tile placed before provider selection existed alive.
+///
+/// Those tiles were serialized as a `StaticConfiguration` with the kind
+/// `HeadroomWidget`. WidgetKit does not migrate an existing tile when the same
+/// kind changes configuration systems; it leaves the tile on its last render
+/// instead. Keeping that exact static definition lets WidgetKit resume asking
+/// for timelines, while editable tiles use a new identity below.
+struct HeadroomLegacyWidgetProvider: TimelineProvider {
+    func placeholder(in context: Context) -> HeadroomWidgetEntry {
+        HeadroomWidgetEntry(date: .now, snapshot: .placeholder)
+    }
+
+    func getSnapshot(
+        in context: Context,
+        completion: @escaping (HeadroomWidgetEntry) -> Void
+    ) {
+        let snapshot = context.isPreview ? .placeholder : load()
+        completion(HeadroomWidgetEntry(date: .now, snapshot: snapshot))
+    }
+
+    func getTimeline(
+        in context: Context,
+        completion: @escaping (Timeline<HeadroomWidgetEntry>) -> Void
+    ) {
+        completion(
+            Timeline(
+                entries: [HeadroomWidgetEntry(date: .now, snapshot: load())],
+                policy: .after(Date(timeIntervalSinceNow: 15 * 60))
+            )
+        )
+    }
+
+    private func load() -> HeadroomWidgetSnapshot {
+        HeadroomWidgetSnapshot.cached() ?? .awaitingFirstSync
+    }
+}
+
 /// No product name, no status dot. A widget the user chose to place already
 /// says which app it belongs to, and the chart says the rest — both of them
 /// were spending the small size's only real currency, which is height.
@@ -114,18 +151,32 @@ struct HeadroomWidgetView: View {
         VStack(alignment: .leading, spacing: 0) {
             if providers.count == 1, let solo = providers.first {
                 HeadroomRings(layers: solo.ringLayers, tint: solo.tint)
-                    .frame(width: 62, height: 62)
-                Spacer(minLength: 8)
+                    .frame(
+                        width: entry.snapshot.isStale ? 46 : 62,
+                        height: entry.snapshot.isStale ? 46 : 62
+                    )
+                Spacer(minLength: entry.snapshot.isStale ? 4 : 8)
                 Text(solo.title)
                     .font(.caption.weight(.semibold))
                     .lineLimit(1)
                 Text(HeadroomCopy.percentUsed(solo.percent))
                     .font(.caption2.monospacedDigit())
                     .foregroundStyle(.secondary)
+                ForEach(smallResetLabels(for: solo), id: \.self) { label in
+                    Text(label)
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             } else if providers.isEmpty {
                 emptyLine
             } else {
-                ringRow(diameter: providers.count > 2 ? 38 : 50)
+                ringRow(
+                    diameter: providers.count > 2
+                        ? (entry.snapshot.isStale ? 32 : 38)
+                        : (entry.snapshot.isStale ? 38 : 50),
+                    showsMediumSummary: false
+                )
             }
             staleNote
         }
@@ -141,8 +192,14 @@ struct HeadroomWidgetView: View {
             VStack(alignment: .leading, spacing: 0) { emptyLine }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         } else if charted.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-                ringRow(diameter: 54)
+            VStack(
+                alignment: .leading,
+                spacing: entry.snapshot.isStale ? 4 : 8
+            ) {
+                ringRow(
+                    diameter: entry.snapshot.isStale ? 40 : 54,
+                    showsMediumSummary: true
+                )
                 Text(HeadroomCopy.noHistoryYet)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -158,28 +215,83 @@ struct HeadroomWidgetView: View {
         }
     }
 
-    /// One cell per source: its rings, its name, its reading. Used by the small
-    /// family whenever there is more than one source, and by both families when
-    /// there is no history to chart yet.
-    private func ringRow(diameter: CGFloat) -> some View {
-        HStack(alignment: .top, spacing: 12) {
+    /// One cell per source. Small widgets name the source and keep only its
+    /// useful reset clocks; medium fallbacks put the entire reading on one
+    /// line, matching the chart legend even before history arrives.
+    private func ringRow(
+        diameter: CGFloat,
+        showsMediumSummary: Bool
+    ) -> some View {
+        HStack(alignment: .top, spacing: providers.count > 2 ? 4 : 8) {
             ForEach(providers) { provider in
-                VStack(spacing: 5) {
+                VStack(
+                    spacing: entry.snapshot.isStale
+                        ? 2
+                        : (providers.count > 2 ? 3 : 5)
+                ) {
                     HeadroomRings(
                         layers: provider.ringLayers, tint: provider.tint
                     )
                     .frame(width: diameter, height: diameter)
+                    #if os(macOS)
+                    if showsMediumSummary {
+                        Text(provider.macWidgetMediumSummaryLabel)
+                            .font(.caption2.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
+                    } else {
+                        Text(provider.title)
+                            .font(.caption2)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
+                        Text(HeadroomCopy.percentUsed(provider.percent))
+                            .font(.caption2.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                        ForEach(
+                            provider.macWidgetResetLabels, id: \.self
+                        ) { label in
+                            Text(label)
+                                .font(.caption2.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.5)
+                        }
+                    }
+                    #else
                     Text(provider.title)
                         .font(.caption2)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.5)
                     Text(HeadroomCopy.percentUsed(provider.percent))
                         .font(.caption2.monospacedDigit())
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
+                    if showsMediumSummary {
+                        Text(provider.widgetPaceSlackLabel)
+                            .font(.caption2.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                    } else {
+                        ForEach(provider.widgetResetLabels, id: \.self) { label in
+                            Text(label)
+                                .font(.caption2.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.5)
+                        }
+                    }
+                    #endif
                 }
+                .frame(
+                    maxWidth: providers.count > 1 ? .infinity : nil,
+                    alignment: .top
+                )
             }
-            Spacer(minLength: 0)
         }
     }
 
@@ -192,20 +304,42 @@ struct HeadroomWidgetView: View {
     /// A source with no line still gets its row: it is one of your sources, and
     /// a widget that quietly drops it reads as a widget that lost it.
     private var legend: some View {
-        HStack(spacing: 10) {
+        HStack(alignment: .top, spacing: 8) {
             ForEach(providers) { provider in
+                Group {
+                #if os(macOS)
                 HStack(spacing: 4) {
                     Capsule()
                         .fill(provider.burndownTint)
                         .frame(width: 10, height: 2.5)
-                    Text(provider.title)
-                        .font(.caption2)
+                    Text(provider.macWidgetMediumSummaryLabel)
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.secondary)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.5)
+                }
+                #else
+                VStack(alignment: .leading, spacing: 1) {
+                    HStack(spacing: 4) {
+                        Capsule()
+                            .fill(provider.burndownTint)
+                            .frame(width: 10, height: 2.5)
+                        Text(provider.title)
+                            .font(.caption2)
+                            .lineLimit(1)
+                    }
                     Text(HeadroomCopy.percentLeft(100 - provider.percent))
                         .font(.caption2.monospacedDigit())
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                    Text(provider.widgetPaceSlackLabel)
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
+                #endif
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .layoutPriority(1)
             }
             Spacer(minLength: 0)
@@ -216,6 +350,16 @@ struct HeadroomWidgetView: View {
             }
         }
         .minimumScaleFactor(0.75)
+    }
+
+    private func smallResetLabels(
+        for provider: HeadroomWidgetSnapshot.Provider
+    ) -> [String] {
+        #if os(macOS)
+        provider.macWidgetResetLabels
+        #else
+        provider.widgetResetLabels
+        #endif
     }
 
     private var emptyLine: some View {
@@ -350,35 +494,52 @@ private struct CombinedBurndownChart: View {
 @main
 struct HeadroomWidgetBundle: WidgetBundle {
     var body: some Widget {
+        HeadroomLegacyStatusWidget()
         HeadroomStatusWidget()
     }
 }
 
-struct HeadroomStatusWidget: Widget {
+private enum HeadroomWidgetGallery {
     /// Same extension, two homes. On the Mac the numbers never left the machine
     /// the widget is sitting on, so "from your Mac" would read strangely there.
-    private static var gallerySubtitle: String {
+    static var subtitle: String {
         #if os(macOS)
         return "Coding quota and attention status at a glance."
         #else
         return "Coding quota and attention status from your Mac."
         #endif
     }
+}
 
+/// The original all-provider widget. Its definition stays because its kind
+/// and configuration type are part of every tile WidgetKit already saved.
+struct HeadroomLegacyStatusWidget: Widget {
     var body: some WidgetConfiguration {
-        // The kind is the identity of every already-placed tile, so it stays
-        // what it has always been. Widgets placed before this was
-        // configurable get the default configuration, which is the behaviour
-        // they already had: every provider the host sent.
+        StaticConfiguration(
+            kind: HeadroomWidgetIdentity.legacyKind,
+            provider: HeadroomLegacyWidgetProvider()
+        ) { entry in
+            HeadroomWidgetView(entry: entry)
+        }
+        .configurationDisplayName("Headroom — All providers")
+        .description(HeadroomWidgetGallery.subtitle)
+        .supportedFamilies([.systemSmall, .systemMedium])
+    }
+}
+
+/// New placements can select one provider without changing the serialized
+/// definition of the original widget.
+struct HeadroomStatusWidget: Widget {
+    var body: some WidgetConfiguration {
         AppIntentConfiguration(
-            kind: "HeadroomWidget",
+            kind: HeadroomWidgetIdentity.editableKind,
             intent: HeadroomWidgetConfiguration.self,
             provider: HeadroomWidgetProvider()
         ) { entry in
             HeadroomWidgetView(entry: entry)
         }
-        .configurationDisplayName(HeadroomCopy.product)
-        .description(Self.gallerySubtitle)
+        .configurationDisplayName("Headroom — Provider")
+        .description(HeadroomWidgetGallery.subtitle)
         .supportedFamilies([.systemSmall, .systemMedium])
     }
 }

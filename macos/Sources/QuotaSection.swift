@@ -3,6 +3,39 @@ import SwiftUI
 /// The quota half of the popover: the ring overview, the single-provider
 /// detail card, and the attention summary.
 
+enum QuotaOverviewSummary {
+    struct Column: Identifiable, Equatable {
+        let providerID: String
+        let resetLine: String?
+        let paceLine: String
+
+        var id: String { providerID }
+    }
+
+    static func columns(
+        for snapshot: UsageSnapshot,
+        timeZone: TimeZone = .autoupdatingCurrent
+    ) -> [Column] {
+        snapshot.codingQuotaProviders.compactMap { provider in
+            guard let burndown = snapshot.overviewBurndown(
+                forProviderID: provider.id
+            ) else { return nil }
+            return Column(
+                providerID: provider.id,
+                resetLine: HeadroomCopy.quotaOverviewReset(
+                    duration: snapshot.meter(for: provider).headline.reset,
+                    resetEpoch: burndown.windowEnd,
+                    timeZone: timeZone
+                ),
+                paceLine: HeadroomCopy.quotaOverviewSlack(
+                    overPace: burndown.kind != .ok,
+                    deltaPct: burndown.deltaPct
+                )
+            )
+        }
+    }
+}
+
 struct QuotaOverviewCard: View {
     let snapshot: UsageSnapshot
     /// Tapping a ring jumps to that provider's detail tab.
@@ -23,6 +56,13 @@ struct QuotaOverviewCard: View {
     private static let minimumRingCell: CGFloat = 54
 
     private var providers: [QuotaProviderInfo] { snapshot.codingQuotaProviders }
+
+    private var overviewColumns: [String: QuotaOverviewSummary.Column] {
+        Dictionary(
+            uniqueKeysWithValues: QuotaOverviewSummary.columns(for: snapshot)
+                .map { ($0.providerID, $0) }
+        )
+    }
 
     /// Columns that fit the measured width, balanced across however many rows
     /// that takes — six providers read as 3+3, not 5+1.
@@ -68,7 +108,8 @@ struct QuotaOverviewCard: View {
                             meter: snapshot.meter(for: provider),
                             rings: snapshot.burndownRings(forProviderID: provider.id),
                             tint: snapshot.tint(forProviderID: provider.id),
-                            diameter: ringDiameter
+                            diameter: ringDiameter,
+                            overview: overviewColumns[provider.id]
                         )
                         .frame(maxWidth: .infinity)
                         .contentShape(Rectangle())
@@ -76,12 +117,6 @@ struct QuotaOverviewCard: View {
                     }
                 }
                 .measuredWidth($rowWidth)
-            }
-            if let primary = snapshot.burndownPrimary, let headline = primary.headline {
-                Text(headline)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .cardStyle()
@@ -285,6 +320,8 @@ struct ProviderQuotaRing: View {
     /// Set by the overview grid, which shrinks the glyph rather than let a
     /// row of them push past the popover.
     var diameter: CGFloat = 72
+    /// The reset and signed slack that belong directly under this ring.
+    var overview: QuotaOverviewSummary.Column? = nil
 
     private var headline: MeterWindow { meter.headline }
 
@@ -306,10 +343,9 @@ struct ProviderQuotaRing: View {
         ]
     }
 
-    /// The countdown is computed against the wall clock, so it keeps ticking
-    /// over numbers that stopped moving hours ago — the one part of this
-    /// glyph that actively insists a frozen meter is live. When the host says
-    /// the fetch is failing, the age of the data replaces it.
+    /// Fallback for an older host with no overview burndown. Current hosts use
+    /// the tested reset/slack column above; stale status remains a separate
+    /// line so it cannot erase those provider readings.
     private var windowCaption: String {
         if let note = provider.statusNote { return note }
         if provider.isBalanceOnly {
@@ -343,13 +379,38 @@ struct ProviderQuotaRing: View {
                 .foregroundStyle(tint)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
-            Text(windowCaption)
-                .font(.caption2)
-                .foregroundStyle(
-                    provider.statusAlarming ? HeadroomPalette.orange : .secondary)
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
+            if let note = provider.statusNote {
+                Text(note)
+                    .font(.caption2)
+                    .foregroundStyle(
+                        provider.statusAlarming
+                            ? HeadroomPalette.orange : .secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+            }
+            if let overview {
+                if let resetLine = overview.resetLine {
+                    Text(resetLine)
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
+                Text(overview.paceLine)
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            } else if provider.statusNote == nil {
+                Text(windowCaption)
+                    .font(.caption2)
+                    .foregroundStyle(
+                        provider.statusAlarming
+                            ? HeadroomPalette.orange : .secondary)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+            }
         }
         .accessibilityElement(children: .combine)
         // The rings no longer carry a printed percentage, so state it here

@@ -141,6 +141,91 @@ final class ContractTests: XCTestCase {
         )
     }
 
+    /// Catches the overview falling back to detached provider sentences
+    /// instead of the two captions that belong under each provider's ring.
+    func testQuotaOverviewColumnsCarryEachProvidersResetAndPace() throws {
+        let json = """
+        {
+          "providers": [
+            {"id": "claude", "title": "Claude", "enabled": true,
+             "headline": "week", "pools": {
+               "week": {"title": "Weekly", "pct": 10, "window_s": 604800,
+                        "resets_in": "5d 1h", "ring": true}
+             }},
+            {"id": "codex", "title": "Codex", "enabled": true,
+             "headline": "week", "pools": {
+               "week": {"title": "Weekly", "pct": 12, "window_s": 604800,
+                        "resets_in": "5d 10h", "ring": true}
+             }}
+          ],
+          "burndown": {
+            "claude": {"week": {
+              "provider": "claude", "pool": "week", "status": "ok",
+              "window_end": 1788094800, "window_s": 604800,
+              "delta_pct": 11
+            }},
+            "codex": {"week": {
+              "provider": "codex", "pool": "week", "status": "ok",
+              "window_end": 1788141600, "window_s": 604800,
+              "delta_pct": 7
+            }}
+          },
+          "burndown_primary": {
+            "provider": "claude", "pool": "week",
+            "headline": "This global line must not be used"
+          }
+        }
+        """
+        let snapshot = try JSONDecoder().decode(
+            UsageSnapshot.self, from: Data(json.utf8))
+
+        let columns = QuotaOverviewSummary.columns(
+            for: snapshot,
+            timeZone: try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        )
+        XCTAssertEqual(columns.map(\.providerID), ["claude", "codex"])
+        XCTAssertEqual(
+            columns.map { [$0.resetLine ?? "", $0.paceLine] },
+            [
+                ["Reset: 5d1h, Sun 1pm.", "11% to spare"],
+                ["Reset: 5d10h, Mon 2am.", "7% to spare"],
+            ]
+        )
+    }
+
+    /// A provider burning too quickly must not be described as on pace; the
+    /// signed distance also has to keep its "over" direction.
+    func testQuotaOverviewSummaryNamesOverPace() {
+        XCTAssertEqual(
+            HeadroomCopy.quotaOverviewSlack(
+                overPace: true,
+                deltaPct: -4
+            ),
+            "4% over"
+        )
+    }
+
+    /// Keeps the decoded burndown status wired through the overview instead
+    /// of testing only the copy formatter's Boolean input.
+    func testQuotaOverviewSummariesMapDecodedOverPaceStatus() throws {
+        let json = """
+        {
+          "providers": [{"id": "claude", "title": "Claude", "enabled": true}],
+          "burndown": {"claude": {"week": {
+            "provider": "claude", "pool": "week", "status": "ahead",
+            "window_s": 604800, "delta_pct": -4
+          }}}
+        }
+        """
+        let snapshot = try JSONDecoder().decode(
+            UsageSnapshot.self, from: Data(json.utf8))
+
+        XCTAssertEqual(
+            QuotaOverviewSummary.columns(for: snapshot).first?.paceLine,
+            "4% over"
+        )
+    }
+
     func testEveryProviderMeterResolves() throws {
         let snapshot = try decodeDemo()
         for provider in snapshot.activeQuotaProviders {
@@ -822,6 +907,71 @@ final class WidgetSnapshotSkewTests: XCTestCase {
             HeadroomWidgetSnapshot.self, from: Data(json.utf8))
     }
 
+    func testStaticAndEditableWidgetsHaveStableDistinctKinds() {
+        // WidgetKit persists both the kind and configuration system for a
+        // placed tile. The original static definition has to keep the kind
+        // shipped before provider selection, while the editable definition
+        // needs a different identity so it cannot strand those tiles.
+        XCTAssertEqual(HeadroomWidgetIdentity.legacyKind, "HeadroomWidget")
+        XCTAssertEqual(
+            HeadroomWidgetIdentity.editableKind,
+            "HeadroomWidget.Configurable"
+        )
+        XCTAssertNotEqual(
+            HeadroomWidgetIdentity.legacyKind,
+            HeadroomWidgetIdentity.editableKind
+        )
+    }
+
+    func testWidgetBundleKeepsBothConfigurationSystems() throws {
+        // The strings above only protect persisted identity. This protects the
+        // wiring that uses it: dropping the compatibility widget, or putting
+        // the old kind on the App Intent definition again, recreates the
+        // indefinitely frozen tiles this migration exists to recover.
+        let testFile = URL(fileURLWithPath: #filePath)
+        let sourceURL = testFile
+            .deletingLastPathComponent()  // Tests
+            .deletingLastPathComponent()  // macos
+            .deletingLastPathComponent()  // repo root
+            .appendingPathComponent("widget/HeadroomWidget.swift")
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+
+        func section(from start: String, to end: String?) throws -> Substring {
+            let startRange = try XCTUnwrap(source.range(of: start))
+            let suffix = source[startRange.lowerBound...]
+            guard let end else { return suffix }
+            let endRange = try XCTUnwrap(suffix.range(of: end))
+            return suffix[..<endRange.lowerBound]
+        }
+        func compact(_ value: Substring) -> String {
+            value.filter { !$0.isWhitespace }
+        }
+
+        let bundle = try section(
+            from: "struct HeadroomWidgetBundle",
+            to: "private enum HeadroomWidgetGallery"
+        )
+        XCTAssertTrue(bundle.contains("HeadroomLegacyStatusWidget()"))
+        XCTAssertTrue(bundle.contains("HeadroomStatusWidget()"))
+
+        let legacy = compact(try section(
+            from: "struct HeadroomLegacyStatusWidget",
+            to: "struct HeadroomStatusWidget"
+        ))
+        XCTAssertTrue(legacy.contains(
+            "StaticConfiguration(kind:HeadroomWidgetIdentity.legacyKind,"
+                + "provider:HeadroomLegacyWidgetProvider()"
+        ))
+
+        let editable = compact(try section(
+            from: "struct HeadroomStatusWidget", to: nil))
+        XCTAssertTrue(editable.contains(
+            "AppIntentConfiguration(kind:HeadroomWidgetIdentity.editableKind,"
+                + "intent:HeadroomWidgetConfiguration.self,"
+                + "provider:HeadroomWidgetProvider()"
+        ))
+    }
+
     func testAnEmptyObjectStillDecodes() throws {
         // The floor: whatever a future build adds, the envelope survives.
         let snapshot = try decode("{}")
@@ -858,6 +1008,227 @@ final class WidgetSnapshotSkewTests: XCTestCase {
         let provider = try XCTUnwrap(snapshot.providers.first)
         XCTAssertEqual(provider.title, "claude")
         XCTAssertEqual(provider.percent, 0)
+    }
+
+    /// The medium widget spends one line per provider on the complete reading,
+    /// leaving the rest of the tile to the graph. A cache without pace still
+    /// keeps that one-line shape and says which part is unknown.
+    func testMacMediumWidgetUsesOneProviderSummaryLine() throws {
+        let current = try decode("""
+        {"providers": [
+            {"id": "claude", "title": "Claude", "percent": 11,
+             "paceDeltaPct": 33}
+        ]}
+        """)
+        XCTAssertEqual(
+            current.providers.first?.widgetPaceSlackLabel,
+            "33% to spare",
+            "shared iPhone/watch presentation stays unchanged"
+        )
+        XCTAssertEqual(
+            current.providers.first?.macWidgetMediumSummaryLabel,
+            "Claude: 89% left, 33% spare"
+        )
+
+        let older = try decode("""
+        {"providers": [
+            {"id": "claude", "title": "Claude", "percent": 11}
+        ]}
+        """)
+        XCTAssertEqual(
+            older.providers.first?.macWidgetMediumSummaryLabel,
+            "Claude: 89% left, — spare"
+        )
+
+        let over = try decode("""
+        {"providers": [
+            {"id": "codex", "title": "Codex", "percent": 14,
+             "paceDeltaPct": -4}
+        ]}
+        """)
+        XCTAssertEqual(
+            over.providers.first?.macWidgetMediumSummaryLabel,
+            "Codex: 86% left, 4% over"
+        )
+    }
+
+    /// The small widget only spends reset rows on readings useful for that
+    /// provider: Claude gets its five-hour clock and Codex gets neither.
+    func testMacSmallWidgetUsesProviderSpecificResetRows() throws {
+        let claude = try decode("""
+        {"providers": [
+            {"id": "claude:work", "title": "Work", "percent": 16,
+             "weekResetsAt": 1788094800,
+             "layers": [
+                {"id": "session", "name": "Session", "percent": 4,
+                 "resetsIn": "1h 34m"},
+                {"id": "week", "name": "Weekly", "percent": 16,
+                 "resetsIn": "5d 2h"}
+             ]}
+        ]}
+        """)
+        XCTAssertEqual(
+            claude.providers.first?.widgetResetLabels(
+                in: try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+            ),
+            ["5h: 1h34m", "1w: 5d2h, Sun 1pm"],
+            "shared iPhone/watch presentation stays unchanged"
+        )
+        XCTAssertEqual(
+            claude.providers.first?.macWidgetResetLabels(
+                in: try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+            ),
+            ["5h: 1h34m"]
+        )
+
+        let codex = try decode("""
+        {"providers": [
+            {"id": "codex:team", "title": "Team", "percent": 9,
+             "sessionResetsIn": "2h 54m", "weekResetsIn": "4d 13h"}
+        ]}
+        """)
+        XCTAssertEqual(
+            codex.providers.first?.widgetResetLabels,
+            ["5h: 2h54m", "1w: 4d13h"],
+            "shared iPhone/watch presentation stays unchanged"
+        )
+        XCTAssertEqual(codex.providers.first?.macWidgetResetLabels, [])
+
+        // Providers not named by this density rule keep their existing rows.
+        let other = try decode("""
+        {"providers": [
+            {"id": "cursor", "title": "Cursor", "percent": 9}
+        ]}
+        """)
+        XCTAssertEqual(
+            other.providers.first?.macWidgetResetLabels,
+            ["5h: —", "1w: —"]
+        )
+    }
+
+    /// The app has to carry the live pool values into the widget cache. The
+    /// presentation fallbacks above must not mask a writer that drops them.
+    func testWidgetCacheCarriesPaceAndResetReadings() throws {
+        let usage = try JSONDecoder().decode(
+            UsageSnapshot.self,
+            from: Data("""
+            {
+              "focus": ["claude"],
+              "providers": [{
+                "id": "claude", "title": "Claude", "enabled": true,
+                "pools": {
+                  "week": {
+                    "title": "Weekly", "rank": 0, "pct": 16,
+                    "pace_pct": 27, "resets_in": "5d 2h",
+                    "window_s": 604800, "ring": true
+                  },
+                  "session": {
+                    "title": "Session", "rank": 1, "pct": 44,
+                    "pace_pct": 53, "resets_in": "1h 34m",
+                    "window_s": 18000, "ring": true
+                  }
+                }
+              }],
+              "burndown": {
+                "claude": {
+                  "week": {
+                    "provider": "claude", "pool": "week",
+                    "window_end": 1788094800, "window_s": 604800
+                  }
+                }
+              }
+            }
+            """.utf8)
+        )
+
+        let cached = HeadroomWidgetCache.save(usage)
+        let provider = try XCTUnwrap(cached.providers.first)
+        XCTAssertEqual(provider.percent, 16)
+        XCTAssertEqual(provider.paceDeltaPct, 11)
+        XCTAssertEqual(provider.sessionResetsIn, "1h 34m")
+        XCTAssertEqual(provider.weekResetsIn, "5d 2h")
+        XCTAssertEqual(provider.weekResetsAt, 1788094800)
+        XCTAssertEqual(
+            provider.layers?.first { $0.id == "session" }?.resetsIn,
+            "1h 34m"
+        )
+        XCTAssertEqual(
+            provider.layers?.first { $0.id == "week" }?.resetsIn,
+            "5d 2h"
+        )
+    }
+
+    func testWidgetCacheKeepsResetWithoutARingReading() throws {
+        let usage = try JSONDecoder().decode(
+            UsageSnapshot.self,
+            from: Data("""
+            {
+              "focus": ["claude"],
+              "providers": [{
+                "id": "claude", "title": "Claude", "enabled": true,
+                "pools": {
+                  "week": {
+                    "title": "Weekly", "rank": 0, "pct": 16,
+                    "resets_in": "5d 2h", "ring": true
+                  },
+                  "session": {
+                    "title": "Session", "rank": 1, "pct": null,
+                    "resets_in": "1h 34m", "ring": true
+                  }
+                }
+              }]
+            }
+            """.utf8)
+        )
+
+        let provider = try XCTUnwrap(
+            HeadroomWidgetCache.save(usage).providers.first)
+        XCTAssertEqual(
+            provider.widgetResetLabels,
+            ["5h: 1h34m", "1w: 5d2h"]
+        )
+    }
+
+    func testWidgetPaceNeverBorrowsFromAnotherPool() throws {
+        let usage = try JSONDecoder().decode(
+            UsageSnapshot.self,
+            from: Data("""
+            {
+              "focus": ["claude"],
+              "providers": [{
+                "id": "claude", "title": "Claude", "enabled": true,
+                "pools": {
+                  "week": {
+                    "title": "Weekly", "rank": 0, "pct": 20,
+                    "ring": true
+                  },
+                  "session": {
+                    "title": "Session", "rank": 1, "pct": 80,
+                    "ring": true
+                  }
+                }
+              }],
+              "burndown": {
+                "claude": {
+                  "week": {
+                    "provider": "claude", "pool": "week",
+                    "window_s": 604800, "delta_pct": 10
+                  }
+                }
+              }
+            }
+            """.utf8)
+        )
+
+        let provider = try XCTUnwrap(
+            HeadroomWidgetCache.save(usage).providers.first)
+        XCTAssertEqual(provider.percent, 20)
+        XCTAssertEqual(provider.paceDeltaPct, 10)
+        XCTAssertEqual(provider.widgetPaceSlackLabel, "10% to spare")
+        XCTAssertEqual(
+            provider.macWidgetMediumSummaryLabel,
+            "Claude: 80% left, 10% spare"
+        )
     }
 
     func testAnAbsentBurndownCurveIsEmptyNotAFailure() throws {
@@ -962,7 +1333,7 @@ final class WidgetSnapshotSkewTests: XCTestCase {
         ]}
         """)
         XCTAssertEqual(snapshot.showing("codex").providers.map(\.id), ["codex"])
-        // The default, and every widget placed before the picker existed.
+        // The editable widget's explicit All providers/absent-parameter path.
         XCTAssertEqual(
             snapshot.showing(nil).providers.map(\.id), ["claude", "codex"])
     }
@@ -992,8 +1363,16 @@ final class WidgetSnapshotSkewTests: XCTestCase {
                     title: "Claude",
                     name: "Claude · Work",
                     percent: 42,
+                    paceDeltaPct: 9,
+                    sessionResetsIn: "2h 3m",
+                    weekResetsIn: "3d 4h",
                     accent: "#D97757",
-                    layers: [.init(id: "week", name: "Week", percent: 42)],
+                    layers: [
+                        .init(
+                            id: "week", name: "Week", percent: 42,
+                            resetsIn: "3d 4h"
+                        ),
+                    ],
                     burndown: .init(
                         actual: [[1, 100], [2, 80]],
                         projected: [[2, 80], [3, 60]])
@@ -1007,7 +1386,11 @@ final class WidgetSnapshotSkewTests: XCTestCase {
         XCTAssertEqual(read.attentionSummary, "one build failed")
         XCTAssertEqual(read.providers.first?.name, "Claude · Work")
         XCTAssertEqual(read.providers.first?.percent, 42)
+        XCTAssertEqual(read.providers.first?.paceDeltaPct, 9)
+        XCTAssertEqual(read.providers.first?.sessionResetsIn, "2h 3m")
+        XCTAssertEqual(read.providers.first?.weekResetsIn, "3d 4h")
         XCTAssertEqual(read.providers.first?.layers?.first?.name, "Week")
+        XCTAssertEqual(read.providers.first?.layers?.first?.resetsIn, "3d 4h")
         XCTAssertEqual(read.providers.first?.burndown?.actual.count, 2)
     }
 }
