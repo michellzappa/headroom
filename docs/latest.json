@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "version": "2.1.3",
-  "published": "2026-09-05T09:03:55Z",
-  "url": "https://github.com/michellzappa/headroom/releases/download/v2.1.3/Headroom-macOS.zip",
-  "sha256": "f4025d3e0fafb20cef4076837c7d138954070f85e0566ff41ab2416551421424",
-  "size": 6417030,
+  "version": "2.1.4",
+  "published": "2026-09-05T09:39:03Z",
+  "url": "https://github.com/michellzappa/headroom/releases/download/v2.1.4/Headroom-macOS.zip",
+  "sha256": "08c28300110358761797c1358ebac34f8a113f34a69db791800cfa933b6526bb",
+  "size": 6472176,
   "min_macos": "14.0",
-  "notes_md": "### Added\n\n- **Settings → Desk display.** The ESP32 board's panel settings now live on\n  the Mac, beside iPhone and Other Macs. Brightness in four steps (25, 50, 75,\n  100%), Dim at night (10% from 22:00 to 07:00 in the host's time zone),\n  Celebrate quota resets, Boot animation, and which of the Vercel, Git and\n  Local servers pages the BOOT button cycles through. The pane also shows the\n  firmware stamp the board reports, how it is connected, and when it last\n  polled. The host stores the answers in `~/.headroom/config.json`, ships them\n  to the board as an additive `display` block in the device view, and the board\n  applies them on its next poll and keeps them in NVS, so a cold boot without\n  the host comes up the same way. A host older than this leaves the pane\n  read-only; a board flashed before this ignores the block. `PANEL_BRIGHTNESS`\n  in the firmware config is now only the first-boot level. Rings/Pace and the\n  lower pane stay on-board gestures. Needs a reflash to take effect on the\n  board."
+  "notes_md": "### Changed\n\n- **Desk display dims on a schedule you set, and fades instead of stepping.**\n  Dim at night becomes Dim on a schedule with From and Until hour pickers in\n  the host's time zone. The host fades the brightness it serves to 10% over\n  thirty minutes after the start hour and back after the end hour, so a board\n  polling once a minute sees about thirty small steps rather than one jump.\n  The pane shows the level the panel holds right now while a fade or the dim\n  level is in effect. No reflash needed; the board applies what arrives.\n- **Desk display pages follow the sources.** Each page row takes its source's\n  title from the host, and a source that is off under Integrations shows as\n  off here and cannot be switched on from the pane, so a toggle never names\n  a page the board cannot draw.\n\n### Added\n\n- **The Desk display pane shows whether the board is still polling.** The host\n  measures the median gap between the board's polls and reports it beside\n  Last seen (\"12 sec. ago · every 60 s\"), with a dot that is green within two\n  and a half polls, orange within six, and red after that. The section\n  refreshes itself every fifteen seconds while open."
 }
