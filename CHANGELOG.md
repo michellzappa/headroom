@@ -7,6 +7,25 @@ are not tracked here because they move on every commit.
 Add a section here before cutting a tag. `scripts/cut-release.sh` refuses to
 tag a version that has no entry.
 
+## 2.1.3 — 2026-09-05
+
+### Added
+
+- **Settings → Desk display.** The ESP32 board's panel settings now live on
+  the Mac, beside iPhone and Other Macs. Brightness in four steps (25, 50, 75,
+  100%), Dim at night (10% from 22:00 to 07:00 in the host's time zone),
+  Celebrate quota resets, Boot animation, and which of the Vercel, Git and
+  Local servers pages the BOOT button cycles through. The pane also shows the
+  firmware stamp the board reports, how it is connected, and when it last
+  polled. The host stores the answers in `~/.headroom/config.json`, ships them
+  to the board as an additive `display` block in the device view, and the board
+  applies them on its next poll and keeps them in NVS, so a cold boot without
+  the host comes up the same way. A host older than this leaves the pane
+  read-only; a board flashed before this ignores the block. `PANEL_BRIGHTNESS`
+  in the firmware config is now only the first-boot level. Rings/Pace and the
+  lower pane stay on-board gestures. Needs a reflash to take effect on the
+  board.
+
 ## 2.1.2 — 2026-09-03
 
 ### Added
