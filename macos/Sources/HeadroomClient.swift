@@ -1002,12 +1002,14 @@ struct DeskDisplayBoard: Decodable, Sendable {
     }
 
     /// Liveness, judged against the board's own cadence. With no cadence yet
-    /// the host's 60 s default poll stands in.
+    /// the firmware's 60 s default poll stands in. The floor guards the
+    /// minutes after a host restart, when the board's quick retries leave a
+    /// median of a few seconds that would call a fresh poll late.
     enum Liveness { case live, late, lost }
 
     var liveness: Liveness {
         guard let ageS else { return .lost }
-        let cadence = Double(pollS ?? 60)
+        let cadence = max(Double(pollS ?? 60), 30)
         if Double(ageS) <= cadence * 2.5 { return .live }
         if Double(ageS) <= cadence * 6 { return .late }
         return .lost
