@@ -46,9 +46,13 @@ extension HeadroomWidgetSnapshot.Provider {
     }
 
     /// Mac small widgets only spend height on provider-specific reset clocks.
-    /// The shared pair remains intact for the iPhone widget and watch cache.
-    func macWidgetResetLabels(in timeZone: TimeZone) -> [String] {
-        let labels = widgetResetLabels(in: timeZone)
+    /// The shared reset presentation remains available to the iPhone widget
+    /// and watch cache, with the same Codex density exception.
+    func macWidgetResetLabels(
+        in timeZone: TimeZone,
+        now: Date = .now
+    ) -> [String] {
+        let labels = widgetResetLabels(in: timeZone, now: now)
         let baseID = id.split(separator: ":", maxSplits: 1)
             .first.map(String.init)
         if baseID == "claude" { return Array(labels.prefix(1)) }
@@ -61,24 +65,31 @@ extension HeadroomWidgetSnapshot.Provider {
     }
     #endif
 
-    /// Both rows are structural in the shared small-widget presentation.
-    /// Missing layers and older caches keep their labels and show an explicit
-    /// unknown countdown.
-    func widgetResetLabels(in timeZone: TimeZone) -> [String] {
+    /// Reset rows are structural in the shared small-widget presentation,
+    /// except Codex's intentionally omitted session row. Missing layers and
+    /// older caches keep their labels and show an explicit unknown countdown.
+    func widgetResetLabels(
+        in timeZone: TimeZone,
+        now: Date = .now
+    ) -> [String] {
         // The layer fallback reads the first cache shape used while this field
         // was introduced; current writers keep resets independently of rings.
         let sessionReset = sessionResetsIn
             ?? layers?.first { $0.id == "session" }?.resetsIn
         let weeklyReset = weekResetsIn
             ?? layers?.first { $0.id == "week" }?.resetsIn
+        let baseID = id.split(separator: ":", maxSplits: 1)
+            .first.map(String.init)
+        let weeklyLabel = HeadroomCopy.widgetWeeklyReset(
+            duration: weeklyReset,
+            resetEpoch: weekResetsAt,
+            timeZone: timeZone,
+            now: now
+        )
+        if baseID == "codex" { return [weeklyLabel] }
         return [
             HeadroomCopy.widgetReset("5h", duration: sessionReset),
-            HeadroomCopy.widgetReset(
-                "1w",
-                duration: weeklyReset,
-                resetEpoch: weekResetsAt,
-                timeZone: timeZone
-            ),
+            weeklyLabel,
         ]
     }
 

@@ -1043,8 +1043,7 @@ final class WidgetSnapshotSkewTests: XCTestCase {
             claude.providers.first?.widgetResetLabels(
                 in: try XCTUnwrap(TimeZone(secondsFromGMT: 0))
             ),
-            ["5h: 1h34m", "1w: 5d2h, Sun 1pm"],
-            "shared iPhone/watch presentation stays unchanged"
+            ["5h: 1h34m", "5d2h"]
         )
         XCTAssertEqual(
             claude.providers.first?.macWidgetResetLabels(
@@ -1061,8 +1060,7 @@ final class WidgetSnapshotSkewTests: XCTestCase {
         """)
         XCTAssertEqual(
             codex.providers.first?.widgetResetLabels,
-            ["5h: 2h54m", "1w: 4d13h"],
-            "shared iPhone/watch presentation stays unchanged"
+            ["4d13h"]
         )
         XCTAssertEqual(codex.providers.first?.macWidgetResetLabels, [])
 
@@ -1074,7 +1072,22 @@ final class WidgetSnapshotSkewTests: XCTestCase {
         """)
         XCTAssertEqual(
             other.providers.first?.macWidgetResetLabels,
-            ["5h: —", "1w: —"]
+            ["5h: —", "—"]
+        )
+    }
+
+    func testWeeklyWidgetResetShowsOnlyTimeWhenItResetsToday() throws {
+        let provider = try decode("""
+        {"providers": [{"id": "claude", "title": "Claude", "percent": 16,
+          "weekResetsAt": 1788094800,
+          "weekResetsIn": "5h 2m"}]}
+        """)
+        XCTAssertEqual(
+            provider.providers.first?.widgetResetLabels(
+                in: try XCTUnwrap(TimeZone(secondsFromGMT: 0)),
+                now: Date(timeIntervalSince1970: 1788076800)
+            ).last,
+            "1pm"
         )
     }
 

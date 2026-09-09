@@ -461,12 +461,13 @@ pace slack is negative. The pace slot is always present; a cache written before
 that reading existed shows **— spare** rather than dropping the words. It never
 adds a separate **N% used** line.
 
-The Mac small widget gives Claude one reset row: **5h: 1h34m**. Codex gets no
-reset rows; its rings and percent are enough for this surface. Other providers
-keep the original **5h** and **1w** rows. Widget durations remove internal
-spaces to fit the tile, and a missing Claude reading stays visible as
-**5h: —**. These density exceptions are Mac-only; the iPhone widget keeps the
-shared two-row reset and three-row medium presentations.
+The small widget gives Claude one reset row: **5h: 1h34m**. Codex gets no reset
+rows on Mac; its rings and percent are enough for that surface. Weekly reset
+rows show only the compact time left (**3d1h**) or, when the reset is today,
+the local time (**2pm**); they have no **1w:** prefix. Widget durations remove
+internal spaces to fit the tile, and a missing Claude reading stays visible as
+**5h: —**. The iPhone widget keeps the shared two-row reset and three-row
+medium presentations.
 
 ### Menu bar icon
 

@@ -227,7 +227,7 @@ struct HeadroomWidgetView: View {
                 VStack(
                     spacing: entry.snapshot.isStale
                         ? 2
-                        : (providers.count > 2 ? 3 : 5)
+                        : (providers.count > 2 ? 2 : 3)
                 ) {
                     HeadroomRings(
                         layers: provider.ringLayers, tint: provider.tint

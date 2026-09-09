@@ -68,6 +68,21 @@ enum HeadroomCopy {
         return "\(weekdays[weekday - 1]) \(clockHour)\(meridiem)"
     }
 
+    private static func quotaClock(
+        resetEpoch: Double?,
+        timeZone: TimeZone
+    ) -> String? {
+        guard let resetEpoch else { return nil }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let hour = calendar.component(
+            .hour, from: Date(timeIntervalSince1970: resetEpoch)
+        )
+        let clockHour = (hour + 11) % 12 + 1
+        let meridiem = hour < 12 ? "am" : "pm"
+        return "\(clockHour)\(meridiem)"
+    }
+
     static let activity = "Activity"
     static let services = "Services"
     static let supabase = "Supabase"
@@ -320,6 +335,25 @@ enum HeadroomCopy {
             answer += ", \(clock)"
         }
         return answer
+    }
+
+    static func widgetWeeklyReset(
+        duration: String?,
+        resetEpoch: Double?,
+        timeZone: TimeZone = .autoupdatingCurrent,
+        now: Date = .now
+    ) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        if let resetEpoch,
+           calendar.isDate(
+               Date(timeIntervalSince1970: resetEpoch), inSameDayAs: now
+           ),
+           let clock = quotaClock(resetEpoch: resetEpoch, timeZone: timeZone) {
+            return clock
+        }
+        let compact = duration?.filter { !$0.isWhitespace }
+        return compact.flatMap { $0.isEmpty ? nil : $0 } ?? "—"
     }
 
     /// "Empty Thu" — the forecast reaches zero before the pool renews.
