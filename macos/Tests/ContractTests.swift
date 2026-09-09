@@ -1170,7 +1170,7 @@ final class WidgetSnapshotSkewTests: XCTestCase {
             HeadroomWidgetCache.save(usage).providers.first)
         XCTAssertEqual(
             provider.widgetResetLabels,
-            ["5h: 1h34m", "1w: 5d2h"]
+            ["5h: 1h34m", "5d2h"]
         )
     }
 
