@@ -229,7 +229,7 @@ struct HeadroomWidgetView: View {
                 VStack(
                     spacing: entry.snapshot.isStale
                         ? 2
-                        : (providers.count > 2 ? 2 : 1)
+                        : (providers.count > 2 ? 2 : 6)
                 ) {
                     HeadroomRings(
                         layers: provider.ringLayers, tint: provider.tint
@@ -243,7 +243,7 @@ struct HeadroomWidgetView: View {
                             .lineLimit(1)
                             .minimumScaleFactor(0.5)
                     } else {
-                        VStack(spacing: -1) {
+                        VStack(spacing: 2) {
                             Text(provider.title)
                                 .font(.caption2)
                                 .lineLimit(1)
