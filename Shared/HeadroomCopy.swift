@@ -59,6 +59,52 @@ enum HeadroomCopy {
     static let balanceLeft = "left"
     static let settingsConnection = "Connection"
     static let settingsPermissions = "Permissions"
+
+    // MARK: Desk display (Settings → Desk display; the ESP32 board)
+    //
+    // Host-owned settings for the panel. Nothing here talks to the board; the
+    // host ships the answers in the device projection and the board applies
+    // them on its next poll (docs/esp32.md, "Settings").
+
+    static let settingsDeskDisplay = "Desk display"
+    static let deskDisplayBoard = "Board"
+    static let deskDisplayFirmware = "Firmware"
+    static let deskDisplayConnection = "Connection"
+    static let deskDisplayLastSeen = "Last seen"
+    static let deskDisplayNoBoard =
+        "No board has reported in yet. One appears here after its first poll of this host."
+    static let deskDisplayBoardHint =
+        "Firmware is the build number and commit running on the board. Changes below reach it on its next poll, within about a minute."
+    static let deskDisplayPanel = "Panel"
+    static let deskDisplayBrightness = "Brightness"
+    static let deskDisplayDim = "Dim on a schedule"
+    static let deskDisplayDimFrom = "From"
+    static let deskDisplayDimUntil = "Until"
+    static let deskDisplayBrightnessNow = "Panel now"
+    /// Footer under the schedule. The level and the fade length are the
+    /// host's, so the sentence is built from what it reports.
+    static func deskDisplayDimHint(pct: Int, rampMinutes: Int) -> String {
+        "Fades to \(pct)% over \(rampMinutes) minutes after the start hour, and back to the level above after the end hour. Hours are in the host time zone, set under General."
+    }
+    /// A source page whose source is off under Integrations: the toggle here
+    /// is disabled and says why.
+    static let deskDisplayPageSourceOff = "Off under Integrations"
+    static let deskDisplayEffects = "Effects"
+    static let deskDisplayCelebrateResets = "Celebrate quota resets"
+    static let deskDisplayCelebrateResetsHint =
+        "A short burst in the provider’s colour when a quota window rolls over."
+    static let deskDisplayBootSplash = "Boot animation"
+    static let deskDisplayBootSplashHint =
+        "The four-second title sequence on power-up. Off, the board goes straight to its startup checklist."
+    static let deskDisplayPages = "Pages"
+    static let deskDisplayPagesHint =
+        "What the BOOT button cycles through after the glance. A page follows its source: switch the source off under Integrations and the page goes with it."
+    static let deskDisplayPagesNone =
+        "None of the sources this board can draw a page for are on. Turn on Vercel, Git or Local under Integrations."
+    static let deskDisplayReadOnly =
+        "This host predates Desk display settings. Update the host to change them."
+    static let deskDisplayWiFi = "Wi-Fi"
+    static let deskDisplayUSB = "USB"
     /// General pane: row-count steppers for what this Mac draws.
     /// LabeledContent title on every integration detail Status row.
     static let settingsStatus = "Status"

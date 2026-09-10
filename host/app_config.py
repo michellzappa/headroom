@@ -11,6 +11,8 @@ import json
 import os
 import re
 import threading
+import time
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 STORE_PATH = os.path.expanduser("~/.headroom/config.json")
@@ -65,6 +67,21 @@ DEFAULTS = {
     # point it anywhere that syncs (Dropbox, Syncthing) and the rest works
     # unchanged — nothing here is iCloud-specific but the default path.
     "icloud_dir": "",
+    # The ESP32 desk display. Read by Settings → Desk display and shipped to
+    # the board inside `/usage?view=device` as `display`; the board mirrors the
+    # block to NVS so a cold boot without the host comes up the same way.
+    # One board talks to one host, so none of this is in SHARED_CONFIG_KEYS.
+    "display_brightness_pct": 75,
+    "display_dim_at_night": False,
+    # Local hours (0-23) in the configured time zone. Equal hours mean no
+    # window; a window may cross midnight.
+    "display_dim_start_hour": 22,
+    "display_dim_end_hour": 7,
+    "display_celebrate_resets": True,
+    "display_boot_splash": True,
+    # Pages the BOOT button cycles through, on top of the source being enabled
+    # at all. Absent id means shown.
+    "display_pages": {},
 }
 
 # Config keys that are the same person's answer on every Mac, so they follow
@@ -181,6 +198,218 @@ def set_timezone(value):
         raise ValueError(f"unknown timezone {name!r}") from exc
     _persist(timezone=name)
     return name
+
+
+# ---- Desk display -----------------------------------------------------------
+
+# The four steps the Settings picker offers. Panel units are 0-255; 75% is
+# within a few units of the 200 the firmware shipped with as a compile-time
+# constant, so a board that has never been told anything looks the same.
+DISPLAY_BRIGHTNESS_STEPS = (25, 50, 75, 100)
+# Scheduled dimming: one toggle plus a start and an end hour. The level it
+# fades to and how long the fade takes are product judgment (docs/product.md,
+# "What earns a Setting"): 10% is what the board sat at after bedtime before
+# dimming was removed in 2.0.9. The fade is served, not flashed — the host
+# interpolates the brightness it hands the board, and a board polling once a
+# minute sees about thirty steps of a few panel units each.
+DISPLAY_DIM_BRIGHTNESS_PCT = 10
+DISPLAY_DIM_RAMP_MIN = 30
+# Pages the board can hide. Slots are the host's `focus` and stay out of this:
+# an empty slot is a page that does not exist, not one that is hidden.
+DISPLAY_PAGE_IDS = ("vercel", "git", "local")
+
+
+def _display_bool(key):
+    value = get(key, DEFAULTS[key])
+    return bool(value) if isinstance(value, bool) else bool(DEFAULTS[key])
+
+
+def display_brightness_pct():
+    value = get("display_brightness_pct", DEFAULTS["display_brightness_pct"])
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        return DEFAULTS["display_brightness_pct"]
+    return value if value in DISPLAY_BRIGHTNESS_STEPS else DEFAULTS["display_brightness_pct"]
+
+
+def display_dim_at_night():
+    return _display_bool("display_dim_at_night")
+
+
+def _display_hour(key):
+    value = get(key, DEFAULTS[key])
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        return DEFAULTS[key]
+    return value if 0 <= value <= 23 else DEFAULTS[key]
+
+
+def display_dim_start_hour():
+    return _display_hour("display_dim_start_hour")
+
+
+def display_dim_end_hour():
+    return _display_hour("display_dim_end_hour")
+
+
+def display_celebrate_resets():
+    return _display_bool("display_celebrate_resets")
+
+
+def display_boot_splash():
+    return _display_bool("display_boot_splash")
+
+
+def display_pages():
+    """{page_id: shown} for every page the board can hide. Unknown ids drop."""
+    raw_pages = get("display_pages", {})
+    if not isinstance(raw_pages, dict):
+        raw_pages = {}
+    pages = {}
+    for page_id in DISPLAY_PAGE_IDS:
+        shown = raw_pages.get(page_id, True)
+        pages[page_id] = shown if isinstance(shown, bool) else True
+    return pages
+
+
+def _display_minute_of_day(now):
+    if now is None:
+        now = time.time()
+    try:
+        zone = ZoneInfo(timezone_name())
+    except Exception:
+        zone = ZoneInfo("UTC")
+    local = datetime.fromtimestamp(now, zone)
+    return local.hour * 60 + local.minute + local.second / 60.0
+
+
+def display_dim_fraction(now=None):
+    """0.0 at the chosen level, 1.0 fully dimmed, in between during a fade.
+
+    Minutes since the start hour and since the end hour are both taken modulo
+    a day, so a window that crosses midnight needs no special case. Inside the
+    window the first DISPLAY_DIM_RAMP_MIN minutes fade down; after the window
+    the same span fades back. Equal hours are no window.
+    """
+    if not display_dim_at_night():
+        return 0.0
+    start = display_dim_start_hour() * 60
+    end = display_dim_end_hour() * 60
+    length = (end - start) % 1440
+    if length == 0:
+        return 0.0
+    t = _display_minute_of_day(now)
+    since_start = (t - start) % 1440
+    since_end = (t - end) % 1440
+    ramp = float(DISPLAY_DIM_RAMP_MIN)
+    if since_start < length:
+        return min(1.0, since_start / ramp)
+    if since_end < ramp:
+        return 1.0 - since_end / ramp
+    return 0.0
+
+
+def display_dimmed_now(now=None):
+    return display_dim_fraction(now) > 0.0
+
+
+def display_effective_brightness_pct(now=None):
+    base = display_brightness_pct()
+    fraction = display_dim_fraction(now)
+    return int(round(base + (DISPLAY_DIM_BRIGHTNESS_PCT - base) * fraction))
+
+
+def display_settings(now=None):
+    """What Settings → Desk display shows and edits."""
+    return {
+        "brightness_pct": display_brightness_pct(),
+        "brightness_steps": list(DISPLAY_BRIGHTNESS_STEPS),
+        "dim_at_night": display_dim_at_night(),
+        "dim_start_hour": display_dim_start_hour(),
+        "dim_end_hour": display_dim_end_hour(),
+        "dim_brightness_pct": DISPLAY_DIM_BRIGHTNESS_PCT,
+        "dim_ramp_minutes": DISPLAY_DIM_RAMP_MIN,
+        "dimmed_now": display_dimmed_now(now),
+        "brightness_now_pct": display_effective_brightness_pct(now),
+        "celebrate_resets": display_celebrate_resets(),
+        "boot_splash": display_boot_splash(),
+        "pages": display_pages(),
+    }
+
+
+def display_projection(now=None):
+    """The `display` block the board reads from `/usage?view=device`.
+
+    Effective values only: the board applies `brightness` as panel units and
+    never learns whether it is dimmed because of a schedule, or mid-fade.
+    Deciding is the host's job (docs/contract.md — the board is a render
+    target), and so is the fade.
+    """
+    pct = display_effective_brightness_pct(now)
+    return {
+        "brightness": max(1, min(255, round(255 * pct / 100))),
+        "celebrate_resets": display_celebrate_resets(),
+        "boot_splash": display_boot_splash(),
+        "pages": display_pages(),
+    }
+
+
+def set_display(brightness_pct=None, dim_at_night=None, dim_start_hour=None,
+                dim_end_hour=None, celebrate_resets=None, boot_splash=None,
+                pages=None):
+    """Persist the desk display settings. Omitted arguments are left alone."""
+    updates = {}
+    for key, value in (("display_dim_start_hour", dim_start_hour),
+                       ("display_dim_end_hour", dim_end_hour)):
+        if value is None:
+            continue
+        if isinstance(value, bool):
+            raise ValueError(f"{key[len('display_'):]} must be an hour, 0-23")
+        try:
+            hour = int(value)
+        except (TypeError, ValueError):
+            raise ValueError(f"{key[len('display_'):]} must be an hour, 0-23")
+        if not 0 <= hour <= 23:
+            raise ValueError(f"{key[len('display_'):]} must be an hour, 0-23")
+        updates[key] = hour
+    if brightness_pct is not None:
+        try:
+            value = int(brightness_pct)
+        except (TypeError, ValueError):
+            raise ValueError("brightness_pct must be one of "
+                             + ", ".join(str(s) for s in DISPLAY_BRIGHTNESS_STEPS))
+        if value not in DISPLAY_BRIGHTNESS_STEPS:
+            raise ValueError("brightness_pct must be one of "
+                             + ", ".join(str(s) for s in DISPLAY_BRIGHTNESS_STEPS))
+        updates["display_brightness_pct"] = value
+    for key, value in (("display_dim_at_night", dim_at_night),
+                       ("display_celebrate_resets", celebrate_resets),
+                       ("display_boot_splash", boot_splash)):
+        if value is None:
+            continue
+        if not isinstance(value, bool):
+            raise ValueError(f"{key[len('display_'):]} must be true or false")
+        updates[key] = value
+    if pages is not None:
+        if not isinstance(pages, dict):
+            raise ValueError("pages must be an object of page id to true/false")
+        current = display_pages()
+        for page_id, shown in pages.items():
+            if page_id not in DISPLAY_PAGE_IDS:
+                raise ValueError(f"unknown page {page_id!r}")
+            if not isinstance(shown, bool):
+                raise ValueError(f"pages.{page_id} must be true or false")
+            current[page_id] = shown
+        # Store only the hidden ones: absent means shown, so the file stays
+        # empty for a person who never touched this.
+        updates["display_pages"] = {
+            page_id: False for page_id, shown in current.items() if not shown
+        }
+    if updates:
+        _persist(**updates)
+    return display_settings()
 
 
 def dev_root():

@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "version": "2.1.2",
-  "published": "2026-09-03T06:48:38Z",
-  "url": "https://github.com/michellzappa/headroom/releases/download/v2.1.2/Headroom-macOS.zip",
-  "sha256": "30316381dc4068a3e0ed7897ad5bd92b3c643a54b62518e2e3ab5a4e4ec08aaa",
-  "size": 6293755,
+  "version": "2.1.4",
+  "published": "2026-09-05T09:39:03Z",
+  "url": "https://github.com/michellzappa/headroom/releases/download/v2.1.4/Headroom-macOS.zip",
+  "sha256": "08c28300110358761797c1358ebac34f8a113f34a69db791800cfa933b6526bb",
+  "size": 6472176,
   "min_macos": "14.0",
-  "notes_md": "### Added\n\n- **Settings shows the menu bar glyph before you pick it.** General draws a\n  Preview strip above the icon picker, using the same renderer the status item\n  uses at the same size, on a dimmed strip with a wifi glyph, a battery and a\n  clock. Switching between Remaining and Pace, or flipping Invert, changes the\n  mark in front of you instead of sending you up to the menu bar and back. It\n  draws your own top three. With no coding provider on it falls back to sample\n  numbers and says so: the glyph is real, the numbers in it are not."
+  "notes_md": "### Changed\n\n- **Desk display dims on a schedule you set, and fades instead of stepping.**\n  Dim at night becomes Dim on a schedule with From and Until hour pickers in\n  the host's time zone. The host fades the brightness it serves to 10% over\n  thirty minutes after the start hour and back after the end hour, so a board\n  polling once a minute sees about thirty small steps rather than one jump.\n  The pane shows the level the panel holds right now while a fade or the dim\n  level is in effect. No reflash needed; the board applies what arrives.\n- **Desk display pages follow the sources.** Each page row takes its source's\n  title from the host, and a source that is off under Integrations shows as\n  off here and cannot be switched on from the pane, so a toggle never names\n  a page the board cannot draw.\n\n### Added\n\n- **The Desk display pane shows whether the board is still polling.** The host\n  measures the median gap between the board's polls and reports it beside\n  Last seen (\"12 sec. ago · every 60 s\"), with a dot that is green within two\n  and a half polls, orange within six, and red after that. The section\n  refreshes itself every fifteen seconds while open."
 }

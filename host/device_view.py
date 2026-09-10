@@ -504,7 +504,7 @@ def _device_providers(doc):
     return rows
 
 
-def build(doc, effect=None):
+def build(doc, effect=None, display=None):
     """Project a full rollup document down to the board's subset."""
     doc = doc or {}
     vercel = doc.get("vercel") or {}
@@ -565,6 +565,21 @@ def build(doc, effect=None):
             "kind": str(effect.get("kind") or "reset"),
             **({"provider": str(effect["provider"])}
                if effect.get("provider") else {}),
+        }
+
+    # Additive settings channel, same shape of decision as device_effect: the
+    # host says what the panel does, the board applies it and mirrors it to
+    # NVS. Effective values only — a dimmed brightness arrives already dimmed.
+    # Firmware that predates the block never asks for the key.
+    if isinstance(display, dict) and display:
+        device["display"] = {
+            "brightness": int(display.get("brightness", 0)),
+            "celebrate_resets": bool(display.get("celebrate_resets", True)),
+            "boot_splash": bool(display.get("boot_splash", True)),
+            "pages": {
+                str(page_id): bool(shown)
+                for page_id, shown in (display.get("pages") or {}).items()
+            },
         }
 
     # Charts only for what the board can show: its three slots, plus the

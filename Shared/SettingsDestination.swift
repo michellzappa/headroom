@@ -26,6 +26,10 @@ enum SettingsDestination: Hashable, Sendable {
     /// iPhone — the two used to be unlabeled sections inside a "Sync" pane
     /// that neither named, so nothing in Settings said "iPhone" out loud.
     case otherMacs
+    /// The ESP32 desk board's panel settings. A root beside the other
+    /// devices; shown whether or not a board has reported in, so the pane
+    /// explains itself instead of appearing by surprise.
+    case deskDisplay
     /// Nested under Integrations.
     case integration(SettingsIntegration)
 
@@ -40,7 +44,7 @@ enum SettingsDestination: Hashable, Sendable {
     /// word iPhone, and onboarding's phone step points at `.iPhone`.
     static let macRoots: [SettingsDestination] = [
         .general, .sources, .integrations, .codingAgents, .iPhone, .otherMacs,
-        .telemetry, .about,
+        .deskDisplay, .telemetry, .about,
     ]
 
     /// iPhone Settings tab roots. Connection is the phone’s view of pairing;
@@ -62,6 +66,7 @@ enum SettingsDestination: Hashable, Sendable {
         case .integrations: return HeadroomCopy.settingsIntegrations
         case .about: return HeadroomCopy.about
         case .otherMacs: return HeadroomCopy.otherMacs
+        case .deskDisplay: return HeadroomCopy.settingsDeskDisplay
         case .integration(let kind): return kind.title
         case .connection: return HeadroomCopy.settingsConnection
         case .permissions: return HeadroomCopy.settingsPermissions
@@ -78,6 +83,7 @@ enum SettingsDestination: Hashable, Sendable {
         case .integrations: return "link"
         case .about: return "info.circle"
         case .otherMacs: return "laptopcomputer.and.iphone"
+        case .deskDisplay: return "display"
         case .integration(let kind): return kind.symbol
         case .connection: return "network"
         case .permissions: return "lock.shield"
@@ -92,7 +98,8 @@ enum SettingsDestination: Hashable, Sendable {
     /// typing a key, and keys are never entered on the phone.
     var isMacOnly: Bool {
         switch self {
-        case .general, .codingAgents, .telemetry, .otherMacs, .integration:
+        case .general, .codingAgents, .telemetry, .otherMacs, .deskDisplay,
+             .integration:
             return true
         case .integrations, .sources, .iPhone, .about, .connection,
              .permissions:

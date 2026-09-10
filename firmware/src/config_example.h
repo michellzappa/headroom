@@ -42,5 +42,8 @@ static const struct { const char *ssid; const char *pass; } WIFI_NETWORKS[] = {
 #define OTA_PASSWORD "change-me"
 
 // ---- Panel brightness (AMOLED) ----
-// One level, all day and all night. Panel units 0-255.
+// First-boot level only, panel units 0-255. Mac Settings → Desk display sets
+// the level the board holds (and night dimming); the board keeps the host's
+// answer in NVS, so this value applies until the first poll of a host that
+// has the pane.
 #define PANEL_BRIGHTNESS 200

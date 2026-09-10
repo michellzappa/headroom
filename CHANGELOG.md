@@ -7,6 +7,49 @@ are not tracked here because they move on every commit.
 Add a section here before cutting a tag. `scripts/cut-release.sh` refuses to
 tag a version that has no entry.
 
+## 2.1.4 — 2026-09-05
+
+### Changed
+
+- **Desk display dims on a schedule you set, and fades instead of stepping.**
+  Dim at night becomes Dim on a schedule with From and Until hour pickers in
+  the host's time zone. The host fades the brightness it serves to 10% over
+  thirty minutes after the start hour and back after the end hour, so a board
+  polling once a minute sees about thirty small steps rather than one jump.
+  The pane shows the level the panel holds right now while a fade or the dim
+  level is in effect. No reflash needed; the board applies what arrives.
+- **Desk display pages follow the sources.** Each page row takes its source's
+  title from the host, and a source that is off under Integrations shows as
+  off here and cannot be switched on from the pane, so a toggle never names
+  a page the board cannot draw.
+
+### Added
+
+- **The Desk display pane shows whether the board is still polling.** The host
+  measures the median gap between the board's polls and reports it beside
+  Last seen ("12 sec. ago · every 60 s"), with a dot that is green within two
+  and a half polls, orange within six, and red after that. The section
+  refreshes itself every fifteen seconds while open.
+
+## 2.1.3 — 2026-09-05
+
+### Added
+
+- **Settings → Desk display.** The ESP32 board's panel settings now live on
+  the Mac, beside iPhone and Other Macs. Brightness in four steps (25, 50, 75,
+  100%), Dim at night (10% from 22:00 to 07:00 in the host's time zone),
+  Celebrate quota resets, Boot animation, and which of the Vercel, Git and
+  Local servers pages the BOOT button cycles through. The pane also shows the
+  firmware stamp the board reports, how it is connected, and when it last
+  polled. The host stores the answers in `~/.headroom/config.json`, ships them
+  to the board as an additive `display` block in the device view, and the board
+  applies them on its next poll and keeps them in NVS, so a cold boot without
+  the host comes up the same way. A host older than this leaves the pane
+  read-only; a board flashed before this ignores the block. `PANEL_BRIGHTNESS`
+  in the firmware config is now only the first-boot level. Rings/Pace and the
+  lower pane stay on-board gestures. Needs a reflash to take effect on the
+  board.
+
 ## 2.1.2 — 2026-09-03
 
 ### Added

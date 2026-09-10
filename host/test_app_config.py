@@ -642,3 +642,113 @@ class SharedConfigValidationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DeskDisplayConfigTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.path = os.path.join(self.tmp.name, "config.json")
+        self.patcher = mock.patch.object(app_config, "STORE_PATH", self.path)
+        self.patcher.start()
+        app_config.reload()
+
+    def tearDown(self):
+        self.patcher.stop()
+        self.tmp.cleanup()
+        app_config.reload()
+
+    def test_defaults(self):
+        settings = app_config.display_settings(now=0)
+        self.assertEqual(settings["brightness_pct"], 75)
+        self.assertFalse(settings["dim_at_night"])
+        self.assertFalse(settings["dimmed_now"])
+        self.assertTrue(settings["celebrate_resets"])
+        self.assertTrue(settings["boot_splash"])
+        self.assertEqual(settings["pages"],
+                         {"vercel": True, "git": True, "local": True})
+        projection = app_config.display_projection(now=0)
+        self.assertEqual(projection["brightness"], 191)
+        self.assertEqual(projection["pages"], settings["pages"])
+
+    def test_brightness_is_one_of_the_offered_steps(self):
+        app_config.set_display(brightness_pct=25)
+        self.assertEqual(app_config.display_projection()["brightness"], 64)
+        app_config.set_display(brightness_pct="100")
+        self.assertEqual(app_config.display_projection()["brightness"], 255)
+        with self.assertRaises(ValueError):
+            app_config.set_display(brightness_pct=60)
+        # A hand-edited file with a value off the scale reads as the default.
+        with open(self.path, "w") as handle:
+            json.dump({"display_brightness_pct": 12}, handle)
+        app_config.reload()
+        self.assertEqual(app_config.display_brightness_pct(), 75)
+
+    def test_dimming_fades_over_thirty_minutes_in_the_configured_zone(self):
+        app_config.set_timezone("Europe/Berlin")
+        app_config.set_display(dim_at_night=True)
+        # 2026-01-15, Berlin is UTC+1. 22:00 local = 21:00 UTC.
+        start = 1768510800
+        minute = 60
+        self.assertEqual(app_config.display_effective_brightness_pct(now=start - minute), 75)
+        # Fifteen minutes in: halfway between 75 and 10.
+        self.assertEqual(app_config.display_effective_brightness_pct(now=start + 15 * minute), 42)
+        # Past the ramp: fully dimmed, and dimmed through the night.
+        self.assertEqual(app_config.display_effective_brightness_pct(now=start + 31 * minute), 10)
+        self.assertEqual(app_config.display_projection(now=start + 3 * 3600)["brightness"], 26)
+        # 07:00 local starts the fade back; 07:15 is halfway; 07:30 is done.
+        end = start + 9 * 3600
+        self.assertEqual(app_config.display_effective_brightness_pct(now=end), 10)
+        self.assertEqual(app_config.display_effective_brightness_pct(now=end + 15 * minute), 42)
+        self.assertEqual(app_config.display_effective_brightness_pct(now=end + 30 * minute), 75)
+        self.assertFalse(app_config.display_dimmed_now(now=end + 30 * minute))
+        self.assertTrue(app_config.display_settings(now=start + 3600)["dimmed_now"])
+        self.assertEqual(app_config.display_settings(now=start + 3600)["brightness_now_pct"], 10)
+        app_config.set_display(dim_at_night=False)
+        self.assertEqual(app_config.display_projection(now=start + 3600)["brightness"], 191)
+
+    def test_dim_window_hours_are_configurable_and_may_cross_midnight(self):
+        app_config.set_timezone("UTC")
+        app_config.set_display(dim_at_night=True, dim_start_hour=9, dim_end_hour=17)
+        settings = app_config.display_settings()
+        self.assertEqual((settings["dim_start_hour"], settings["dim_end_hour"]), (9, 17))
+        noon = 1768478400   # 2026-01-15 12:00 UTC
+        self.assertEqual(app_config.display_effective_brightness_pct(now=noon), 10)
+        self.assertEqual(app_config.display_effective_brightness_pct(now=noon + 8 * 3600), 75)
+        # Defaults cross midnight: 22 → 7.
+        app_config.set_display(dim_start_hour=22, dim_end_hour=7)
+        self.assertEqual(app_config.display_effective_brightness_pct(now=noon), 75)
+        self.assertEqual(app_config.display_effective_brightness_pct(now=noon + 14 * 3600), 10)
+        # Equal hours: no window.
+        app_config.set_display(dim_start_hour=9, dim_end_hour=9)
+        self.assertEqual(app_config.display_effective_brightness_pct(now=noon), 75)
+        for bad in (24, -1, "nine", True):
+            with self.assertRaises(ValueError):
+                app_config.set_display(dim_start_hour=bad)
+
+    def test_pages_store_only_the_hidden_ones(self):
+        app_config.set_display(pages={"git": False})
+        self.assertEqual(app_config.display_pages(),
+                         {"vercel": True, "git": False, "local": True})
+        with open(self.path) as handle:
+            self.assertEqual(json.load(handle)["display_pages"], {"git": False})
+        app_config.set_display(pages={"git": True, "local": False})
+        self.assertEqual(app_config.display_pages(),
+                         {"vercel": True, "git": True, "local": False})
+        with self.assertRaises(ValueError):
+            app_config.set_display(pages={"slot0": False})
+        with self.assertRaises(ValueError):
+            app_config.set_display(pages={"git": "no"})
+
+    def test_toggles_must_be_booleans_and_omitted_keys_stay(self):
+        app_config.set_display(celebrate_resets=False)
+        app_config.set_display(boot_splash=False)
+        self.assertFalse(app_config.display_celebrate_resets())
+        self.assertFalse(app_config.display_boot_splash())
+        with self.assertRaises(ValueError):
+            app_config.set_display(celebrate_resets="yes")
+        self.assertFalse(app_config.display_celebrate_resets())
+
+    def test_display_keys_stay_local_to_this_mac(self):
+        for key in app_config.DEFAULTS:
+            if key.startswith("display_"):
+                self.assertNotIn(key, app_config.SHARED_CONFIG_KEYS)
