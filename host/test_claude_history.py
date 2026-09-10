@@ -174,6 +174,32 @@ class BackfillTests(unittest.TestCase):
         claude_history.backfill(tz=TZ)
         self.assertEqual(claude_history.series(days=10)[0]["input"], 200)
 
+    def test_repeated_message_keeps_largest_partial_snapshot(self):
+        """Streaming snapshots under one id should bill the max, not first."""
+        day = datetime(2026, 7, 1, 12, 0, tzinfo=TZ)
+        self.write("a.jsonl", [
+            record(day, inp=1000, out=5, message_id="msg_01A"),
+            record(day, inp=1000, out=5, message_id="msg_01A"),
+            record(day, inp=1000, out=256, message_id="msg_01A"),
+        ])
+        claude_history.backfill(tz=TZ)
+        row = claude_history.series(days=10)[0]
+        self.assertEqual(row["input"], 1000)
+        self.assertEqual(row["output"], 256)
+        self.assertEqual(row["total"], 1256)
+
+    def test_repeated_message_uses_max_not_last_snapshot(self):
+        day = datetime(2026, 7, 1, 12, 0, tzinfo=TZ)
+        self.write("a.jsonl", [
+            record(day, inp=1000, out=2132, message_id="msg_01A"),
+            record(day, inp=1000, out=0, message_id="msg_01A"),
+            record(day, inp=10, out=7, message_id="msg_01B"),
+        ])
+        claude_history.backfill(tz=TZ)
+        row = claude_history.series(days=10)[0]
+        self.assertEqual(row["input"], 1010)
+        self.assertEqual(row["output"], 2139)
+
     def test_subagent_messages_are_kept(self):
         """Sidechain runs carry their own message ids — separate API calls."""
         day = datetime(2026, 7, 1, 12, 0, tzinfo=TZ)
