@@ -8,6 +8,7 @@ extension SettingsView {
             timezoneSection
 
             Section {
+                menuBarIconPreview
                 Picker(HeadroomCopy.menuBarIcon, selection: $menuBarIconStyle) {
                     Text(HeadroomCopy.menuBarIconRemaining)
                         .tag(MenuBarIconStyle.remaining.rawValue)
@@ -51,6 +52,74 @@ extension SettingsView {
             }
         }
         .formStyle(.grouped)
+    }
+
+    /// The glyph as the menu bar draws it, on a strip that reads as one.
+    /// Drawn by the real renderer at the real 18pt, so the picker cannot
+    /// describe a mark the status item does not paint.
+    var menuBarIconPreview: some View {
+        let preview = menuBarPreviewWindows
+        return LabeledContent(HeadroomCopy.menuBarIconPreview) {
+            VStack(alignment: .trailing, spacing: 6) {
+                HStack(spacing: 12) {
+                    Image(nsImage: MeterIconRenderer.render(
+                        windows: preview.windows,
+                        healthy: true,
+                        style: MenuBarIconStyle(rawValue: menuBarIconStyle)
+                            ?? .remaining,
+                        invert: menuBarIconInvert,
+                        accessibilityDescription: HeadroomCopy.menuBarIcon
+                    ))
+                    // Neighbours and a clock, dimmed: they place the glyph in
+                    // a menu bar without competing with it.
+                    Image(systemName: "wifi")
+                        .foregroundStyle(.tertiary)
+                    Image(systemName: "battery.100")
+                        .foregroundStyle(.tertiary)
+                    Text(Self.menuBarPreviewClock)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(.quaternary)
+                )
+                if preview.isSample {
+                    Text(HeadroomCopy.menuBarIconPreviewSample)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    /// Live top-3 tanks when the host reports them, sample numbers otherwise.
+    /// An empty strip would answer nothing about what the two styles draw,
+    /// and the picker is often the first thing a new install touches.
+    var menuBarPreviewWindows: (windows: [MeterWindow], isSample: Bool) {
+        if let snapshot = menuBarPreviewSnapshot {
+            let live = snapshot.focusProviders().map {
+                snapshot.meter(for: $0).menuBarWindow
+            }
+            if live.contains(where: { $0.percent != nil }) {
+                return (live, false)
+            }
+        }
+        return (Self.menuBarPreviewSampleWindows, true)
+    }
+
+    /// One slot under pace, one on it, one over — so switching styles or
+    /// flipping Invert visibly changes the mark.
+    static let menuBarPreviewSampleWindows: [MeterWindow] = [
+        MeterWindow(title: "Weekly", percent: 22, pacePercent: 40),
+        MeterWindow(title: "Weekly", percent: 54, pacePercent: 52),
+        MeterWindow(title: "Weekly", percent: 86, pacePercent: 61),
+    ]
+
+    static var menuBarPreviewClock: String {
+        Date().formatted(date: .omitted, time: .shortened)
     }
 
     /// Drop an Integrations catalog row into another's slot.

@@ -3,6 +3,7 @@ import unittest
 from unittest import mock
 
 import github_actions as ga
+import headroom_server
 
 
 class OwnerPrefixTests(unittest.TestCase):
@@ -196,6 +197,99 @@ class InboxTests(unittest.TestCase):
             {"reason": "mention", "repo": "acme/web"},
         ])
         self.assertEqual(summary, "1 review request · 2 mentions")
+
+
+class InboxAttentionAgeTests(unittest.TestCase):
+    """An assignment nobody touched in two weeks is debt, not attention."""
+
+    def _row(self, age_s, now):
+        return {"id": "1", "reason": "assigned", "repo": "acme/web",
+                "created_at": now - age_s}
+
+    def test_recent_row_still_pages(self):
+        now = time.time()
+        self.assertTrue(ga.inbox_is_fresh(self._row(3600, now), now=now))
+
+    def test_aged_row_drops_out(self):
+        now = time.time()
+        row = self._row(ga.ATTENTION_INBOX_MAX_AGE_S + 60, now)
+        self.assertFalse(ga.inbox_is_fresh(row, now=now))
+
+    def test_row_without_timestamp_stays(self):
+        # Same posture as failures: unknown age never hides a row.
+        self.assertTrue(ga.inbox_is_fresh({"id": "1"}))
+
+    def test_attention_inbox_keeps_only_fresh(self):
+        now = time.time()
+        fresh = self._row(60, now)
+        aged = dict(self._row(ga.ATTENTION_INBOX_MAX_AGE_S + 60, now), id="2")
+        self.assertEqual(ga.attention_inbox([fresh, aged], now=now), [fresh])
+
+    def test_flatten_stamps_the_verdict(self):
+        row = ga._flatten_inbox_item({
+            "id": 5,
+            "number": 7,
+            "title": "Old one",
+            "html_url": "https://github.com/acme/web/issues/7",
+            "repository_url": "https://api.github.com/repos/acme/web",
+            "user": {"login": "alice"},
+            "updated_at": "2020-01-01T10:00:00Z",
+        }, "assigned")
+        self.assertFalse(row["needs_attention"])
+
+
+class InboxAttentionServerTests(unittest.TestCase):
+    """The age gate has to reach the rollup and the feed, not just the helper."""
+
+    def _github(self, age_s):
+        now = time.time()
+        item = {
+            "id": "7",
+            "reason": "assigned",
+            "repo": "acme/web",
+            "number": 7,
+            "title": "Limit headline to 200 chars",
+            "created_at": now - age_s,
+            "needs_attention": age_s <= ga.ATTENTION_INBOX_MAX_AGE_S,
+            "ago": "1y",
+        }
+        return {"configured": True, "runs": [], "fail_count": 0,
+                "inbox": [item], "inbox_count": 1}
+
+    def _attention(self, github):
+        doc = {"github": github, "claude_status": {}, "supabase": {},
+               "vercel": {"deployments": []}, "providers": []}
+        with mock.patch(
+            "headroom_server.app_config.attention_ack_fingerprint",
+            return_value="",
+        ):
+            return headroom_server._build_attention(doc)
+
+    def test_fresh_inbox_lights_the_pip(self):
+        attention = self._attention(self._github(3600))
+        kinds = {r["kind"] for r in attention["reasons"]}
+        self.assertIn("github-inbox", kinds)
+
+    def test_aged_inbox_does_not(self):
+        aged = self._github(ga.ATTENTION_INBOX_MAX_AGE_S + 86400)
+        attention = self._attention(aged)
+        kinds = {r["kind"] for r in attention["reasons"]}
+        self.assertNotIn("github-inbox", kinds)
+
+    def test_aged_row_stays_in_the_feed_unflagged(self):
+        aged = self._github(ga.ATTENTION_INBOX_MAX_AGE_S + 86400)
+        items = headroom_server._build_activity(
+            {"deployments": []}, {"commits": []}, github=aged)
+        rows = [i for i in items if i["id"].startswith("github-inbox:")]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["status"], "assigned")
+        self.assertFalse(rows[0]["needs_attention"])
+
+    def test_fresh_row_keeps_its_flag(self):
+        items = headroom_server._build_activity(
+            {"deployments": []}, {"commits": []}, github=self._github(3600))
+        rows = [i for i in items if i["id"].startswith("github-inbox:")]
+        self.assertTrue(rows[0]["needs_attention"])
 
 
 if __name__ == "__main__":

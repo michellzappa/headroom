@@ -16,7 +16,7 @@ struct ActivitySection: View {
     var body: some View {
         let rows = Array(
             items
-                .filter { !ActivityStatusStyle.resolve($0.status).needsAttention }
+                .filter { !$0.needsAttention }
                 .prefix(max(3, min(activityRowLimit, 24)))
         )
         if !rows.isEmpty {

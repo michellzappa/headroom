@@ -40,6 +40,10 @@ struct SettingsView: View {
     @State var usageProviders: [String: QuotaProviderInfo] = [:]
     /// Public Claude service health, shown on Claude's provider row.
     @State var claudeStatus: ClaudeStatus?
+    /// Last document read here, for General's menu-bar preview strip. Settings
+    /// is its own scene and holds no `UsageStore`, so the preview draws off
+    /// the snapshot `reloadSources()` already fetched.
+    @State var menuBarPreviewSnapshot: UsageSnapshot?
     /// Activity panel pin order from the host (legacy).
     @State var servicesOrder: [String] = IntegrationWatch.activityBlocks(from: nil)
         .map(\.rawValue)

@@ -62,7 +62,7 @@ struct ActivityScreen: View {
     private var hasAnyActivityBlock: Bool {
         let snap = store.snapshot
         let feed = (snap.activity ?? []).filter {
-            !ActivityStatusStyle.resolve($0.status).needsAttention
+            !$0.needsAttention
         }
         if !feed.isEmpty { return true }
         for watch in IntegrationWatch.activityBlocks(

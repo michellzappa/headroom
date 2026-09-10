@@ -22,7 +22,7 @@ struct ServiceSections: View {
         _ watch: IntegrationWatch, blocks: [IntegrationWatch]
     ) -> some View {
         let feed = (store.snapshot.activity ?? []).filter {
-            !ActivityStatusStyle.resolve($0.status).needsAttention
+            !$0.needsAttention
         }
         switch watch {
         case .git, .github, .vercel, .sentry, .datadog, .axiom:

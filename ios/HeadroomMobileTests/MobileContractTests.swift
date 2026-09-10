@@ -253,16 +253,19 @@ final class MobileContractTests: XCTestCase {
                 {"id": "a1", "status": "failure", "subject": "Release"},
                 {"id": "a2", "status": "ready", "subject": "Deploy"},
                 {"id": "a3", "status": "pushed", "subject": "Push"},
-                {"id": "a4", "status": "error", "subject": "Tests"}
+                {"id": "a4", "status": "error", "subject": "Tests"},
+                {"id": "a5", "status": "assigned", "subject": "Year-old issue",
+                 "needs_attention": false}
               ]
             }
             """.utf8
         )
         let snapshot = try JSONDecoder().decode(UsageSnapshot.self, from: data)
         let failing = AttentionScreen.failures(in: snapshot)
-        let rest = (snapshot.activity ?? []).filter {
-            !ActivityStatusStyle.resolve($0.status).needsAttention
-        }
+        let rest = (snapshot.activity ?? []).filter { !$0.needsAttention }
+        // a5 is an aged inbox row: `assigned` still, but the host says it no
+        // longer pages. Both sides read the same verdict, so the partition
+        // holds and the row lands in the feed instead of the queue.
         XCTAssertEqual(failing.map(\.id), ["a1", "a4"])
         XCTAssertEqual(failing.count + rest.count, snapshot.activity?.count)
         XCTAssertTrue(Set(failing.map(\.id)).isDisjoint(with: rest.map(\.id)))

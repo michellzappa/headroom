@@ -9,64 +9,35 @@ tag a version that has no entry.
 
 ## 2.1.2 — 2026-09-03
 
-### Changed
+### Added
 
-- **Claude Status is no longer a standalone provider.** The public service
-  health check is hidden from provider/setup lists and appears as a compact
-  status line on Claude's quota card when the check is enabled. Major outages
-  still flow into Attention.
+- **Settings shows the menu bar glyph before you pick it.** General draws a
+  Preview strip above the icon picker, using the same renderer the status item
+  uses at the same size, on a dimmed strip with a wifi glyph, a battery and a
+  clock. Switching between Remaining and Pace, or flipping Invert, changes the
+  mark in front of you instead of sending you up to the menu bar and back. It
+  draws your own top three. With no coding provider on it falls back to sample
+  numbers and says so: the glyph is real, the numbers in it are not.
 
 ## 2.1.1 — 2026-09-03
 
 ### Fixed
 
-- **Claude read "Not found" on first run for the Macs that had it.** Detection
-  checked `~/.headroom/oauth` and `~/.claude/.credentials.json` and stopped
-  there, deliberately: reading a Keychain item can pop SecurityAgent, and a
-  first-run probe must not. But Claude Code stores its credentials in the
-  Keychain by default and writes that file only in the file-store
-  configuration, so the common Mac had neither path. Seeding enables what it
-  detects, so the provider the app exists for arrived switched off. Detection
-  now reads the Keychain item with `kSecUseAuthenticationUIFail`, which cannot
-  prompt and cannot be caught by a sticky Deny, and it checks the blob's shape
-  rather than its existence — the same item also carries MCP grants, and a Mac
-  that has only ever authorized an MCP server has no Claude login in there. An
-  item too gated to read falls back to existence. The legacy
-  `Claude Code-credentials` service is searched alongside the per-config-dir
-  one.
-- **"run `claude /login`" on a Mac with no `claude`.** Headroom reads the
-  OAuth blob the Claude Code CLI writes; the desktop app authenticates its own
-  session and leaves nothing behind. Every Claude credential error still ended
-  by naming that command, so on a desktop-app-only Mac the one instruction
-  given was `command not found`. The hint now checks for the binary — past the
-  LaunchAgent's `PATH`, at `~/.claude/local` and `~/.local/bin` too — and says
-  to install the CLI when there is none. That the ring needs the CLI at all is
-  still undocumented anywhere the row can show it; that is a backlog item, not
-  this fix.
-- **A Claude burndown could read 0%/day while the budget was being spent.**
-  A provider can refill a quota counter without moving its scheduled reset,
-  and the fit only ever split the series on a changed window. The refill sat
-  inside the window, so the regression saw an upward jump, reported no burn,
-  and drew a flat line to reset — the one shape that says you will not run
-  out. The scheduled window and its ideal line are unchanged; the live series
-  now starts at the latest refill inside it, and the cross-window history
-  curve gets its riser there instead of a diagonal across it.
-- **Copilot was ticked for anyone who had ever run `gh auth login`.** Its
-  probe was "is there a GitHub token", which is a question about GitHub. A
-  machine with no Copilot seat got the row enabled for it and a quota that
-  could only ever resolve to "GitHub token lacks Copilot access". Detection
-  now wants evidence of Copilot itself: the editor sign-in under
-  `~/.config/github-copilot`, or a last-good quota snapshot naming a plan —
-  which is how a seat granted through an org, leaving nothing local behind,
-  still latches on once the row has fetched.
+- **GitHub review requests and assignments stopped ageing out of Attention.**
+  An open issue keeps the status word `assigned` for as long as it is open, so
+  a request nobody answered a year ago sat in the queue with the same weight as
+  one from this morning. Dismissing it lasted until the next launch, because
+  dismissal is per-run memory and the row came straight back out of the search.
+  Inbox rows now leave Attention after 14 days untouched, the same way a failed
+  Actions run leaves after 24 hours. They keep their word and stay in the
+  Activity feed, so nothing disappears. They stop lighting the pip.
 
 ### Changed
 
-- Setup and Welcome rows show what is actually being probed. "Claude Status ·
-  Detected" sitting under "Claude · Not found" read as one provider
-  contradicting itself; it is a public status page and says so now, as do
-  Claude ("Keychain or ~/.claude") and Copilot ("Copilot sign-in on this
-  Mac").
+- The host now says per row whether it belongs on Attention
+  (`activity[].needs_attention`), rather than every client working it out from
+  the status word. Older hosts do not send the key and behave exactly as
+  before. See [`docs/contract.md`](docs/contract.md).
 
 ## 2.1.0 — 2026-08-26
 

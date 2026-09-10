@@ -9,9 +9,7 @@ import Foundation
 enum AttentionList {
     /// Feed rows that belong on Attention (failed deploys, inbox, red CI, …).
     static func failures(in snapshot: UsageSnapshot) -> [ActivityItem] {
-        let flagged = (snapshot.activity ?? []).filter {
-            ActivityStatusStyle.resolve($0.status).needsAttention
-        }
+        let flagged = (snapshot.activity ?? []).filter(\.needsAttention)
         if !flagged.isEmpty { return flagged }
 
         // Rollup lit up but nothing in the feed was marked — expand each
@@ -101,9 +99,12 @@ enum AttentionList {
         case "github-inbox":
             let fromFeed = feed.filter {
                 $0.kind == "github" && isInboxStatus($0.status)
+                    && $0.needsAttention
             }
             if !fromFeed.isEmpty { return fromFeed }
-            return (snapshot.github?.inbox ?? []).map(activityItem(from:))
+            return (snapshot.github?.inbox ?? [])
+                .map(activityItem(from:))
+                .filter(\.needsAttention)
         case "supabase", "supabase-security":
             return feed.filter {
                 $0.kind == "supabase" && isProblem($0.status)
@@ -167,7 +168,8 @@ enum AttentionList {
             number: item.number,
             ago: item.ago,
             url: item.url,
-            inspectorURL: item.url
+            inspectorURL: item.url,
+            hostNeedsAttention: item.hostNeedsAttention
         )
     }
 
