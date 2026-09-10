@@ -519,7 +519,13 @@ class AuthRequiredTests(unittest.TestCase):
             "enabled": True, "ok": True, "stale": True,
             "auth_required": True, "stale_for_s": 60,
         }]}
-        reasons = headroom_server._build_attention(doc)["reasons"]
+        # The remedy is platform-dependent: CI has no Claude CLI installed,
+        # while a developer Mac may. This test covers attention classification,
+        # so pin the copy independently of the machine running it.
+        with patch.object(
+            sources_config, "login_remedy", return_value="run `claude /login`"
+        ):
+            reasons = headroom_server._build_attention(doc)["reasons"]
         kinds = [r["kind"] for r in reasons]
         self.assertIn("signin", kinds)
         self.assertNotIn("stale", kinds)

@@ -193,6 +193,15 @@ class ClaudeCredentialPresenceTests(unittest.TestCase):
     def test_exists_query_fails_closed_on_ui(self):
         seen = {}
 
+        # CI runs the host tests on Linux, where Security.framework is not
+        # available.  That path is already fail-closed; the assertion about
+        # kSecUseAuthenticationUI applies when the framework can be loaded.
+        if not keychain._CF_PATH or not keychain._SEC_PATH:
+            self.assertFalse(
+                keychain.generic_password_exists("headroom-test-absent-service")
+            )
+            return
+
         def fake_auth_pairs(cf, sec, allow_ui):
             seen["allow_ui"] = allow_ui
             return []
