@@ -28,12 +28,12 @@ struct QuotaOverviewCard: View {
                                 from: snapshot.burndown?[provider.id]
                             ),
                             subscriptionPricing: provider.subscriptionPricing,
+                            todayBurn: snapshot.byDay?
+                                .last?
+                                .burn(forProviderID: provider.id),
                             claudeStatus: provider.id == "claude"
                                 ? snapshot.claudeStatusIfEnabled
                                 : nil,
-                            todayBurn: snapshot.byDay?
-                                .last?
-                                .burn(forProviderID: provider.id)
                         )
                     } label: {
                         HStack(spacing: 10) {
