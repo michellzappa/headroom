@@ -52,12 +52,20 @@ extension HeadroomWidgetSnapshot.Provider {
         in timeZone: TimeZone,
         now: Date = .now
     ) -> [String] {
-        let labels = widgetResetLabels(in: timeZone, now: now)
-        let baseID = id.split(separator: ":", maxSplits: 1)
-            .first.map(String.init)
-        if baseID == "claude" { return Array(labels.prefix(1)) }
-        if baseID == "codex" { return [] }
-        return labels
+        let sessionReset = sessionResetsIn
+            ?? layers?.first { $0.id == "session" }?.resetsIn
+        let weeklyReset = weekResetsIn
+            ?? layers?.first { $0.id == "week" }?.resetsIn
+        let session = HeadroomCopy.widgetReset(
+            "5h", duration: sessionReset
+        )
+        let weekly = HeadroomCopy.macWidgetWeeklyReset(
+            duration: weeklyReset,
+            resetEpoch: weekResetsAt,
+            timeZone: timeZone,
+            now: now
+        )
+        return ["1w: \(weekly)", session]
     }
 
     var macWidgetResetLabels: [String] {

@@ -1024,8 +1024,7 @@ final class WidgetSnapshotSkewTests: XCTestCase {
         )
     }
 
-    /// The small widget only spends reset rows on readings useful for that
-    /// provider: Claude gets its five-hour clock and Codex gets neither.
+    /// The small widget keeps the useful reset rows, with compact macOS copy.
     func testMacSmallWidgetUsesProviderSpecificResetRows() throws {
         let claude = try decode("""
         {"providers": [
@@ -1049,7 +1048,7 @@ final class WidgetSnapshotSkewTests: XCTestCase {
             claude.providers.first?.macWidgetResetLabels(
                 in: try XCTUnwrap(TimeZone(secondsFromGMT: 0))
             ),
-            ["5h: 1h34m"]
+            ["1w: 5d2h", "5h: 1h34m"]
         )
 
         let codex = try decode("""
@@ -1062,9 +1061,12 @@ final class WidgetSnapshotSkewTests: XCTestCase {
             codex.providers.first?.widgetResetLabels,
             ["4d13h"]
         )
-        XCTAssertEqual(codex.providers.first?.macWidgetResetLabels, [])
+        XCTAssertEqual(
+            codex.providers.first?.macWidgetResetLabels,
+            ["1w: 4d13h", "5h: 2h54m"]
+        )
 
-        // Providers not named by this density rule keep their existing rows.
+        // Providers without a reset keep explicit unknown values.
         let other = try decode("""
         {"providers": [
             {"id": "cursor", "title": "Cursor", "percent": 9}
@@ -1072,7 +1074,7 @@ final class WidgetSnapshotSkewTests: XCTestCase {
         """)
         XCTAssertEqual(
             other.providers.first?.macWidgetResetLabels,
-            ["5h: —", "—"]
+            ["1w: —", "5h: —"]
         )
     }
 
@@ -1088,6 +1090,27 @@ final class WidgetSnapshotSkewTests: XCTestCase {
                 now: Date(timeIntervalSince1970: 1788076800)
             ).last,
             "1pm"
+        )
+    }
+
+    func testMacWeeklyWidgetResetUsesDurationUntilItResetsToday() throws {
+        let provider = try decode("""
+        {"providers": [{"id": "codex", "title": "Codex", "percent": 16,
+          "weekResetsAt": 1788094800,
+          "weekResetsIn": "4d 8h"}]}
+        """)
+        let utc = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        XCTAssertEqual(
+            provider.providers.first?.macWidgetResetLabels(
+                in: utc, now: Date(timeIntervalSince1970: 1787990400)
+            ),
+            ["1w: 4d8h", "5h: —"]
+        )
+        XCTAssertEqual(
+            provider.providers.first?.macWidgetResetLabels(
+                in: utc, now: Date(timeIntervalSince1970: 1788076800)
+            ),
+            ["1w: 1pm", "5h: —"]
         )
     }
 

@@ -356,6 +356,30 @@ enum HeadroomCopy {
         return compact.flatMap { $0.isEmpty ? nil : $0 } ?? "—"
     }
 
+    #if os(macOS)
+    /// The Mac small widget keeps the weekly window visible while using the
+    /// compact duration that fits beside the session reset.
+    static func macWidgetWeeklyReset(
+        duration: String?,
+        resetEpoch: Double?,
+        timeZone: TimeZone = .autoupdatingCurrent,
+        now: Date = .now
+    ) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        if let resetEpoch,
+           calendar.isDate(
+               Date(timeIntervalSince1970: resetEpoch), inSameDayAs: now
+           ),
+           let clock = quotaClock(resetEpoch: resetEpoch, timeZone: timeZone) {
+            return clock
+        }
+
+        let compact = duration?.filter { !$0.isWhitespace }
+        return compact.flatMap { $0.isEmpty ? nil : $0 } ?? "—"
+    }
+    #endif
+
     /// "Empty Thu" — the forecast reaches zero before the pool renews.
     ///
     /// The counterpart to `resets(_:)`, and the one that outranks it wherever

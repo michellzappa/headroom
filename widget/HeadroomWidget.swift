@@ -159,9 +159,11 @@ struct HeadroomWidgetView: View {
                 Text(solo.title)
                     .font(.caption.weight(.semibold))
                     .lineLimit(1)
+                #if !os(macOS)
                 Text(HeadroomCopy.percentUsed(solo.percent))
                     .font(.caption2.monospacedDigit())
                     .foregroundStyle(.secondary)
+                #endif
                 ForEach(smallResetLabels(for: solo), id: \.self) { label in
                     Text(label)
                         .font(.caption2.monospacedDigit())
@@ -245,11 +247,6 @@ struct HeadroomWidgetView: View {
                             .font(.caption2)
                             .lineLimit(1)
                             .minimumScaleFactor(0.5)
-                        Text(HeadroomCopy.percentUsed(provider.percent))
-                            .font(.caption2.monospacedDigit())
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.6)
                         ForEach(
                             provider.macWidgetResetLabels, id: \.self
                         ) { label in
