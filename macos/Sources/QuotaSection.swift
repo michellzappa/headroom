@@ -376,42 +376,44 @@ struct ProviderQuotaRing: View {
                     .frame(width: diameter, height: diameter)
                     .opacity(provider.readingSuspect ? 0.4 : 1)
             }
-            Text(meter.title)
-                .font(.footnote.weight(.medium))
-                .foregroundStyle(tint)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-            if let note = provider.statusNote {
-                Text(note)
-                    .font(.caption2)
-                    .foregroundStyle(
-                        provider.statusAlarming
-                            ? HeadroomPalette.orange : .secondary)
+            VStack(spacing: 1) {
+                Text(meter.title)
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(tint)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.85)
-            }
-            if let overview {
-                if let resetLine = overview.resetLine {
-                    Text(resetLine)
+                    .minimumScaleFactor(0.8)
+                if let note = provider.statusNote {
+                    Text(note)
+                        .font(.caption2)
+                        .foregroundStyle(
+                            provider.statusAlarming
+                                ? HeadroomPalette.orange : .secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                }
+                if let overview {
+                    if let resetLine = overview.resetLine {
+                        Text(resetLine)
+                            .font(.caption2.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
+                    Text(overview.paceLine)
                         .font(.caption2.monospacedDigit())
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.7)
+                        .minimumScaleFactor(0.8)
+                } else if provider.statusNote == nil {
+                    Text(windowCaption)
+                        .font(.caption2)
+                        .foregroundStyle(
+                            provider.statusAlarming
+                                ? HeadroomPalette.orange : .secondary)
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                 }
-                Text(overview.paceLine)
-                    .font(.caption2.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            } else if provider.statusNote == nil {
-                Text(windowCaption)
-                    .font(.caption2)
-                    .foregroundStyle(
-                        provider.statusAlarming
-                            ? HeadroomPalette.orange : .secondary)
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
             }
         }
         .accessibilityElement(children: .combine)
