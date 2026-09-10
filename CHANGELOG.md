@@ -7,6 +7,15 @@ are not tracked here because they move on every commit.
 Add a section here before cutting a tag. `scripts/cut-release.sh` refuses to
 tag a version that has no entry.
 
+## 2.1.5 — 2026-09-10
+
+### Changed
+
+- **Claude Status now lives on the Claude provider.** When enabled, its health
+  appears on Claude's row while the underlying check continues to monitor
+  incidents and feed Attention. It is no longer a standalone service users
+  have to add, configure, or reorder.
+
 ## 2.1.4 — 2026-09-05
 
 ### Changed
