@@ -36,13 +36,10 @@ extension HeadroomWidgetSnapshot.Provider {
     }
 
     #if os(macOS)
-    /// The Mac medium widget's only text row for this provider. Keeping
-    /// identity, quota and pace together buys the chart the height separate
-    /// rows spent without changing the iPhone widget's established layout.
+    /// The Mac medium widget's only text row for this provider.
     var macWidgetMediumSummaryLabel: String {
-        let remaining = HeadroomCopy.percentLeft(100 - percent)
         let pace = HeadroomCopy.macWidgetPaceSlack(paceDeltaPct)
-        return "\(title): \(remaining), \(pace)"
+        return "\(title): \(pace)"
     }
 
     /// Mac small widgets only spend height on provider-specific reset clocks.

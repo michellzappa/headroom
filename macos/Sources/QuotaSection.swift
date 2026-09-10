@@ -14,7 +14,8 @@ enum QuotaOverviewSummary {
 
     static func columns(
         for snapshot: UsageSnapshot,
-        timeZone: TimeZone = .autoupdatingCurrent
+        timeZone: TimeZone = .autoupdatingCurrent,
+        now: Date = .now
     ) -> [Column] {
         snapshot.codingQuotaProviders.compactMap { provider in
             guard let burndown = snapshot.overviewBurndown(
@@ -25,7 +26,8 @@ enum QuotaOverviewSummary {
                 resetLine: HeadroomCopy.quotaOverviewReset(
                     duration: snapshot.meter(for: provider).headline.reset,
                     resetEpoch: burndown.windowEnd,
-                    timeZone: timeZone
+                    timeZone: timeZone,
+                    now: now
                 ),
                 paceLine: HeadroomCopy.quotaOverviewSlack(
                     overPace: burndown.kind != .ok,

@@ -20,20 +20,23 @@ enum HeadroomCopy {
     static func quotaOverviewReset(
         duration: String?,
         resetEpoch: Double?,
-        timeZone: TimeZone = .autoupdatingCurrent
+        timeZone: TimeZone = .autoupdatingCurrent,
+        now: Date = .now
     ) -> String? {
-        var readings: [String] = []
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        if let resetEpoch,
+           calendar.isDate(
+               Date(timeIntervalSince1970: resetEpoch), inSameDayAs: now
+           ),
+           let clock = quotaClock(resetEpoch: resetEpoch, timeZone: timeZone) {
+            return clock
+        }
         if let compact = duration?.filter({ !$0.isWhitespace }),
            !compact.isEmpty {
-            readings.append(compact)
+            return compact
         }
-        if let clock = quotaOverviewClock(
-            resetEpoch: resetEpoch, timeZone: timeZone
-        ) {
-            readings.append(clock)
-        }
-        guard !readings.isEmpty else { return nil }
-        return "Reset: \(readings.joined(separator: ", "))."
+        return quotaOverviewClock(resetEpoch: resetEpoch, timeZone: timeZone)
     }
 
     /// "11% to spare" / "4% over" — standalone ring-column slack. When a
