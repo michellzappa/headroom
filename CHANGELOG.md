@@ -7,6 +7,14 @@ are not tracked here because they move on every commit.
 Add a section here before cutting a tag. `scripts/cut-release.sh` refuses to
 tag a version that has no entry.
 
+## 2.1.6 — 2026-09-10
+
+### Fixed
+
+- **The iPhone companion now builds with Claude Status enabled.** Keep the
+  provider-detail arguments in declaration order so the companion can ship to
+  TestFlight with the macOS release.
+
 ## 2.1.5 — 2026-09-10
 
 ### Changed
