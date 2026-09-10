@@ -243,18 +243,20 @@ struct HeadroomWidgetView: View {
                             .lineLimit(1)
                             .minimumScaleFactor(0.5)
                     } else {
-                        Text(provider.title)
-                            .font(.caption2)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.5)
-                        ForEach(
-                            provider.macWidgetResetLabels, id: \.self
-                        ) { label in
-                            Text(label)
-                                .font(.caption2.monospacedDigit())
-                                .foregroundStyle(.secondary)
+                        VStack(spacing: -1) {
+                            Text(provider.title)
+                                .font(.caption2)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.5)
+                            ForEach(
+                                provider.macWidgetResetLabels, id: \.self
+                            ) { label in
+                                Text(label)
+                                    .font(.caption2.monospacedDigit())
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.5)
+                            }
                         }
                     }
                     #else
