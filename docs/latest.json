@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "version": "2.1.5",
-  "published": "2026-09-10T19:29:47Z",
-  "url": "https://github.com/michellzappa/headroom/releases/download/v2.1.5/Headroom-macOS.zip",
-  "sha256": "c4627263ed71cf55716b28626b6b676bfd392d3726ac5cee9f1c9564f0d03a1e",
-  "size": 6503931,
+  "version": "2.1.6",
+  "published": "2026-09-10T19:38:41Z",
+  "url": "https://github.com/michellzappa/headroom/releases/download/v2.1.6/Headroom-macOS.zip",
+  "sha256": "9ebed7a9d75ac4af3c8606787b670e11ba345d00b7ada296d68a317f1fdea6ee",
+  "size": 6503979,
   "min_macos": "14.0",
-  "notes_md": "### Changed\n\n- **Claude Status now lives on the Claude provider.** When enabled, its health\n  appears on Claude's row while the underlying check continues to monitor\n  incidents and feed Attention. It is no longer a standalone service users\n  have to add, configure, or reorder."
+  "notes_md": "### Fixed\n\n- **The iPhone companion now builds with Claude Status enabled.** Keep the\n  provider-detail arguments in declaration order so the companion can ship to\n  TestFlight with the macOS release."
 }
