@@ -281,7 +281,7 @@ enum MeterIconRenderer {
             }
 
             if warning {
-                let pip = PixelRect(x: 25, y: 25, width: 8, height: 8)
+                let pip = PixelRect(x: 24, y: 24, width: 8, height: 8)
                 let color = HeadroomPalette.nsAttention(attentionLevel)
                 color.setFill()
                 NSBezierPath(ovalIn: pip.rect).fill()
@@ -294,10 +294,11 @@ enum MeterIconRenderer {
         return image
     }
 
-    /// 17pt rounded plate inset in the 18pt canvas, same gradient/rim as the app icons.
+    /// 16pt rounded plate centred in the 18pt canvas — the shared menu bar plate
+    /// size across Cargo, Tessellate and Headroom.
     private static func drawPlate() {
         guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        let frame = PixelRect(x: 1, y: 1, width: canvasPixels - 2, height: canvasPixels - 2).rect
+        let frame = PixelRect(x: 2, y: 2, width: canvasPixels - 4, height: canvasPixels - 4).rect
         let radius = frame.width * 0.225
         let path = NSBezierPath(roundedRect: frame, xRadius: radius, yRadius: radius)
         ctx.saveGState()
