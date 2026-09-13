@@ -237,11 +237,12 @@ enum MeterIconRenderer {
         let size = NSSize(width: 18, height: 18)
         let warning = attentionLevel == "warn" || attentionLevel == "critical"
         let image = NSImage(size: size, flipped: false) { _ in
-            drawPlate()
+            if let ctx = NSGraphicsContext.current?.cgContext { MenuBarPlate.drawPlate(ctx) }
             // While the first poll is still out (or nothing is enabled),
             // draw three empty slots so the icon is never blank.
+            // Geometry fits MenuBarPlate.field (20px @2x): 4px bars, 4px gaps.
             let barCount = windows.isEmpty ? 3 : windows.count
-            let barWidthPixels = 5
+            let barWidthPixels = 4
             let barHeightPixels = 20
             let gapPixels = 4
             let groupWidth =
@@ -292,33 +293,6 @@ enum MeterIconRenderer {
         image.isTemplate = false
         image.accessibilityDescription = accessibilityDescription
         return image
-    }
-
-    /// 16pt rounded plate centred in the 18pt canvas — the shared menu bar plate
-    /// size across Cargo, Tessellate and Headroom.
-    private static func drawPlate() {
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        let frame = PixelRect(x: 2, y: 2, width: canvasPixels - 4, height: canvasPixels - 4).rect
-        let radius = frame.width * 0.225
-        let path = NSBezierPath(roundedRect: frame, xRadius: radius, yRadius: radius)
-        ctx.saveGState()
-        path.addClip()
-        let colors = [
-            NSColor(calibratedWhite: 0.28, alpha: 1).cgColor,
-            NSColor(calibratedWhite: 0.13, alpha: 1).cgColor
-        ] as CFArray
-        if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 1]) {
-            ctx.drawLinearGradient(
-                gradient,
-                start: CGPoint(x: frame.minX, y: frame.maxY),
-                end: CGPoint(x: frame.maxX, y: frame.minY),
-                options: []
-            )
-        }
-        ctx.restoreGState()
-        NSColor(calibratedWhite: 1, alpha: 0.16).setStroke()
-        path.lineWidth = 1 / outputScale
-        path.stroke()
     }
 
     private static func accessibilityLabel(
