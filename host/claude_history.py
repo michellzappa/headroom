@@ -171,9 +171,65 @@ def _state_locked():
     return _state
 
 
+def _message_id(rec):
+    if not isinstance(rec, dict):
+        return None
+    return (rec.get("message") or {}).get("id")
+
+
+def _usage_rank(rec):
+    """Rank repeated snapshots of the same assistant message.
+
+    Claude Code normally repeats byte-identical usage on each content-block
+    record. Some logs instead contain growing partial snapshots under the same
+    `message.id`; in that case the largest snapshot is the billable one. Output
+    tokens are the field observed to grow, with total tokens as a stable tie
+    breaker for cache/input-only shapes.
+    """
+    usage = ((rec or {}).get("message") or {}).get("usage") or {}
+    out = usage.get("output_tokens", 0) or 0
+    inp = usage.get("input_tokens", 0) or 0
+    cache_read = usage.get("cache_read_input_tokens", 0) or 0
+    creation = usage.get("cache_creation") or {}
+    w5 = creation.get("ephemeral_5m_input_tokens", 0) or 0
+    w1h = creation.get("ephemeral_1h_input_tokens", 0) or 0
+    if not (w5 or w1h):
+        w5 = usage.get("cache_creation_input_tokens", 0) or 0
+    return (out, inp + out + cache_read + w5 + w1h)
+
+
+def _fold_record(rec, tz, days, minutes):
+    parsed = usage_from_record(rec)
+    if parsed is None:
+        return
+    t, model, inp, out, cache_read, w5, w1h, cost = parsed
+    try:
+        key = datetime.fromtimestamp(t, tz).date().isoformat()
+    except (OverflowError, OSError, ValueError):
+        return
+    row = days.setdefault(key, _blank_day())
+    row["input"] += inp
+    row["output"] += out
+    row["cache_read"] += cache_read
+    row["cache_write"] += w5 + w1h
+    row["cost_usd"] += cost
+    total = inp + out + cache_read + w5 + w1h
+    row["by_model"][model] = row["by_model"].get(model, 0) + total
+    minutes.setdefault(key, set()).add(int(t) // 60)
+
+
 def _scan_file(path, tz, days, minutes):
     """Fold one session file into `days` / `minutes`. Streams line by line."""
-    deduper = MessageDeduper()
+    pending_id = None
+    pending = None
+
+    def flush_pending():
+        nonlocal pending_id, pending
+        if pending is not None:
+            _fold_record(pending, tz, days, minutes)
+        pending_id = None
+        pending = None
+
     try:
         with open(path, "r", errors="replace") as handle:
             for line in handle:
@@ -184,25 +240,18 @@ def _scan_file(path, tz, days, minutes):
                     rec = json.loads(line)
                 except (json.JSONDecodeError, UnicodeDecodeError):
                     continue
-                if not deduper.accept(rec):
-                    continue
-                parsed = usage_from_record(rec)
-                if parsed is None:
-                    continue
-                t, model, inp, out, cache_read, w5, w1h, cost = parsed
-                try:
-                    key = datetime.fromtimestamp(t, tz).date().isoformat()
-                except (OverflowError, OSError, ValueError):
-                    continue
-                row = days.setdefault(key, _blank_day())
-                row["input"] += inp
-                row["output"] += out
-                row["cache_read"] += cache_read
-                row["cache_write"] += w5 + w1h
-                row["cost_usd"] += cost
-                total = inp + out + cache_read + w5 + w1h
-                row["by_model"][model] = row["by_model"].get(model, 0) + total
-                minutes.setdefault(key, set()).add(int(t) // 60)
+                message_id = _message_id(rec)
+                if message_id is None:
+                    flush_pending()
+                    _fold_record(rec, tz, days, minutes)
+                elif message_id == pending_id:
+                    if _usage_rank(rec) > _usage_rank(pending):
+                        pending = rec
+                else:
+                    flush_pending()
+                    pending_id = message_id
+                    pending = rec
+            flush_pending()
     except OSError:
         return False
     return True
