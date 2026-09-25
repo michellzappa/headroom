@@ -8,6 +8,7 @@ options:
     # landed; the watch app has no reason to reach further back than the
     # complications it exists to host.
     watchOS: "10.0"
+  defaultConfig: Release
 settings:
   base:
     SWIFT_VERSION: "6.0"
@@ -114,6 +115,7 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"
         CODE_SIGN_STYLE: Automatic
         SWIFT_STRICT_CONCURRENCY: complete
+        DEVELOPMENT_TEAM: 992N457T8D
         CODE_SIGN_ENTITLEMENTS: ../ios/HeadroomMobile/HeadroomMobile.entitlements
     preBuildScripts:
       - name: Refresh Version.xcconfig
@@ -133,9 +135,6 @@ targets:
       # watch has to the Mac's numbers — see ios/HeadroomMobile/WatchBridge.swift.
       - target: HeadroomWatch
         embed: true
-    scheme:
-      testTargets:
-        - HeadroomMobileTests
   HeadroomWidget:
     type: app-extension
     platform: iOS
@@ -291,3 +290,22 @@ targets:
         SWIFT_STRICT_CONCURRENCY: complete
     dependencies:
       - target: HeadroomMobile
+
+schemes:
+  HeadroomMobile:
+    build:
+      targets:
+        HeadroomMobile: all
+    run:
+      config: Release
+      debugEnabled: false
+    test:
+      config: Debug
+      targets:
+        - HeadroomMobileTests
+    profile:
+      config: Release
+    analyze:
+      config: Release
+    archive:
+      config: Release
