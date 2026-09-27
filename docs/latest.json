@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "version": "2.1.6",
-  "published": "2026-09-10T19:38:41Z",
-  "url": "https://github.com/michellzappa/headroom/releases/download/v2.1.6/Headroom-macOS.zip",
-  "sha256": "9ebed7a9d75ac4af3c8606787b670e11ba345d00b7ada296d68a317f1fdea6ee",
-  "size": 6503979,
+  "version": "2.1.7",
+  "published": "2026-09-27T17:42:51Z",
+  "url": "https://github.com/michellzappa/headroom/releases/download/v2.1.7/Headroom-macOS.zip",
+  "sha256": "edebb4e94e46170fdc52b16288dfec4a01696e9b3cf36e0c76b54604aadb95d2",
+  "size": 6515345,
   "min_macos": "14.0",
-  "notes_md": "### Fixed\n\n- **The iPhone companion now builds with Claude Status enabled.** Keep the\n  provider-detail arguments in declaration order so the companion can ship to\n  TestFlight with the macOS release."
+  "notes_md": "### Fixed\n\n- **Headroom no longer asks for your keychain password over and over after\n  a Claude login dies.** It used to re-read the Claude Code Keychain item on\n  every retry, and each read prompts unless you chose Always Allow. It now\n  checks the item's modification date first and reads it again only after\n  `claude /login` rewrites it. A refresh token the server rejected is never\n  sent again, and more than 4 refreshes in 30 minutes stops refreshing until\n  you press Refresh.\n\n### Added\n\n- **Failing sources say what to do.** Every provider that stops updating now\n  shows one line of fix guidance under its error in the Mac popover and the\n  iPhone detail card (`fix` in `/usage`). `headroom.log` records when each\n  source starts failing, why, and when it recovers.\n- **Also in this release:** the menu bar icon draws its live tanks on a shared\n  16 pt dark plate, and the host tests run the same in CI as on a Mac."
 }
