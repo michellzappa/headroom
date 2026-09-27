@@ -7,6 +7,27 @@ are not tracked here because they move on every commit.
 Add a section here before cutting a tag. `scripts/cut-release.sh` refuses to
 tag a version that has no entry.
 
+## 2.1.7 — 2026-09-27
+
+### Fixed
+
+- **Headroom no longer asks for your keychain password over and over after
+  a Claude login dies.** It used to re-read the Claude Code Keychain item on
+  every retry, and each read prompts unless you chose Always Allow. It now
+  checks the item's modification date first and reads it again only after
+  `claude /login` rewrites it. A refresh token the server rejected is never
+  sent again, and more than 4 refreshes in 30 minutes stops refreshing until
+  you press Refresh.
+
+### Added
+
+- **Failing sources say what to do.** Every provider that stops updating now
+  shows one line of fix guidance under its error in the Mac popover and the
+  iPhone detail card (`fix` in `/usage`). `headroom.log` records when each
+  source starts failing, why, and when it recovers.
+- **Also in this release:** the menu bar icon draws its live tanks on a shared
+  16 pt dark plate, and the host tests run the same in CI as on a Mac.
+
 ## 2.1.6 — 2026-09-10
 
 ### Fixed
