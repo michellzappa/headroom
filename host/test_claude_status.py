@@ -7,6 +7,7 @@ from unittest import mock
 
 import claude_status
 import headroom_server
+import sources_config
 
 
 def _summary(*, indicator="none", description=None, incidents=None):
@@ -143,6 +144,10 @@ class FetchTests(unittest.TestCase):
 
 
 class AttentionTests(unittest.TestCase):
+    def test_status_is_not_a_standalone_integration(self):
+        self.assertNotIn(
+            "claude-status", sources_config.INTEGRATION_CATALOG_IDS)
+
     def test_alerting_lights_critical(self):
         attention = headroom_server._build_attention({
             "github": {"configured": True, "fail_count": 0},

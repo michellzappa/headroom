@@ -237,7 +237,9 @@ struct MobileSettingsScreen: View {
     }
 
     private func sources(in group: SourceGroup) -> [SyncSource] {
-        groupedSources.first { $0.group == group }?.sources ?? []
+        groupedSources.first { $0.group == group }?.sources.filter {
+            $0.id != "claude-status"
+        } ?? []
     }
 
     private var iPhonePane: some View {

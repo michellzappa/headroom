@@ -34,7 +34,7 @@ import json
 import os
 import re
 import threading
-from typing import Callable, NamedTuple, Optional
+from typing import Callable, NamedTuple, Optional, Union
 
 import accounts
 import claude_status
@@ -223,8 +223,10 @@ class Source(NamedTuple):
     subscription_prices_checked: Optional[str] = None
     # What Attention / meter errors say after "needs sign-in — …". A CLI
     # command in backticks when one exists; plain prose for IDE-only tools.
-    # Installed-but-not-authed is the common case this exists for.
-    login_hint: Optional[str] = None
+    # Installed-but-not-authed is the common case this exists for — but not
+    # the only one, so a callable is allowed here for providers whose remedy
+    # depends on what is actually on the machine.
+    login_hint: Union[str, Callable[[], str], None] = None
 
     def subscription_pricing_payload(self):
         """Provider-owned plan catalog for the additive /usage payload."""
@@ -818,7 +820,7 @@ _ZED_SUBSCRIPTION_PRICES = (
 )
 
 BASE_SOURCES = (
-    Source("claude", "Claude", "~/.headroom/oauth (imports Claude login)", 120,
+    Source("claude", "Claude", "Claude Code login — Keychain or ~/.claude", 120,
            oauth_usage.fetch_quota,
            kind="quota", group=GROUP_AI, pools=_CLAUDE_POOLS,
            headline=("week", "session"), accent="#D97757",
@@ -828,7 +830,7 @@ BASE_SOURCES = (
            account_probe=oauth_usage.credentials_present,
            subscription_prices=_CLAUDE_SUBSCRIPTION_PRICES,
            subscription_pricing_url="https://www.anthropic.com/pricing",
-           login_hint="run `claude /login`"),
+           login_hint=oauth_usage.login_instruction),
     Source("codex", "Codex", "~/.codex/auth.json", 60,
            codex_usage.fetch_quota, summary_fn=_summary_codex,
            kind="quota", group=GROUP_AI, pools=_CODEX_POOLS,
@@ -852,7 +854,7 @@ BASE_SOURCES = (
            subscription_prices=_CURSOR_SUBSCRIPTION_PRICES,
            subscription_pricing_url="https://cursor.com/pricing",
            login_hint="sign in to Cursor"),
-    Source("copilot", "Copilot", "GitHub token / `gh auth`", 60,
+    Source("copilot", "Copilot", "Copilot sign-in on this Mac", 60,
            copilot_usage.fetch_quota,
            kind="quota", group=GROUP_AI, pools=_COPILOT_POOLS,
            headline=("premium", "chat"), accent="#A371F7",
@@ -909,9 +911,9 @@ BASE_SOURCES = (
            accent="#111111"),
     # Non-quota rows are appended after quotas in ordered_sources(); keep this
     # with the other activity sources so SOURCE_IDS stays in rollup order.
-    Source("claude-status", "Claude Status", "status.claude.com", 60,
+    Source("claude-status", "Claude Status", "status.claude.com — incidents, not your quota", 60,
            claude_status.fetch, _detail_claude_status, _summary_claude_status,
-           _blank_claude_status, kind="activity", group=GROUP_AI),
+           _blank_claude_status, kind="activity", group=GROUP_DEVTOOLS),
     Source("vercel", "Vercel", "Vercel CLI login", 60,
            vercel_builds.fetch_deployments, _detail_vercel, _summary_vercel,
            _blank_vercel, login_hint="run `vercel login`"),
@@ -1546,6 +1548,8 @@ def login_remedy(source_id):
     provider, _slug = accounts.split_id(source_id or "")
     base = BASE_BY_ID.get(provider) or BY_ID.get(source_id)
     hint = (base.login_hint if base is not None else None) or ""
+    if callable(hint):
+        hint = hint() or ""
     hint = hint.strip()
     return hint or "log in with the tool again"
 

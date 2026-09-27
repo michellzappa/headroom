@@ -1,5 +1,78 @@
 import SwiftUI
 
+extension UsageSnapshot {
+    /// Claude's service health is an attached status, not a quota provider.
+    /// Respect the internal source switch so an existing user who disabled
+    /// the check does not get a new line on their Claude card.
+    var claudeStatusIfEnabled: ClaudeStatus? {
+        guard sources?.first(where: { $0.id == "claude-status" })?.enabled
+                != false else {
+            return nil
+        }
+        return claudeStatus
+    }
+}
+
+/// Secondary health line attached to Claude's quota card. Claude Status is a
+/// public service check, so it has no provider row, meter, or account of its
+/// own.
+struct ClaudeStatusLine: View {
+    let status: ClaudeStatus
+    var showsLink: Bool = true
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: symbol)
+            Text(label)
+                .lineLimit(1)
+            Spacer(minLength: 0)
+            if showsLink {
+                PermalinkButton(
+                    url: Permalink.url(from: status.url),
+                    help: "Open Claude service status"
+                )
+            }
+        }
+        .font(.caption)
+        .foregroundStyle(tint)
+    }
+
+    private var label: String {
+        guard status.ok == true else { return "Status unavailable" }
+        if status.alerting == true {
+            return status.incidentName
+                ?? status.description
+                ?? "Claude outage"
+        }
+        return status.description ?? "All systems operational"
+    }
+
+    private var symbol: String {
+        if status.ok != true { return "questionmark.circle" }
+        if status.alerting == true { return "exclamationmark.triangle.fill" }
+        if isDegraded {
+            return "exclamationmark.circle.fill"
+        }
+        return "checkmark.circle.fill"
+    }
+
+    private var tint: Color {
+        if status.ok != true { return HeadroomPalette.orange }
+        if status.alerting == true { return HeadroomPalette.red }
+        if isDegraded {
+            return HeadroomPalette.amber
+        }
+        return HeadroomPalette.green
+    }
+
+    private var isDegraded: Bool {
+        guard let indicator = status.indicator?.lowercased() else {
+            return false
+        }
+        return indicator == "minor" || indicator == "maintenance"
+    }
+}
+
 /// How a provider from the host document reads on a ring, wherever it is drawn
 /// — the Mac's overview, the phone's quota cards, and the widget cache both
 /// apps write.

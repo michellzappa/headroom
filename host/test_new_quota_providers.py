@@ -8,7 +8,9 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from unittest.mock import patch
 
+import cache_util
 import copilot_usage
+import github_actions
 import grok_usage
 import jetbrains_usage
 import quota_util
@@ -95,6 +97,48 @@ class CopilotMapTests(unittest.TestCase):
         self.assertEqual(out["premium"]["pct"], 60.0)
         self.assertEqual(out["chat"]["pct"], 20.0)
         self.assertEqual(out["plan"], "Pro")
+
+
+class CopilotDetectionTests(unittest.TestCase):
+    """Detection must be about Copilot, not about `gh auth login`."""
+
+    def test_github_token_alone_is_not_copilot(self):
+        with patch.object(copilot_usage, "_local_config_signed_in",
+                          return_value=False):
+            with patch.object(cache_util, "load_disk", return_value=None):
+                with patch.object(github_actions, "_token",
+                                  return_value="ghp_xxx"):
+                    self.assertFalse(copilot_usage.signed_in())
+                    self.assertTrue(copilot_usage.has_token())
+
+    def test_local_copilot_config_detects(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "apps.json"
+            path.write_text(json.dumps({
+                "github.com:Iv1.abc": {"oauth_token": "gho_x", "user": "me"},
+            }))
+            with patch.object(copilot_usage, "CONFIG_PATHS", (str(path),)):
+                with patch.object(cache_util, "load_disk", return_value=None):
+                    self.assertTrue(copilot_usage.signed_in())
+
+    def test_config_without_a_token_is_not_enough(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "hosts.json"
+            path.write_text(json.dumps({"github.com": {"user": "me"}}))
+            with patch.object(copilot_usage, "CONFIG_PATHS", (str(path),)):
+                with patch.object(cache_util, "load_disk", return_value=None):
+                    self.assertFalse(copilot_usage.signed_in())
+
+    def test_confirmed_plan_on_disk_latches_detection(self):
+        """Org seats leave no local config — the first good fetch is the proof."""
+        with patch.object(copilot_usage, "_local_config_signed_in",
+                          return_value=False):
+            with patch.object(cache_util, "load_disk",
+                              return_value={"ok": True, "plan": "Business"}):
+                self.assertTrue(copilot_usage.signed_in())
+            with patch.object(cache_util, "load_disk",
+                              return_value={"ok": True, "plan": None}):
+                self.assertFalse(copilot_usage.signed_in())
 
 
 class WindsurfMapTests(unittest.TestCase):

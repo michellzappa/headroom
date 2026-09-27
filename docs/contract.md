@@ -130,9 +130,11 @@ grants only — a provider handing back a week it had already taken. A Claude
 session simply rolling on schedule is not in there, so it had no cut to square
 against and came out as a diagonal between whatever two samples survived
 thinning: a two-hour ramp where the chart should read as a step.
-`boundaries` names every one of them, grants included, and `resets` stays
-exactly what it was. Clients read it through `historyRisers`, which falls back
-to `resets` for a host that predates the key.
+`boundaries` names every one of them, grants included, and also records a
+provider refill that leaves the scheduled window unchanged (Claude can do
+this after a token reset); `resets` stays exactly what it was. Clients read it
+through `historyRisers`, which falls back to `resets` for a host that predates
+the key.
 
 `activity[].needs_attention` is a third shape: a key that exists to overrule
 a client-side derivation. Every surface used to decide the Attention queue

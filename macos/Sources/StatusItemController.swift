@@ -170,9 +170,14 @@ final class StatusItemController: NSObject {
     }
 }
 
+/// Draws the menu bar glyph in the house style shared with Cargo and Tessellate:
+/// a dark gradient plate with white marks on it. The marks stay live (quota tanks
+/// or pace dots); the plate makes it read as an app, not a system indicator.
 enum MeterIconRenderer {
     private static let outputScale: CGFloat = 2
     private static let canvasPixels = 36
+    /// Everything drawn on the plate uses this ink — the plate is always dark.
+    private static let ink = NSColor.white
 
     private struct PixelRect {
         let x: Int
@@ -232,12 +237,14 @@ enum MeterIconRenderer {
         let size = NSSize(width: 18, height: 18)
         let warning = attentionLevel == "warn" || attentionLevel == "critical"
         let image = NSImage(size: size, flipped: false) { _ in
+            if let ctx = NSGraphicsContext.current?.cgContext { MenuBarPlate.drawPlate(ctx) }
             // While the first poll is still out (or nothing is enabled),
             // draw three empty slots so the icon is never blank.
+            // Geometry fits MenuBarPlate.field (20px @2x): 4px bars, 4px gaps.
             let barCount = windows.isEmpty ? 3 : windows.count
-            let barWidthPixels = 6
-            let barHeightPixels = 30
-            let gapPixels = 5
+            let barWidthPixels = 4
+            let barHeightPixels = 20
+            let gapPixels = 4
             let groupWidth =
                 barCount * barWidthPixels
                 + max(0, barCount - 1) * gapPixels
@@ -275,15 +282,15 @@ enum MeterIconRenderer {
             }
 
             if warning {
-                let pip = PixelRect(x: 26, y: 26, width: 8, height: 8)
+                let pip = PixelRect(x: 24, y: 24, width: 8, height: 8)
                 let color = HeadroomPalette.nsAttention(attentionLevel)
                 color.setFill()
                 NSBezierPath(ovalIn: pip.rect).fill()
             }
             return true
         }
-        // Template icons can't show the colored warning pip.
-        image.isTemplate = !warning
+        // Full-color plate, never template-tinted — it should read as the app icon.
+        image.isTemplate = false
         image.accessibilityDescription = accessibilityDescription
         return image
     }
@@ -330,7 +337,7 @@ enum MeterIconRenderer {
             height: 2
         )
         let railAlpha: CGFloat = healthy ? 0.40 : 0.25
-        NSColor.labelColor.withAlphaComponent(railAlpha).setFill()
+        ink.withAlphaComponent(railAlpha).setFill()
         NSBezierPath(rect: rail.rect).fill()
 
         let dotPixels = 4
@@ -353,7 +360,7 @@ enum MeterIconRenderer {
                 height: dotPixels
             )
             let fillAlpha: CGFloat = healthy ? 1 : 0.55
-            NSColor.labelColor.withAlphaComponent(fillAlpha).setFill()
+            ink.withAlphaComponent(fillAlpha).setFill()
             NSBezierPath(ovalIn: dot.rect).fill()
         }
     }
@@ -363,7 +370,7 @@ enum MeterIconRenderer {
         healthy: Bool,
         unavailable: Bool
     ) {
-        let base = NSColor.labelColor
+        let base = ink
         let alpha: CGFloat = unavailable ? 0.45 : 1
         let trackFillAlpha: CGFloat = healthy ? 0.18 : 0.12
         let trackStrokeAlpha: CGFloat = healthy ? 0.36 : 0.22
@@ -404,11 +411,11 @@ enum MeterIconRenderer {
         unavailable: Bool = false,
         invert: Bool = false
     ) {
-        let base = NSColor.labelColor
+        let base = ink
         let alpha: CGFloat = unavailable ? 0.45 : 1
-        let trackFillAlpha: CGFloat = healthy ? 0.28 : 0.18
-        let trackStrokeAlpha: CGFloat = healthy ? 0.44 : 0.28
-        let fillAlpha: CGFloat = healthy ? 1 : 0.55
+        let trackFillAlpha: CGFloat = healthy ? 0.22 : 0.14
+        let trackStrokeAlpha: CGFloat = healthy ? 0.30 : 0.18
+        let fillAlpha: CGFloat = healthy ? 0.95 : 0.5
         let frame = pixelRect.rect
         let radius = CGFloat(pixelRect.width / 2) / outputScale
         let track = NSBezierPath(

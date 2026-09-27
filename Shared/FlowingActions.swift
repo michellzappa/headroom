@@ -13,15 +13,16 @@ import SwiftUI
 /// plain rows with a divider between them and a chevron to say they act —
 /// the same shape a grouped list uses everywhere else on the system. Colour
 /// stays on the chevron, where it marks the control without shouting.
+///
+/// Free-text replies are deliberately not rendered here. Headroom is the
+/// attention layer, not a mobile agent client; questions that need words stay
+/// available on the Mac where the agent's full context is visible.
 struct FlowingActions: View {
     let actions: [AgentAttentionAction]
     let tint: Color
     let disabled: Bool
     let responding: Bool
-    var answer: (AgentAttentionAction, String?) -> Void
-
-    @State private var reply = ""
-    @FocusState private var replyFocused: Bool
+    var answer: (AgentAttentionAction) -> Void
 
     /// Choice rows whenever the ledger handed us `choice_*` actions — even
     /// when Claude omitted descriptions. Requiring a subtitle used to drop
@@ -30,11 +31,6 @@ struct FlowingActions: View {
     private var isChoiceList: Bool {
         buttons.contains { $0.id.hasPrefix("choice_") }
             || buttons.contains { $0.subtitle?.isEmpty == false }
-    }
-
-    /// The answer carried by typed words, if this request takes one.
-    private var textAction: AgentAttentionAction? {
-        actions.first { $0.acceptsText == true }
     }
 
     private var buttons: [AgentAttentionAction] {
@@ -51,46 +47,7 @@ struct FlowingActions: View {
                     pillColumn
                 }
             }
-            if let textAction {
-                replyField(textAction)
-            }
         }
-    }
-
-    /// Always available where the provider has a channel for words, because
-    /// none of the fixed answers is ever quite the thing you want to say.
-    private func replyField(_ action: AgentAttentionAction) -> some View {
-        HStack(spacing: 8) {
-            TextField(HeadroomCopy.agentReplyPlaceholder, text: $reply, axis: .vertical)
-                .textFieldStyle(.plain)
-                .lineLimit(1...4)
-                .font(.subheadline)
-                .focused($replyFocused)
-                .submitLabel(.send)
-                .disabled(disabled)
-            Button {
-                let words = reply.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !words.isEmpty else { return }
-                replyFocused = false
-                reply = ""
-                answer(action, words)
-            } label: {
-                Image(systemName: "arrow.up.circle.fill")
-                    .font(.title3)
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(canSend ? tint : Color.secondary.opacity(0.4))
-            .disabled(!canSend)
-            .accessibilityLabel(action.label)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(.quaternary.opacity(0.5), in: Capsule())
-    }
-
-    private var canSend: Bool {
-        !disabled
-        && !reply.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private var choiceList: some View {
@@ -101,7 +58,7 @@ struct FlowingActions: View {
             }
             if let aside {
                 Divider()
-                Button(aside.label) { answer(aside, nil) }
+                Button(aside.label) { answer(aside) }
                     .font(.subheadline)
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
@@ -129,7 +86,7 @@ struct FlowingActions: View {
 
     private func choiceRow(_ action: AgentAttentionAction) -> some View {
         Button {
-            answer(action, nil)
+            answer(action)
         } label: {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -175,7 +132,7 @@ struct FlowingActions: View {
     @ViewBuilder
     private var pills: some View {
         ForEach(buttons) { action in
-            Button(action.label) { answer(action, nil) }
+            Button(action.label) { answer(action) }
                 .buttonStyle(.bordered)
                 .tint(color(for: action))
                 .disabled(disabled)

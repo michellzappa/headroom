@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "version": "2.1.3",
-  "published": "2026-09-05T09:03:55Z",
-  "url": "https://github.com/michellzappa/headroom/releases/download/v2.1.3/Headroom-macOS.zip",
-  "sha256": "f4025d3e0fafb20cef4076837c7d138954070f85e0566ff41ab2416551421424",
-  "size": 6417030,
+  "version": "2.1.7",
+  "published": "2026-09-27T17:42:51Z",
+  "url": "https://github.com/michellzappa/headroom/releases/download/v2.1.7/Headroom-macOS.zip",
+  "sha256": "edebb4e94e46170fdc52b16288dfec4a01696e9b3cf36e0c76b54604aadb95d2",
+  "size": 6515345,
   "min_macos": "14.0",
-  "notes_md": "### Added\n\n- **Settings → Desk display.** The ESP32 board's panel settings now live on\n  the Mac, beside iPhone and Other Macs. Brightness in four steps (25, 50, 75,\n  100%), Dim at night (10% from 22:00 to 07:00 in the host's time zone),\n  Celebrate quota resets, Boot animation, and which of the Vercel, Git and\n  Local servers pages the BOOT button cycles through. The pane also shows the\n  firmware stamp the board reports, how it is connected, and when it last\n  polled. The host stores the answers in `~/.headroom/config.json`, ships them\n  to the board as an additive `display` block in the device view, and the board\n  applies them on its next poll and keeps them in NVS, so a cold boot without\n  the host comes up the same way. A host older than this leaves the pane\n  read-only; a board flashed before this ignores the block. `PANEL_BRIGHTNESS`\n  in the firmware config is now only the first-boot level. Rings/Pace and the\n  lower pane stay on-board gestures. Needs a reflash to take effect on the\n  board."
+  "notes_md": "### Fixed\n\n- **Headroom no longer asks for your keychain password over and over after\n  a Claude login dies.** It used to re-read the Claude Code Keychain item on\n  every retry, and each read prompts unless you chose Always Allow. It now\n  checks the item's modification date first and reads it again only after\n  `claude /login` rewrites it. A refresh token the server rejected is never\n  sent again, and more than 4 refreshes in 30 minutes stops refreshing until\n  you press Refresh.\n\n### Added\n\n- **Failing sources say what to do.** Every provider that stops updating now\n  shows one line of fix guidance under its error in the Mac popover and the\n  iPhone detail card (`fix` in `/usage`). `headroom.log` records when each\n  source starts failing, why, and when it recovers.\n- **Also in this release:** the menu bar icon draws its live tanks on a shared\n  16 pt dark plate, and the host tests run the same in CI as on a Mac."
 }

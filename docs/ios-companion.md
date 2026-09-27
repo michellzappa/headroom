@@ -42,7 +42,9 @@ Mac on its own — the phone forwards what it fetched. See
   as Mac — Vercel, Git, Actions, Supabase, Plausible, PostHog, Sentry, Datadog,
   Axiom, local servers, builds). Face ID before stopping a local server.
   Credentials stay in the Mac Keychain.
-- Attention summary, agent approvals when granted, and local notifications.
+- Attention summary, bounded agent responses when granted, and local
+  notifications. The phone can answer an existing request, but it cannot
+  start or steer an agent task.
 - Home Screen widgets backed by an App Group cache: rings on the small size,
   the combined burndown on the medium one. The Mac runs the same extension in
   Notification Center — one source file, `widget/HeadroomWidget.swift`, built
@@ -74,9 +76,10 @@ Mac on its own — the phone forwards what it fetched. See
 
 Every mobile operation requires the **mobile token**, a private/Tailscale client
 address, the `X-Headroom-Client: ios` header, and its matching Mac-owned
-permission: `read`, `refresh`, `sources`, or `servers`. Change the four grants
-under Mac Settings → iPhone pairing. Provider credentials and permission
-changes remain Mac-only.
+permission: `read`, `refresh`, `sources`, `servers`, or `agents`. Change the
+grants under Mac Settings → iPhone pairing. The `agents` grant answers existing
+attention events only; task creation and steering remain Mac-local. Provider
+credentials and permission changes remain Mac-only.
 
 ## Build
 

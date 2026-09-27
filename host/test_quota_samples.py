@@ -219,6 +219,19 @@ class RollTests(unittest.TestCase):
         self.assertEqual(
             quota_samples.rolls(rows, since=NOW + 2 * 3600), [])
 
+    def test_in_place_refill_is_a_boundary_without_a_new_window(self):
+        # Claude can clear the used counter after a token reset while keeping
+        # the same scheduled weekly reset. It must be a chart/fit boundary,
+        # but not a new window label or a granted-reset event.
+        first = row_at(NOW, 39.0, 3 * 24 * 3600)
+        second = row_at(
+            NOW + 3600, 0.0, 3 * 24 * 3600 - 3600,
+            previous=first)
+        self.assertEqual(second["window_start"], first["window_start"])
+        self.assertEqual(
+            quota_samples.boundaries([first, second]), [int(NOW + 3600)])
+        self.assertEqual(quota_samples.rolls([first, second]), [])
+
 
 class RollJournalTests(unittest.TestCase):
     """Durable grant journal — heatmap history past sample retention."""

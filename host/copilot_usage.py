@@ -6,6 +6,8 @@ Uses the same GitHub token sources as Actions (`gh auth`, env, Keychain), then
 
 from __future__ import annotations
 
+import json
+import os
 import time
 import urllib.error
 
@@ -25,8 +27,57 @@ _cache = {"t": 0.0, "data": None, "err": None}
 _EMPTY = {"ok": False, "plan": None, "premium": None, "chat": None}
 
 
-def signed_in():
+# Copilot's own local state, written by the editor plugins and `gh copilot`.
+# `apps.json` is the current layout, `hosts.json` the one before it; either
+# naming github.com means this Mac has actually signed in to Copilot.
+CONFIG_PATHS = (
+    "~/.config/github-copilot/apps.json",
+    "~/.config/github-copilot/hosts.json",
+)
+
+
+def has_token():
+    """Whether a GitHub token exists to authenticate a Copilot fetch with."""
     return bool(github_actions._token())
+
+
+def _local_config_signed_in():
+    for path in CONFIG_PATHS:
+        try:
+            with open(os.path.expanduser(path)) as handle:
+                blob = json.load(handle)
+        except (OSError, json.JSONDecodeError, TypeError):
+            continue
+        if not isinstance(blob, dict):
+            continue
+        for key, row in blob.items():
+            if "github.com" not in str(key):
+                continue
+            if isinstance(row, dict) and (row.get("oauth_token")
+                                          or row.get("token")):
+                return True
+    return False
+
+
+def signed_in():
+    """Whether this Mac shows evidence of Copilot itself — not of GitHub.
+
+    This used to be `bool(github_actions._token())`, which answers a different
+    question: "has anyone run `gh auth login`". First-run seeding enables every
+    detected source, so anyone with a `gh` token got Copilot ticked for them,
+    and a seat they do not have resolves to a permanent "GitHub token lacks
+    Copilot access" on a row they never asked for.
+
+    Two local signals, no network — `/setup` runs every probe per request:
+      * Copilot's own config, written when an editor or `gh copilot` signs in;
+      * a last-good quota snapshot, which only exists after the API confirmed
+        a plan, so an entitlement that arrives through an org (no local config,
+        Copilot never opened here) still latches on once the row has fetched.
+    """
+    if _local_config_signed_in():
+        return True
+    snapshot = cache_util.load_disk(DISK)
+    return bool(isinstance(snapshot, dict) and snapshot.get("plan"))
 
 
 def _fetch(token):

@@ -90,6 +90,10 @@ def _load():
     cf.CFDictionaryGetTypeID.argtypes = []
     cf.CFDataGetTypeID.restype = ctypes.c_ulong
     cf.CFDataGetTypeID.argtypes = []
+    cf.CFDateGetAbsoluteTime.restype = ctypes.c_double
+    cf.CFDateGetAbsoluteTime.argtypes = [ctypes.c_void_p]
+    cf.CFDateGetTypeID.restype = ctypes.c_ulong
+    cf.CFDateGetTypeID.argtypes = []
     cf.CFRelease.restype = None
     cf.CFRelease.argtypes = [ctypes.c_void_p]
 
@@ -173,6 +177,93 @@ def _auth_ui_pairs(cf, sec, allow_ui):
         _const(sec, "kSecUseAuthenticationUI"),
         _const(sec, "kSecUseAuthenticationUIFail"),
     )]
+
+
+def generic_password_exists(service, account=None, synchronizable=True):
+    """Whether an item is there, without reading the secret and without UI.
+
+    `read_token(..., allow_ui=False)` already avoids SecurityAgent, but it
+    still asks for `kSecReturnData`, and the data half of an item is what
+    carries the ACL. Presence checks want neither: this asks only for the
+    item's attributes, so an item this process is not on the ACL for still
+    answers "yes, it exists" rather than looking like a miss.
+
+    Used by first-run detection, where "not found" and "found but locked"
+    have to read the same to the probe and very differently to the user.
+    """
+    return _generic_attributes(
+        service, account, synchronizable, lambda cf, sec, attrs: True) is True
+
+
+def generic_password_modified(service, account=None, synchronizable=True):
+    """When the item was last written, as CFAbsoluteTime, or None.
+
+    Attributes only, so no ACL check and no password prompt. The OAuth reader
+    uses it to tell whether a Keychain item that held a dead login has been
+    rewritten since, without asking macOS for the secret to find out.
+    """
+    def read(cf, sec, attrs):
+        ref = cf.CFDictionaryGetValue(
+            attrs, _const(sec, "kSecAttrModificationDate"))
+        if not ref or cf.CFGetTypeID(ref) != cf.CFDateGetTypeID():
+            return None
+        return float(cf.CFDateGetAbsoluteTime(ref))
+
+    return _generic_attributes(service, account, synchronizable, read)
+
+
+def _generic_attributes(service, account, synchronizable, read):
+    """Run an attributes-only lookup and hand the result dict to `read`.
+
+    Returns what `read` returns, or None on a miss or any Keychain error.
+    """
+    try:
+        cf, sec = _load()
+    except KeychainError:
+        return None
+    owned = []
+    result = ctypes.c_void_p()
+
+    def track(ref):
+        owned.append(ref)
+        return ref
+
+    try:
+        pairs = [
+            (_const(sec, "kSecClass"),
+             _const(sec, "kSecClassGenericPassword")),
+            (_const(sec, "kSecAttrService"), track(_cfstr(cf, service))),
+            (_const(sec, "kSecReturnAttributes"),
+             _const(cf, "kCFBooleanTrue")),
+            (_const(sec, "kSecMatchLimit"),
+             _const(sec, "kSecMatchLimitOne")),
+        ]
+        if account is not None:
+            pairs.append((
+                _const(sec, "kSecAttrAccount"),
+                track(_cfstr(cf, account)),
+            ))
+        if synchronizable:
+            pairs.append((
+                _const(sec, "kSecAttrSynchronizable"),
+                _const(sec, "kSecAttrSynchronizableAny"),
+            ))
+        pairs.extend(_auth_ui_pairs(cf, sec, False))
+        query = track(_cfdict(cf, pairs))
+        status = int(sec.SecItemCopyMatching(query, ctypes.byref(result)))
+        if result.value:
+            owned.append(result.value)
+        if status != ERR_SEC_SUCCESS or not result.value:
+            return None
+        if cf.CFGetTypeID(result.value) != cf.CFDictionaryGetTypeID():
+            return None
+        return read(cf, sec, result.value)
+    except KeychainError:
+        return None
+    finally:
+        for ref in owned:
+            if ref:
+                cf.CFRelease(ref)
 
 
 def get_generic_password(

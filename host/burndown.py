@@ -336,13 +336,25 @@ def compute(provider, pool, payload, *, now=None, points=DEFAULT_POINTS,
     # and only include tweet fields when present so older clients ignore them.
     resets = [_wire_reset(event) for event in resets]
 
-    # Clipped to the window, so the curve can never span a reset. Samples from
-    # the other side of one describe a budget that no longer exists.
+    history_floor = now - HISTORY_LOOKBACK_S
+    # A provider can refill a quota counter without moving its scheduled
+    # reset. Keep the scheduled window/ideal line intact, but treat the latest
+    # refill inside it as the start of the live burn. Otherwise the regression
+    # sees the upward jump, reports 0%/day, and projects a flat line to reset.
+    boundaries = quota_samples.boundaries(rows, since=history_floor)
+    live_start = max(
+        [window_start]
+        + [t for t in boundaries if window_start < t <= int(now)]
+    )
+
+    # Clipped to the current quota epoch, so the curve can never span a reset.
+    # Samples from the other side of one describe a budget that no longer
+    # exists, even when the provider kept the scheduled window label.
     series = [
         (int(row["t"]), max(0.0, 100.0 - float(row["pct"])))
         for row in rows
         if row.get("t") is not None and row.get("pct") is not None
-        and window_start <= int(row["t"]) <= window_end
+        and live_start <= int(row["t"]) <= window_end
     ]
     series.sort(key=lambda p: p[0])
     # The live reading is newer than the newest persisted bucket.
@@ -390,9 +402,8 @@ def compute(provider, pool, payload, *, now=None, points=DEFAULT_POINTS,
     #
     # This is the same readings unclipped: a sawtooth that climbs at every
     # reset, because that is what happened. Nothing fits a slope through it and
-    # nothing measures pace against it. Consumers split it at `resets` so no
-    # stroke spans a boundary, and draw it faint behind `actual`.
-    history_floor = now - HISTORY_LOOKBACK_S
+    # nothing measures pace against it. Consumers split it at `boundaries` so
+    # no stroke spans a boundary, and draw it faint behind `actual`.
     history = sorted(
         (int(row["t"]), max(0.0, 100.0 - float(row["pct"])))
         for row in rows
@@ -402,8 +413,8 @@ def compute(provider, pool, payload, *, now=None, points=DEFAULT_POINTS,
     # Where that sawtooth climbs. `resets` holds only the grants, which are
     # the rare kind — a Claude session rolling on schedule is not in there,
     # and drawing its riser from `resets` alone is what left a plain restart
-    # looking like a two-hour refill.
-    boundaries = quota_samples.boundaries(rows, since=history_floor)
+    # looking like a two-hour refill. `boundaries` also catches a provider
+    # refill that leaves the scheduled window label unchanged.
     if history:
         history = _downsample(history, points, history[0][0], now,
                               keep=_boundary_samples(history, boundaries))

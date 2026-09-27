@@ -30,13 +30,16 @@ Wake-cache freezes walk the derived end forward a poll at a time; holding
 against those is what keeps the axis from forking. An end that lands
 *earlier* is not that failure mode, so it re-anchors: otherwise a sample
 written under the wrong login (or any other briefly-wrong long countdown)
-sticks for the rest of the week. The other exception is a reset granted out
-of band (Codex handing everyone a fresh week mid-window), which no
-elapsed-time rule can ever recognise; `rolled_window` detects those from the
-reading itself, and `rolls` reads them back out of the stored labels so the
-chart can mark the moment instead of silently starting a new line. Reads then
-select by sample *time* inside the window, so labels forked before the hold
-still reunite on the chart.
+sticks for the rest of the week. A provider can also refill the counter
+without moving the scheduled reset (Claude does this after a token reset).
+That is not a new scheduled window, but it is still a boundary for fitting and
+drawing the current burn; `boundaries` records both kinds. The other exception
+is a reset granted out of band (Codex handing everyone a fresh week
+mid-window), which no elapsed-time rule can ever recognise; `rolled_window`
+detects those from the reading itself, and `rolls` reads them back out of the
+stored labels so the chart can mark the moment instead of silently starting a
+new line. Reads then select by sample *time* inside the window, so labels
+forked before the hold still reunite on the chart.
 
 Stdlib only.
 """
@@ -494,14 +497,16 @@ def _maybe_compact_rolls(now=None):
 
 
 def boundaries(rows, *, since=None):
-    """Every instant this pool refilled, oldest first — scheduled or granted.
+    """Every instant this pool refilled, oldest first — scheduled or in-place.
 
     `rolls` answers "when was I handed a week I had already spent", which is
     news and earns a rule and a notification. This answers the duller
-    question underneath it: where does one window stop and the next begin.
-    Nearly every boundary is a session simply running out on time, which is
-    not worth announcing but *is* worth drawing — it is where the cross-window
-    `history` curve climbs back to full.
+    question underneath it: where does one quota epoch stop and the next
+    begin. Nearly every boundary is a session simply running out on time,
+    which is not worth announcing but *is* worth drawing — it is where the
+    cross-window `history` curve climbs back to full. Some providers can also
+    refill a counter while leaving the scheduled window unchanged; those are
+    boundaries for the history and forecast, but not granted-reset events.
 
     A boundary that did not refill anything is not one of these. Sources
     report `resets_in_s` loosely enough that a window gets relabelled without
@@ -517,17 +522,23 @@ def boundaries(rows, *, since=None):
     previous = None
     for row in rows:
         start = row.get("window_start")
-        if (previous is not None
-                and start is not None
-                and start != previous.get("window_start")):
+        if previous is not None:
             t = _num(row.get("t"))
             prev_t = _num(previous.get("t"))
             refilled = ((_num(previous.get("pct")) or 0.0)
                         - (_num(row.get("pct")) or 0.0))
             if (t is not None and prev_t is not None
                     and refilled >= RESET_MIN_DROP_PCT):
-                cut = _num(start)
-                if cut is None or not prev_t < cut <= t:
+                # A changed label identifies a scheduled or granted window
+                # boundary. With the same label, the provider refilled the
+                # existing counter in place; the sample timestamp is the only
+                # honest cut we have.
+                if (start is not None
+                        and start != previous.get("window_start")):
+                    cut = _num(start)
+                    if cut is None or not prev_t < cut <= t:
+                        cut = t
+                else:
                     cut = t
                 out.append(int(cut))
         previous = row

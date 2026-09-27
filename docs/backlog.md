@@ -6,7 +6,7 @@ release.
 Last reviewed 2026-08-26, against 2.1.0. Every line count and every claim
 below was re-measured on that pass. Two items were finished; their outcomes
 are recorded under the section they left, where the next person would
-otherwise re-open them.
+otherwise re-open them. One item was added 2026-09-03, under Product.
 
 ## The one decision that reorders this list
 
@@ -109,11 +109,11 @@ next person can find it.
   emitting a firmware header, a Swift file and a Python module. `boot_max.h`
   and the `HostVersion` golden vector are the two precedents already in the
   repo.
-- **Decide the transport for `agents`.** Approving a command that runs on the
-  Mac still rides a plaintext bearer token with Face ID enforced only by the
-  client. `/agents/tasks` accepts any private-range caller holding the `agents`
-  grant; `_is_private()` already separates Tailscale CGNAT from RFC1918, so
-  option 1 in [trust.md](trust.md) remains one predicate.
+- **Harden remote agent answers.** Approving a command that runs on the Mac
+  still rides a plaintext bearer token with Face ID enforced only by the
+  client. `/attention/events/{id}/respond` is the remaining mobile agent
+  control route; `_is_private()` already separates Tailscale CGNAT from
+  RFC1918, so option 1 in [trust.md](trust.md) remains one predicate.
 - **A clear-history control.** The ledger prunes at 30 days
   (`agent_events.RETENTION_S`), which was the urgent half. The remaining half
   is a button — deleting a SQLite file with the host stopped is not a thing to
@@ -146,6 +146,18 @@ optional.
   `detect_sources.suggested_enabled()` turns *all* quota sources on when it
   detects none, deliberately, so the UI can show sign-in errors. Someone who
   has none of them sees three errors and no explanation.
+- **Claude without the CLI.** Headroom reads the OAuth blob the Claude Code
+  **CLI** writes; Claude.app authenticates its own account session and leaves
+  nothing behind that the host can read. Nothing anywhere says so — the row
+  reads Not found or Needs sign-in for ever, and 2.1.1 only got as far as
+  making the hint say to install the CLI instead of naming a command that is
+  not there (`oauth_usage.login_instruction`). Desktop-app-only is not an
+  exotic setup, and Claude is the provider the app is named for. Two ways out,
+  and the cheap one is not obviously wrong: teach Providers to say plainly
+  that the Claude ring needs the CLI, before someone enables the row and waits
+  for it to fill; or find a readable signal from the desktop app and stop
+  requiring the CLI at all. Nobody has looked at whether the second is
+  possible.
 - **Board reconnect.** Wi-Fi to USB CDC failover works and the copy improved:
   the board keeps the HTTP reason when USB also fails, and says
   `no wi-fi, no usb host` rather than one blank cause. What is still thin is

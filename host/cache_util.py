@@ -82,6 +82,13 @@ def _stamp_stale_meta(payload, cache, now, err):
         payload.pop("retry_at", None)
 
 
+def _stamp_fix(payload, fix):
+    if fix:
+        payload["fix"] = fix
+    else:
+        payload.pop("fix", None)
+
+
 def _disk_path(name: str) -> str:
     return os.path.join(CACHE_DIR, f"{name}.json")
 
@@ -239,6 +246,7 @@ def store(cache, now, data, disk_name=None):
         # at each call site means no fetcher can leave the flag set on a
         # payload it just refreshed.
         data["auth_required"] = False
+        data.pop("fix", None)
     if disk_name:
         save_disk(disk_name, data)
     # A good fetch also ends both backoffs: the provider answered, so neither
@@ -248,7 +256,8 @@ def store(cache, now, data, disk_name=None):
     return data
 
 
-def keep_stale(cache, now, err, empty, disk_name=None, auth_required=False):
+def keep_stale(cache, now, err, empty, disk_name=None, auth_required=False,
+               fix=None):
     """Prefer last-good snapshot on transient failure instead of wiping UI.
 
     `cache` is a dict with at least `data` (and usually `t`). On success paths
@@ -267,6 +276,9 @@ def keep_stale(cache, now, err, empty, disk_name=None, auth_required=False):
     carry when the numbers were last *true*, or a source that has been failing
     for a day reads as one poll old and nothing downstream can tell the
     difference.
+
+    `fix` is what the reader should do about this failure, when the fetcher
+    knows better than the generic advice the server derives from the cause.
     """
     # Every failing fetch lands here, whatever the reason, which makes this
     # the one place a streak can be counted without each fetcher remembering
@@ -281,6 +293,7 @@ def keep_stale(cache, now, err, empty, disk_name=None, auth_required=False):
         stale["stale"] = True
         stale["error"] = err
         stale["auth_required"] = bool(auth_required)
+        _stamp_fix(stale, fix)
         # Age from the last real fetch, not from the last attempt — every
         # attempt lands here, so counting attempts would keep resetting the
         # clock and a permanently broken source would read as fresh forever.
@@ -302,6 +315,7 @@ def keep_stale(cache, now, err, empty, disk_name=None, auth_required=False):
     out["error"] = err
     out["stale"] = False
     out["auth_required"] = bool(auth_required)
+    _stamp_fix(out, fix)
     _stamp_stale_meta(out, cache, now, err)
     cache.update(t=now, data=out, err=err)
     return out

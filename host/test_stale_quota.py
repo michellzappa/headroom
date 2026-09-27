@@ -219,11 +219,22 @@ class CredentialSearchTests(unittest.TestCase):
         oauth_usage.rearm_keychain()
         self.assertFalse(oauth_usage._is_keychain_denied(service))
 
-    def test_credentials_present_does_not_touch_keychain(self):
+    def test_credentials_present_never_prompts(self):
+        """Presence reads the shape fail-closed; the blob path is untouched.
+
+        `_read_keychain_blob` is the path that can pop SecurityAgent and the
+        path a sticky Deny guards. Detection goes straight to Keychain with
+        `allow_ui=False` instead, so a Keychain-stored Claude Code login is
+        found without a prompt and a gated one cannot raise it.
+        """
         with patch.object(oauth_usage, "_read_keychain_blob") as read_kc, \
+             patch.object(keychain, "get_generic_password",
+                          return_value=(keychain.ERR_SEC_ITEM_NOT_FOUND,
+                                        None)) as read, \
              patch.object(oauth_usage, "CREDS_FILE", "/nonexistent/creds"):
             self.assertFalse(oauth_usage.credentials_present())
         read_kc.assert_not_called()
+        self.assertFalse(read.call_args_list[0].kwargs.get("allow_ui", True))
 
     def test_oauth_mem_skips_reread_until_expiry(self):
         path = oauth_usage._headroom_path()
@@ -508,13 +519,54 @@ class AuthRequiredTests(unittest.TestCase):
             "enabled": True, "ok": True, "stale": True,
             "auth_required": True, "stale_for_s": 60,
         }]}
-        reasons = headroom_server._build_attention(doc)["reasons"]
+        # The remedy is platform-dependent: CI has no Claude CLI installed,
+        # while a developer Mac may. This test covers attention classification,
+        # so pin the copy independently of the machine running it.
+        with patch.object(
+            sources_config, "login_remedy", return_value="run `claude /login`"
+        ):
+            reasons = headroom_server._build_attention(doc)["reasons"]
         kinds = [r["kind"] for r in reasons]
         self.assertIn("signin", kinds)
         self.assertNotIn("stale", kinds)
         summary = next(r["summary"] for r in reasons if r["kind"] == "signin")
         self.assertEqual(
             summary, "Claude needs sign-in — run `claude /login`")
+
+    def test_login_hint_drops_the_cli_when_there_is_no_cli(self):
+        """`claude /login` is not a remedy on a Mac with no `claude`.
+
+        Headroom reads the blob the CLI writes; the desktop app authenticates
+        its own session and leaves nothing here. Telling a desktop-app-only
+        Mac to run a command it does not have is a dead end, so the hint says
+        to install it first.
+        """
+        oauth_usage._cli_cache["t"] = 0.0
+        try:
+            with patch.object(oauth_usage.shutil, "which", return_value=None), \
+                 patch.object(oauth_usage.os, "access", return_value=False):
+                remedy = sources_config.login_remedy("claude")
+            self.assertIn("install the Claude Code CLI", remedy)
+            self.assertNotIn("desktop app's login", remedy)
+            oauth_usage._cli_cache["t"] = 0.0
+            with patch.object(oauth_usage.shutil, "which",
+                              return_value="/opt/homebrew/bin/claude"):
+                self.assertEqual(sources_config.login_remedy("claude"),
+                                 "run `claude /login`")
+        finally:
+            oauth_usage._cli_cache["t"] = 0.0
+
+    def test_login_hint_finds_a_cli_off_the_launchagent_path(self):
+        """`~/.claude/local/claude` is a default install and not on PATH."""
+        oauth_usage._cli_cache["t"] = 0.0
+        try:
+            with patch.object(oauth_usage.shutil, "which", return_value=None), \
+                 patch.object(oauth_usage, "CLI_EXTRA_PATHS",
+                              ("~/.claude/local/claude",)), \
+                 patch.object(oauth_usage.os, "access", return_value=True):
+                self.assertTrue(oauth_usage.cli_installed())
+        finally:
+            oauth_usage._cli_cache["t"] = 0.0
 
     def test_signin_attention_uses_each_provider_login_hint(self):
         # Installed-but-not-authed is the case this line exists for — name

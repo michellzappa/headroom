@@ -5,6 +5,8 @@
 | Welcome / host isn’t running | Tap **Start host & keep at login** in the popover |
 | Host unhealthy | `tail -f ~/.headroom/logs/headroom.err` (owner-only; it names repos and ports, so read before pasting into an issue) |
 | Empty provider | Sign into that app/CLI; enable under Settings → Providers |
+| Claude says **Needs sign-in** and macOS keeps asking for the keychain password | The Claude login is dead, so the Keychain item holds a rejected token. Run `claude /login` in Terminal, then refresh Headroom. When macOS asks, choose **Always Allow**. **Allow** grants one read only. Headroom does not read an unchanged item that holds a dead login again, so the prompts stop until the item changes |
+| A source stopped updating and you want to know why | `grep -E "FAILING\|recovered\|fix:\|oauth" ~/.headroom/logs/headroom.log`. Each failing source writes one line when it breaks or its error changes, and one line when it recovers. The popover shows the same **fix** under the error |
 | Empty integration | Paste its key under Settings → Integrations, then enable the row |
 | Extra account missing | Settings → Providers → Library → **Add account** — [setup.md](setup.md#extra-accounts) |
 | Gemini flips to “Not updating” after ~1h | OAuth client not found (custom npm prefix / bundled CLI). Install `gemini-cli` where the host looks, or set `gemini_oauth_client_id` / `_secret` in `config.json` — [host.md](host.md) |
