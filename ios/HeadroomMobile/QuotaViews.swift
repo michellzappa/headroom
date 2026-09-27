@@ -331,6 +331,11 @@ private struct ProviderQuotaDetail: View {
                                     ? HeadroomPalette.orange : Color.secondary)
                             .lineLimit(2)
                     }
+                    if let fix = meter.fix {
+                        Label(fix, systemImage: "wrench.and.screwdriver")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 .headroomCard()
 

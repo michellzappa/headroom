@@ -88,6 +88,30 @@ _oauth_lock = threading.Lock()
 # down.
 _dead_refresh = {}
 
+# Token refresh attempts per account, newest last. A refresh that "works"
+# while the usage API keeps refusing the new token used to repeat on every
+# poll, and a forced refresh from the phone or the board skipped the backoff
+# on top of that. Each attempt rotates the grant, which can sign out the
+# `claude` CLI that shares it. Past AUTH_LOOP_MAX attempts in the window the
+# host stops asking and says so; a forced refresh gets one attempt through.
+AUTH_LOOP_MAX = 4
+AUTH_LOOP_WINDOW_S = 30 * 60
+AUTH_LOOP_FIX = ("Run `claude /login` in Terminal, then refresh Headroom. "
+                 "If this happens again, quit other tools that share "
+                 "this Claude login and try again.")
+_refresh_attempts = {}
+KEYCHAIN_DENIED_FIX = ("Refresh Claude in Headroom Settings, then choose "
+                       "Always Allow when macOS asks for the login keychain "
+                       "password.")
+
+# Keychain service -> (modification date, blob) for an item whose last read
+# held only a grant the server had already rejected. Every poll after a dead
+# login used to read the secret again looking for a new one, and each read is
+# a macOS password prompt unless the user chose Always Allow. The date is an
+# attribute, readable without a prompt; while it has not moved, the secret
+# has not either, and the answer is the blob already in hand.
+_dead_keychain = {}
+
 # Sticky Keychain refusals, keyed by Claude Code service name. Survives across
 # polls until rearm_keychain(); also mirrored to disk so a KeepAlive respawn
 # does not immediately re-prompt.
@@ -282,6 +306,11 @@ def _read_keychain_blob(service=KEYCHAIN_SERVICE):
         raise KeychainRefused(
             service, keychain.ERR_SEC_USER_CANCELED,
             sticky=True)
+    modified = keychain.generic_password_modified(service)
+    with _oauth_lock:
+        held = _dead_keychain.get(service)
+    if held is not None and modified is not None and held[0] == modified:
+        return held[1]
     try:
         status, raw = keychain.get_generic_password(service)
     except keychain.KeychainError:
@@ -293,9 +322,24 @@ def _read_keychain_blob(service=KEYCHAIN_SERVICE):
     if status != keychain.ERR_SEC_SUCCESS or not raw:
         return None
     try:
-        return json.loads(raw)
+        blob = json.loads(raw)
     except json.JSONDecodeError:
         return None
+    _hold_if_dead(service, modified, blob)
+    return blob
+
+
+def _hold_if_dead(service, modified, blob):
+    """Remember a Keychain item that holds only a rejected grant."""
+    with _oauth_lock:
+        dead = set().union(*_dead_refresh.values()) if _dead_refresh else set()
+        if modified is not None and _buried(blob, dead):
+            if service not in _dead_keychain:
+                print(f"oauth: Keychain item {service!r} holds the rejected "
+                      f"login; not reading it again until it changes")
+            _dead_keychain[service] = (modified, blob)
+        else:
+            _dead_keychain.pop(service, None)
 
 
 class KeychainRefused(RuntimeError):
@@ -594,6 +638,18 @@ def login_instruction(*, after_update=False):
     return "run `claude /login`"
 
 
+def login_fix():
+    """What to do about a dead Claude login, as a full sentence for the UI.
+
+    The Keychain half matters as much as the login: "Allow" grants one read,
+    so a host that polls asks for the password again on the next one.
+    """
+    step = login_instruction()
+    return (f"{step[:1].upper()}{step[1:]} in Terminal, then refresh "
+            f"Headroom. If macOS asks for the login keychain password, "
+            f"choose Always Allow, not Allow.")
+
+
 def _credentials_hint(account=None):
     path = _creds_file(account)
     owned = _headroom_path(account)
@@ -639,6 +695,66 @@ def _needs_refresh(oauth):
 class OAuthLoginRequired(RuntimeError):
     """The stored grant is gone. Only a new `claude /login` replaces it."""
 
+    @property
+    def fix(self):
+        return login_fix()
+
+
+class AuthLoop(OAuthLoginRequired):
+    """Too many token refreshes in a row. Asking again would make it worse."""
+
+    @property
+    def fix(self):
+        return AUTH_LOOP_FIX
+
+
+def _recent_attempts(account, now):
+    key = _account_key(account)
+    with _oauth_lock:
+        kept = [t for t in _refresh_attempts.get(key, ())
+                if now - t < AUTH_LOOP_WINDOW_S]
+        _refresh_attempts[key] = kept
+        return kept
+
+
+def _note_refresh_attempt(account, now):
+    with _oauth_lock:
+        _refresh_attempts.setdefault(_account_key(account), []).append(now)
+
+
+def _clear_refresh_attempts(account):
+    with _oauth_lock:
+        _refresh_attempts.pop(_account_key(account), None)
+
+
+def _check_auth_loop(account, force=False):
+    """Raise AuthLoop when this login has refreshed too often to try again.
+
+    `force` is a person pressing Refresh, usually right after `claude /login`,
+    so it gets one attempt. That attempt is counted like any other.
+    """
+    now = time.time()
+    attempts = _recent_attempts(account, now)
+    if force or len(attempts) < AUTH_LOOP_MAX:
+        return
+    minutes = max(1, int((now - attempts[0]) // 60))
+    raise AuthLoop(
+        f"Claude sign-in is looping: {len(attempts)} token refreshes in "
+        f"{minutes} min and the usage API still refuses the token. Headroom "
+        f"stopped refreshing so it cannot sign out the `claude` CLI.")
+
+
+def _api_error_message(exc):
+    """The `error.message` an Anthropic API error body carries, if any."""
+    try:
+        body = json.loads(exc.read().decode() or "{}")
+    except Exception:
+        return None
+    err = body.get("error") if isinstance(body, dict) else None
+    if isinstance(err, dict) and isinstance(err.get("message"), str):
+        return err["message"].strip() or None
+    return None
+
 
 # Error ranks, lowest wins. Reporting whichever error came *last* let a host
 # that no longer serves the route speak over the one that answered with a
@@ -664,6 +780,13 @@ def _refresh(oauth, store, blob, account=None):
     if not refresh:
         raise OAuthLoginRequired(
             f"no refreshToken — {login_instruction()}")
+    who = _account_key(account)
+    if refresh in _dead_refresh_tokens(account):
+        # The token endpoint already said no to this exact token. Asking
+        # again cannot change the answer, and it is one more auth request.
+        raise OAuthLoginRequired(
+            f"Claude sign-in expired — {login_instruction()}")
+    _note_refresh_attempt(account, time.time())
     best = None
 
     def note(rank, msg):
@@ -688,6 +811,8 @@ def _refresh(oauth, store, blob, account=None):
             if kind == "invalid_grant":
                 # Definitive, and true of every host: this grant is gone. The
                 # next URL can only replace a clear answer with a worse one.
+                print(f"oauth[{who}]: refresh rejected: invalid_grant "
+                      f"{detail or ''}".rstrip())
                 _bury_grant(refresh, account)
                 raise OAuthLoginRequired(
                     detail
@@ -721,8 +846,11 @@ def _refresh(oauth, store, blob, account=None):
             # good for this process — don't throw the refresh away.
             print("oauth: could not persist refreshed token:", exc)
         _store_oauth_mem(account, store, blob, oauth)
+        print(f"oauth[{who}]: token refreshed via {url}")
         return oauth
-    raise RuntimeError(best[1] if best else "token refresh failed")
+    reason = best[1] if best else "token refresh failed"
+    print(f"oauth[{who}]: refresh failed: {reason}")
+    raise RuntimeError(reason)
 
 
 def _http_get_usage(token):
@@ -877,16 +1005,18 @@ def fetch_quota(force=False, account=None):
 
     empty = {"ok": False, "plan": None, "session": None, "week": None, "error": None}
 
-    def _keep_stale(err, auth_required=False):
+    def _keep_stale(err, auth_required=False, fix=None):
+        if auth_required and fix is None:
+            fix = login_fix()
         return cache_util.keep_stale(
             cache, now, err, empty, disk_name=disk_name,
-            auth_required=auth_required)
+            auth_required=auth_required, fix=fix)
 
     try:
         try:
             store, blob, oauth = _load_oauth(account)
         except KeychainRefused as exc:
-            return _keep_stale(str(exc))
+            return _keep_stale(str(exc), fix=KEYCHAIN_DENIED_FIX)
         # Nothing to authenticate with, and nothing here gets better on a
         # retry: both want a `claude /login`, not patience.
         if not store:
@@ -899,6 +1029,7 @@ def fetch_quota(force=False, account=None):
 
         if _needs_refresh(oauth):
             try:
+                _check_auth_loop(account, force)
                 oauth = _refresh(oauth, store, blob, account=account)
                 store = _headroom_store(account)
                 blob = _read_file_blob(_headroom_path(account)) or blob
@@ -909,7 +1040,7 @@ def fetch_quota(force=False, account=None):
                 # memoised blob so the next poll re-reads, which is how a fresh
                 # `claude /login` gets picked up without a restart.
                 _invalidate_oauth_mem(account)
-                return _keep_stale(str(exc), auth_required=True)
+                return _keep_stale(str(exc), auth_required=True, fix=exc.fix)
             except Exception:
                 # still try the current token; it might work
                 pass
@@ -927,13 +1058,15 @@ def fetch_quota(force=False, account=None):
                     return _keep_stale(
                         f"HTTP Error {e.code}: {e.reason}", auth_required=True)
                 try:
+                    _check_auth_loop(account, force)
                     oauth = _refresh(oauth, store, blob, account=account)
                 except Exception as exc:
                     # The token was rejected and the refresh could not replace
                     # it. Left to the outer handler this reads as a generic
                     # failure, when it is the same dead login as a missing
                     # token and wants the same fix.
-                    return _keep_stale(str(exc), auth_required=True)
+                    return _keep_stale(str(exc), auth_required=True,
+                                       fix=getattr(exc, "fix", None))
                 try:
                     status, body = _http_get_usage(oauth["accessToken"])
                 except urllib.error.HTTPError as again:
@@ -943,6 +1076,19 @@ def fetch_quota(force=False, account=None):
                     # failure and kept its poll cadence.
                     if again.code == 429:
                         return _keep_stale(_rate_limited(cache, now, again))
+                    if again.code in (401, 403):
+                        # A fresh token refused again is not an outage. It is
+                        # the start of the refresh loop, and the server's own
+                        # message (a missing scope, a revoked org) is the only
+                        # part of it that says why.
+                        said = _api_error_message(again)
+                        print(f"oauth[{_account_key(account)}]: usage API "
+                              f"refused a fresh token: HTTP {again.code} "
+                              f"{said or again.reason}")
+                        return _keep_stale(
+                            f"Claude refused a freshly refreshed token "
+                            f"(HTTP {again.code}: {said or again.reason})",
+                            auth_required=True)
                     return _keep_stale(
                         f"HTTP Error {again.code}: {again.reason}")
             elif e.code == 429:
@@ -957,13 +1103,14 @@ def fetch_quota(force=False, account=None):
         data = parse_usage(body, oauth)
         data["stale"] = False
         data["error"] = None
+        _clear_refresh_attempts(account)
         return cache_util.store(cache, now, data, disk_name=disk_name)
     except KeychainRefused as e:
-        return _keep_stale(str(e))
+        return _keep_stale(str(e), fix=KEYCHAIN_DENIED_FIX)
     except OAuthLoginRequired as e:
         # Reaching the generic arm would drop `auth_required`, and the one
         # failure a person can actually fix would render as a plain outage.
-        return _keep_stale(str(e), auth_required=True)
+        return _keep_stale(str(e), auth_required=True, fix=e.fix)
     except Exception as e:
         return _keep_stale(str(e))
 
@@ -1009,6 +1156,8 @@ def reset_for_tests():
     with _oauth_lock:
         _oauth_mem.clear()
         _dead_refresh.clear()
+        _refresh_attempts.clear()
+        _dead_keychain.clear()
     with _deny_lock:
         _keychain_denied.clear()
     # Includes the failure bookkeeping: leaving it set bleeds one test's

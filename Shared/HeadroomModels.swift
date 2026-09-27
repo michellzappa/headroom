@@ -486,7 +486,8 @@ struct UsageSnapshot: Decodable, Sendable {
             statusNote: info.statusNote,
             needsSignIn: info.needsSignIn,
             statusAlarming: info.statusAlarming,
-            displayError: info.displayError
+            displayError: info.displayError,
+            fix: info.fix
         )
     }
 
@@ -872,6 +873,8 @@ struct ProviderMeter: Sendable {
     var statusAlarming: Bool
     /// Error text worth drawing; nil when `statusNote` already covers it.
     var displayError: String?
+    /// What to do about the failure, from the host. Nil while healthy.
+    var fix: String?
 
     var knownProvider: UsageProvider? { UsageProvider(rawValue: id) }
 
@@ -896,7 +899,8 @@ struct ProviderMeter: Sendable {
         statusNote: String? = nil,
         needsSignIn: Bool = false,
         statusAlarming: Bool = false,
-        displayError: String? = nil
+        displayError: String? = nil,
+        fix: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -922,6 +926,7 @@ struct ProviderMeter: Sendable {
         // is set but already summarised by `statusNote` (rate limits). Do not
         // coalesce back to `error` here.
         self.displayError = displayError
+        self.fix = fix
     }
 
     /// Compatibility for call sites still typed on the known-provider enum.
@@ -1194,6 +1199,9 @@ struct QuotaProviderInfo: Decodable, Identifiable, Sendable {
     var retryInS: Double?
     var plan: String?
     var error: String?
+    /// One sentence from the host on how to get this provider's data flowing
+    /// again. Nil while healthy and on hosts that predate the field.
+    var fix: String?
     var accent: String?
     /// The registry's own color, before any Settings override. Settings marks
     /// this swatch "Default"; everything else just paints `accent`.
@@ -1232,6 +1240,7 @@ struct QuotaProviderInfo: Decodable, Identifiable, Sendable {
         retryInS: Double? = nil,
         plan: String? = nil,
         error: String? = nil,
+        fix: String? = nil,
         accent: String? = nil,
         accentDefault: String? = nil,
         titleDefault: String? = nil,
@@ -1257,6 +1266,7 @@ struct QuotaProviderInfo: Decodable, Identifiable, Sendable {
         self.retryInS = retryInS
         self.plan = plan
         self.error = error
+        self.fix = fix
         self.accent = accent
         self.accentDefault = accentDefault
         self.titleDefault = titleDefault
@@ -1269,7 +1279,7 @@ struct QuotaProviderInfo: Decodable, Identifiable, Sendable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, title, label, email, kind, rank, enabled, ok, plan, error, accent, stale
+        case id, title, label, email, kind, rank, enabled, ok, plan, error, fix, accent, stale
         case headline, pools, spend
         case staleForS = "stale_for_s"
         case authRequired = "auth_required"
@@ -2156,6 +2166,8 @@ struct SyncSource: Decodable, Identifiable, Sendable {
     var staleCause: String?
     var configured: Bool?
     var error: String?
+    /// Same host-written remedy as `QuotaProviderInfo.fix`.
+    var fix: String?
     var detail: String?
     var ageS: Int?
 
@@ -2172,7 +2184,7 @@ struct SyncSource: Decodable, Identifiable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case id, title, label, email, hint, kind, group, accent, enabled, ok, stale
-        case configured, error, detail, dismissed
+        case configured, error, fix, detail, dismissed
         case authRequired = "auth_required"
         case staleCause = "stale_cause"
         case accentDefault = "accent_default"

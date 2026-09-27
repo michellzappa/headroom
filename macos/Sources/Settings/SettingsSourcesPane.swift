@@ -929,6 +929,7 @@ private struct AccountBar: View {
                     .font(.caption)
                     .foregroundStyle(HeadroomPalette.orange)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .help(row.fix ?? "")
             } else if let pool = primaryPool, let pct = pool.pct {
                 bar(fraction: pct / 100)
                 Text(meterLabel(pct: pct, pool: pool))

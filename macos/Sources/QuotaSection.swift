@@ -210,6 +210,15 @@ struct ProviderQuotaCard: View {
                             ? HeadroomPalette.orange : Color.secondary)
                     .lineLimit(2)
             }
+            // The host's one-line remedy. Secondary even for a dead login:
+            // the status note above already carries the alarm colour.
+            if let fix = meter.fix {
+                Label(fix, systemImage: "wrench.and.screwdriver")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(3)
+                    .textSelection(.enabled)
+            }
         }
         .cardStyle()
     }

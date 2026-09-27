@@ -90,6 +90,10 @@ def _load():
     cf.CFDictionaryGetTypeID.argtypes = []
     cf.CFDataGetTypeID.restype = ctypes.c_ulong
     cf.CFDataGetTypeID.argtypes = []
+    cf.CFDateGetAbsoluteTime.restype = ctypes.c_double
+    cf.CFDateGetAbsoluteTime.argtypes = [ctypes.c_void_p]
+    cf.CFDateGetTypeID.restype = ctypes.c_ulong
+    cf.CFDateGetTypeID.argtypes = []
     cf.CFRelease.restype = None
     cf.CFRelease.argtypes = [ctypes.c_void_p]
 
@@ -187,10 +191,36 @@ def generic_password_exists(service, account=None, synchronizable=True):
     Used by first-run detection, where "not found" and "found but locked"
     have to read the same to the probe and very differently to the user.
     """
+    return _generic_attributes(
+        service, account, synchronizable, lambda cf, sec, attrs: True) is True
+
+
+def generic_password_modified(service, account=None, synchronizable=True):
+    """When the item was last written, as CFAbsoluteTime, or None.
+
+    Attributes only, so no ACL check and no password prompt. The OAuth reader
+    uses it to tell whether a Keychain item that held a dead login has been
+    rewritten since, without asking macOS for the secret to find out.
+    """
+    def read(cf, sec, attrs):
+        ref = cf.CFDictionaryGetValue(
+            attrs, _const(sec, "kSecAttrModificationDate"))
+        if not ref or cf.CFGetTypeID(ref) != cf.CFDateGetTypeID():
+            return None
+        return float(cf.CFDateGetAbsoluteTime(ref))
+
+    return _generic_attributes(service, account, synchronizable, read)
+
+
+def _generic_attributes(service, account, synchronizable, read):
+    """Run an attributes-only lookup and hand the result dict to `read`.
+
+    Returns what `read` returns, or None on a miss or any Keychain error.
+    """
     try:
         cf, sec = _load()
     except KeychainError:
-        return False
+        return None
     owned = []
     result = ctypes.c_void_p()
 
@@ -223,9 +253,13 @@ def generic_password_exists(service, account=None, synchronizable=True):
         status = int(sec.SecItemCopyMatching(query, ctypes.byref(result)))
         if result.value:
             owned.append(result.value)
-        return status == ERR_SEC_SUCCESS
+        if status != ERR_SEC_SUCCESS or not result.value:
+            return None
+        if cf.CFGetTypeID(result.value) != cf.CFDictionaryGetTypeID():
+            return None
+        return read(cf, sec, result.value)
     except KeychainError:
-        return False
+        return None
     finally:
         for ref in owned:
             if ref:
