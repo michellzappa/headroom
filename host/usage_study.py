@@ -272,6 +272,130 @@ def profile(root=None, tz=None):
     return prof
 
 
+SHARD_VERSION = 1
+SHARD_MAX_BYTES = 8 * 1024 * 1024
+
+_SCALARS = ("turns", "sidechain_turns", "input", "output", "cache_read",
+            "cache_write", "files")
+_COUNTERS = ("out_by_family", "all_by_family", "daily_tokens", "prompt_hist",
+             "out_hist", "hours", "weekdays", "tools")
+_NESTED = ("out_by_month", "out_by_week")
+_INT_KEYED = ("hours", "weekdays")
+
+
+def to_shard(prof, machine, now):
+    """One Mac's profile as plain JSON, keyed by that Mac.
+
+    A shard holds *counts*, which is what makes two Macs addable. It is for
+    moving between your own machines and never goes into a card: exact counts
+    are the fingerprint the payload is built to avoid. `now` is an ISO string;
+    the caller supplies it so tests need no clock.
+    """
+    shard = {"version": SHARD_VERSION, "machine": str(machine),
+             "generated": now,
+             "cost_usd": round(prof["cost_usd"], 4)}
+    for key in _SCALARS:
+        shard[key] = prof.get(key, 0)
+    for key in _COUNTERS:
+        shard[key] = {str(k): v for k, v in prof[key].items()}
+    for key in _NESTED:
+        shard[key] = {k: dict(v) for k, v in prof[key].items()}
+    shard["sessions"] = [[round(s["active_min"], 1), s["turns"], s["prompts"]]
+                         for s in prof["sessions"]]
+    return shard
+
+
+def _count(value):
+    if isinstance(value, bool) or not isinstance(value, (int, float)) \
+            or value < 0:
+        raise ValueError("count must be a non-negative number")
+    return value
+
+
+def from_shard(shard):
+    """Validate a shard from another Mac and return it as a profile.
+
+    A shard arrives by file today and by sync later, so it is input. A wrong
+    type raises ValueError instead of being coerced into a wrong total.
+    """
+    if not isinstance(shard, dict) or shard.get("version") != SHARD_VERSION:
+        raise ValueError("not a version-%d shard" % SHARD_VERSION)
+    if not isinstance(shard.get("machine"), str) or not shard["machine"]:
+        raise ValueError("shard has no machine id")
+    prof = _blank()
+    prof["cost_usd"] = float(_count(shard.get("cost_usd", 0)))
+    for key in _SCALARS:
+        prof[key] = _count(shard.get(key, 0))
+    for key in _COUNTERS:
+        raw = shard.get(key, {})
+        if not isinstance(raw, dict):
+            raise ValueError(key + " must be an object")
+        for k, v in raw.items():
+            prof[key][int(k) if key in _INT_KEYED else k] = _count(v)
+    for key in _NESTED:
+        raw = shard.get(key, {})
+        if not isinstance(raw, dict):
+            raise ValueError(key + " must be an object")
+        for outer, inner in raw.items():
+            if not isinstance(inner, dict):
+                raise ValueError(key + " rows must be objects")
+            for k, v in inner.items():
+                prof[key][outer][k] = _count(v)
+    for row in shard.get("sessions", []):
+        if not isinstance(row, list) or len(row) != 3:
+            raise ValueError("bad session row")
+        prof["sessions"].append({"active_min": float(_count(row[0])),
+                                 "turns": _count(row[1]),
+                                 "prompts": _count(row[2])})
+    return prof
+
+
+def merge(shards):
+    """Add the profiles of several Macs into one. None when all are empty.
+
+    Usage on two Macs is disjoint sessions, so unlike a provider quota there is
+    nothing to double count and the honest merge is a sum. One shard per Mac:
+    if a machine appears twice, the newer `generated` stamp wins, so importing
+    a stale copy of a Mac's shard cannot inflate anything.
+    """
+    newest = {}
+    for shard in shards:
+        seen = newest.get(shard["machine"])
+        if seen is None or str(shard["generated"]) > str(seen["generated"]):
+            newest[shard["machine"]] = shard
+    out = _blank()
+    out["files"] = 0
+    out["machines"] = len(newest)
+    for shard in newest.values():
+        part = from_shard(shard)
+        for key in _SCALARS + ("cost_usd",):
+            out[key] += part[key]
+        for key in _COUNTERS:
+            out[key].update(part[key])
+        for key in _NESTED:
+            for outer, inner in part[key].items():
+                out[key][outer].update(inner)
+        out["sessions"].extend(part["sessions"])
+    return out if out["turns"] else None
+
+
+def combined(machine, now, peer_paths=(), root=None, tz=None):
+    """This Mac's live scan merged with shards read from `peer_paths`.
+
+    The live scan replaces any older shard of this same Mac found among them.
+    """
+    shards = []
+    own = profile(root=root, tz=tz)
+    if own is not None:
+        shards.append(to_shard(own, machine, now))
+    for path in peer_paths:
+        if os.path.getsize(path) > SHARD_MAX_BYTES:
+            raise ValueError(f"{path}: larger than {SHARD_MAX_BYTES} bytes")
+        with open(path) as handle:
+            shards.append(json.load(handle))
+    return merge(shards)
+
+
 def payload(prof):
     """The coarse summary that would leave this Mac. Shares, never counts."""
     blocks = collections.Counter()
@@ -307,6 +431,8 @@ def report(prof):
     lines = []
     add = lines.append
     days = sorted(prof["daily_tokens"])
+    if prof.get("machines", 1) > 1:
+        add(f"combined from {prof['machines']} Macs")
     add(f"files {prof['files']}  turns {prof['turns']:,}  "
         f"sessions {len(prof['sessions']):,}  active days {len(days)}  "
         f"{days[0]} .. {days[-1]}")
@@ -374,9 +500,28 @@ def main(argv=None):
                         help="log directory (default ~/.claude/projects)")
     parser.add_argument("--payload", action="store_true",
                         help="print only the payload JSON")
+    parser.add_argument("--export-shard", metavar="PATH",
+                        help="write this Mac's counts, for merging on another Mac")
+    parser.add_argument("--merge", metavar="SHARD", nargs="+", default=[],
+                        help="add shards exported from your other Macs")
     args = parser.parse_args(argv)
 
-    prof = profile(root=args.root)
+    import machine_identity
+    now = datetime.now().astimezone().isoformat(timespec="seconds")
+    machine = machine_identity.machine_id()
+    if args.export_shard:
+        own = profile(root=args.root)
+        if own is None:
+            print(f"no usage found under {args.root or claude_history.LOG_ROOT}")
+            return 1
+        with open(args.export_shard, "w") as handle:
+            json.dump(to_shard(own, machine, now), handle,
+                      separators=(",", ":"), sort_keys=True)
+        os.chmod(args.export_shard, 0o600)
+        print(f"wrote {args.export_shard}  (counts; keep it between your own Macs)")
+        return 0
+
+    prof = combined(machine, now, args.merge, root=args.root)
     if prof is None:
         print(f"no usage found under {args.root or claude_history.LOG_ROOT}")
         return 1
