@@ -876,6 +876,37 @@ enum HeadroomCopy {
     static let studyCopyCard = "Copy card"
     static let studyCopied = "Copied"
     static let studySave = "Save"
+    static let studyTabYou = "You"
+    static let studyTabFriends = "Friends"
+    static let studyAddFriend = "Add a friend"
+    static let studyAddFriendHint =
+        "Paste the card a friend sent you. It shows how they use Claude Code in coarse steps. Adding one sends nothing anywhere."
+    static let studyCardField = "Paste a card"
+    static let studyAdd = "Add"
+    static let studyPasteAndAdd = "Paste and add"
+    static let studyClipboardEmpty = "Nothing on the clipboard to add."
+    static let studyNoFriends = "No friends yet."
+    static let studyRename = "Rename"
+    static let studyRemove = "Remove"
+    static let studyAliasField = "A name only you see"
+    static let studyYouColumn = "You"
+    static let studyStaleCard = "Card from a different week"
+    static let studyMacs = "Your Macs"
+    static let studyThisMac = "This Mac"
+    static let studyAnotherMac = "Another Mac"
+    static let studyMacsHint =
+        "Your usage adds up across your Macs. Save this Mac's counts, move the file to your other Mac, and add it there. The file holds exact counts, so keep it between your own Macs."
+    static let studyExportCounts = "Save this Mac's counts"
+    static let studyImportCounts = "Add another Mac's counts"
+    static let studyExportPanelMessage =
+        "Keep this file between your own Macs. It holds exact counts."
+    static let studyImportPanelMessage =
+        "Choose the counts file saved on your other Mac."
+    static let studyFileTooLarge = "That file is too large to be a counts file."
+    static let studyMacAdded = "Added. Your usage now includes that Mac."
+    static func studyRemoveFriendTitle(_ name: String) -> String {
+        "Remove \(name)?"
+    }
     static func studyCombined(_ count: Int) -> String {
         "Combined from \(count) Macs"
     }

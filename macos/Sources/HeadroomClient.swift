@@ -503,6 +503,59 @@ struct HeadroomClient: Sendable {
         return try JSONDecoder().decode(StudyHandleResult.self, from: data)
     }
 
+    /// Import a friend's card. The host decodes it strictly and answers with
+    /// the reason when it refuses (`send` surfaces that as the message).
+    func addStudyFriend(card: String) async throws -> StudyFriendResult {
+        let data = try await studyPost("friends", ["card": card])
+        return try JSONDecoder().decode(StudyFriendResult.self, from: data)
+    }
+
+    /// `nil` clears the alias. The alias lives on this Mac only.
+    func setStudyAlias(id: String, alias: String?) async throws {
+        _ = try await studyPost("friends/alias", [
+            "id": id, "alias": alias.map { $0 as Any } ?? NSNull(),
+        ])
+    }
+
+    func removeStudyFriend(id: String) async throws {
+        _ = try await studyPost("friends/remove", ["id": id])
+    }
+
+    /// This Mac's own counts, exactly as the host wrote them. Swift is only the
+    /// courier here: the bytes go to a file the person moves to another Mac.
+    func exportStudyShard() async throws -> Data {
+        let url = try base()
+            .appendingPathComponent("study")
+            .appendingPathComponent("shard")
+        return try await send(request(url, timeout: 30))
+    }
+
+    /// Hand the host a file exported on another of your Macs. The host checks
+    /// every field; a file that is not a shard comes back as a message.
+    func importStudyShard(_ shard: Data) async throws -> StudyShardResult {
+        let url = try base()
+            .appendingPathComponent("study")
+            .appendingPathComponent("shard")
+        let data = try await send(request(
+            url, method: "POST", body: shard, timeout: 30))
+        return try JSONDecoder().decode(StudyShardResult.self, from: data)
+    }
+
+    func removeStudyMachine(id: String) async throws {
+        _ = try await studyPost("shard/remove", ["machine": id])
+    }
+
+    private func studyPost(_ path: String, _ payload: [String: Any])
+        async throws -> Data {
+        var url = try base().appendingPathComponent("study")
+        for part in path.split(separator: "/") {
+            url = url.appendingPathComponent(String(part))
+        }
+        let body = try JSONSerialization.data(withJSONObject: payload)
+        return try await send(request(
+            url, method: "POST", body: body, timeout: 8))
+    }
+
     func fetchClaudeHookConfiguration() async throws
         -> ClaudeHookConfiguration {
         let url = try base()

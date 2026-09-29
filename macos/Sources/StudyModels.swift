@@ -206,3 +206,17 @@ struct StudyHandleResult: Decodable, Sendable {
     var ok: Bool
     var handle: String
 }
+
+/// `POST /study/friends`.
+struct StudyFriendResult: Decodable, Sendable {
+    var ok: Bool
+    /// True when the card replaced one you already had from the same sender.
+    var updated: Bool
+    var friend: StudyFriend?
+}
+
+/// `POST /study/shard`.
+struct StudyShardResult: Decodable, Sendable {
+    var ok: Bool
+    var machine: String
+}

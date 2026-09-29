@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import UniformTypeIdentifiers
 
 /// State behind the "Your usage" window.
 ///
@@ -15,6 +16,14 @@ final class StudyStore: ObservableObject {
     @Published private(set) var isSavingHandle = false
     /// Set for a couple of seconds after Copy, so the button can say so.
     @Published private(set) var copiedCard = false
+    /// The outcome of the last friend action, in words. Refusals from the host
+    /// arrive here verbatim ("that is your own card").
+    @Published private(set) var friendMessage: String?
+    @Published private(set) var macsMessage: String?
+
+    /// A shard is counts for months of sessions. Far above a real one, far
+    /// below anything worth reading into memory.
+    private static let maxShardBytes = 4 * 1024 * 1024
 
     /// The first scan takes a few seconds. Poll quickly until it lands, then
     /// slowly: the host only rescans when the logs changed and five minutes
@@ -76,6 +85,116 @@ final class StudyStore: ObservableObject {
             return nil
         } catch {
             return error.localizedDescription
+        }
+    }
+
+    // MARK: Friends
+
+    /// True when the card was accepted, so a caller can clear its field.
+    @discardableResult
+    func addFriend(_ text: String) async -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        do {
+            let result = try await HeadroomClient().addStudyFriend(card: trimmed)
+            let name = result.friend?.name ?? "friend"
+            friendMessage = result.updated
+                ? "Updated \(name)." : "Added \(name)."
+            await load()
+            return true
+        } catch {
+            friendMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    /// One click for the usual case: the card is on the clipboard.
+    func addFriendFromClipboard() async {
+        guard let text = NSPasteboard.general.string(forType: .string),
+              !text.isEmpty
+        else {
+            friendMessage = HeadroomCopy.studyClipboardEmpty
+            return
+        }
+        await addFriend(text)
+    }
+
+    /// Returns a message when the host refused the name.
+    func setAlias(_ id: String, _ alias: String) async -> String? {
+        let trimmed = alias.trimmingCharacters(in: .whitespacesAndNewlines)
+        do {
+            try await HeadroomClient().setStudyAlias(
+                id: id, alias: trimmed.isEmpty ? nil : trimmed)
+            await load()
+            return nil
+        } catch {
+            return error.localizedDescription
+        }
+    }
+
+    func removeFriend(_ id: String) async {
+        do {
+            try await HeadroomClient().removeStudyFriend(id: id)
+            friendMessage = nil
+            await load()
+        } catch {
+            friendMessage = error.localizedDescription
+        }
+    }
+
+    // MARK: Your other Macs
+
+    /// Save this Mac's counts as a file to carry to another Mac.
+    func exportCounts() async {
+        let mac = snapshot?.machines.first(where: \.thisMac)?.name ?? "Mac"
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.json]
+        panel.nameFieldStringValue = "headroom-counts-"
+            + mac.filter { $0.isLetter || $0.isNumber || $0 == "-" } + ".json"
+        panel.message = HeadroomCopy.studyExportPanelMessage
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let data = try await HeadroomClient().exportStudyShard()
+            try data.write(to: url, options: .atomic)
+            // Exact counts: keep the file private to this account.
+            try FileManager.default.setAttributes(
+                [.posixPermissions: 0o600], ofItemAtPath: url.path)
+            macsMessage = "Saved \(url.lastPathComponent)."
+        } catch {
+            macsMessage = error.localizedDescription
+        }
+    }
+
+    /// Add the counts another of your Macs saved.
+    func importCounts() async {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        panel.message = HeadroomCopy.studyImportPanelMessage
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let size = (try FileManager.default.attributesOfItem(
+                atPath: url.path)[.size] as? Int) ?? 0
+            guard size <= Self.maxShardBytes else {
+                macsMessage = HeadroomCopy.studyFileTooLarge
+                return
+            }
+            _ = try await HeadroomClient().importStudyShard(
+                Data(contentsOf: url))
+            macsMessage = HeadroomCopy.studyMacAdded
+            await load()
+        } catch {
+            macsMessage = error.localizedDescription
+        }
+    }
+
+    func removeMachine(_ id: String) async {
+        do {
+            try await HeadroomClient().removeStudyMachine(id: id)
+            macsMessage = nil
+            await load()
+        } catch {
+            macsMessage = error.localizedDescription
         }
     }
 

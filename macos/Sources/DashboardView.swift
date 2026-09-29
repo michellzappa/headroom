@@ -23,10 +23,6 @@ struct DashboardView: View {
     @State private var updateInstallMessage: String?
     @AppStorage("confirmServerStops")
     private var confirmServerStops = true
-    /// Hidden until friends can be added, so a card is not a dead end.
-    /// `defaults write <bundle id> studyEntry -bool true` shows it.
-    @AppStorage("studyEntry")
-    private var studyEntry = false
 
     private var visibleProviders: [QuotaProviderInfo] {
         store.snapshot.codingQuotaProviders
@@ -559,17 +555,15 @@ struct DashboardView: View {
                 )
             }
             Spacer()
-            if studyEntry {
-                Button {
-                    NotificationCenter.default.post(
-                        name: .headroomShowStudy, object: nil)
-                } label: {
-                    Image(systemName: "chart.bar.xaxis")
-                }
-                .buttonStyle(.plain)
-                .help(HeadroomCopy.studyTitle)
-                .accessibilityLabel(HeadroomCopy.studyTitle)
+            Button {
+                NotificationCenter.default.post(
+                    name: .headroomShowStudy, object: nil)
+            } label: {
+                Image(systemName: "chart.bar.xaxis")
             }
+            .buttonStyle(.plain)
+            .help(HeadroomCopy.studyTitle)
+            .accessibilityLabel(HeadroomCopy.studyTitle)
             SettingsLink {
                 Image(systemName: "gearshape")
             }

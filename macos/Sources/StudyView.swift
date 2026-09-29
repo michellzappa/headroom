@@ -10,6 +10,12 @@ import SwiftUI
 /// and how much coarser it is.
 struct StudyView: View {
     @ObservedObject var store: StudyStore
+    @State private var tab: Tab = .you
+    @State private var friendDraft = ""
+    @State private var renamingID: String?
+    @State private var aliasDraft = ""
+    @State private var aliasMessage: String?
+    @State private var removing: StudyFriend?
     @State private var handleDraft = ""
     @State private var handleMessage: String?
     @FocusState private var handleFocused: Bool
@@ -26,37 +32,73 @@ struct StudyView: View {
         }
         .frame(minWidth: 560, minHeight: 480)
         .background(Color(nsColor: .windowBackgroundColor))
+        .confirmationDialog(
+            HeadroomCopy.studyRemoveFriendTitle(removing?.name ?? ""),
+            isPresented: Binding(
+                get: { removing != nil },
+                set: { if !$0 { removing = nil } }),
+            presenting: removing
+        ) { friend in
+            Button(HeadroomCopy.studyRemove, role: .destructive) {
+                Task { await store.removeFriend(friend.id) }
+            }
+        }
     }
 
     // MARK: State
+
+    private enum Tab: String, CaseIterable, Identifiable {
+        case you, friends
+        var id: String { rawValue }
+        var title: String {
+            self == .you ? HeadroomCopy.studyTabYou : HeadroomCopy.studyTabFriends
+        }
+    }
 
     @ViewBuilder
     private var content: some View {
         if !store.isLocalHost {
             notice(HeadroomCopy.studyRemoteHost)
         } else if let snapshot = store.snapshot {
-            if let insights = snapshot.insights {
-                if let message = store.errorMessage {
-                    notice(message)
-                }
-                header(snapshot, insights)
-                tiles(insights)
-                models(insights)
-                monthly(insights)
-                rhythm(insights)
-                prompts(insights)
-                sessions(insights)
-                card(snapshot)
-            } else if snapshot.isScanning {
-                reading
-            } else {
-                notice(snapshot.error ?? HeadroomCopy.studyEmpty)
+            Picker("", selection: $tab) {
+                ForEach(Tab.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(maxWidth: 220)
+            if let message = store.errorMessage {
+                notice(message)
+            }
+            switch tab {
+            case .you: youTab(snapshot)
+            case .friends: friendsTab(snapshot)
             }
         } else if let message = store.errorMessage {
             notice(message)
         } else {
             reading
         }
+    }
+
+    @ViewBuilder
+    private func youTab(_ snapshot: StudySnapshot) -> some View {
+        if let insights = snapshot.insights {
+            header(snapshot, insights)
+            tiles(insights)
+            models(insights)
+            monthly(insights)
+            rhythm(insights)
+            prompts(insights)
+            sessions(insights)
+            card(snapshot)
+        } else if snapshot.isScanning {
+            reading
+        } else {
+            notice(snapshot.error ?? HeadroomCopy.studyEmpty)
+        }
+        // Always shown, even with no usage of its own: a Mac with no session
+        // logs is exactly the one that needs to add another Mac's counts.
+        macs(snapshot)
     }
 
     private var reading: some View {
@@ -335,6 +377,226 @@ struct StudyView: View {
         }
     }
 
+    // MARK: Other Macs
+
+    private func macs(_ snapshot: StudySnapshot) -> some View {
+        section(HeadroomCopy.studyMacs, caption: HeadroomCopy.studyMacsHint) {
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(snapshot.machines) { machine in
+                    HStack {
+                        Text(machine.name)
+                        Text(machine.thisMac
+                             ? HeadroomCopy.studyThisMac
+                             : "\(HeadroomCopy.studyAnotherMac), counts from \(machine.generated.map { String($0.prefix(10)) } ?? "an earlier day")")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        if !machine.thisMac {
+                            Button(HeadroomCopy.studyRemove) {
+                                Task { await store.removeMachine(machine.id) }
+                            }
+                        }
+                    }
+                }
+                HStack {
+                    Button(HeadroomCopy.studyExportCounts) {
+                        Task { await store.exportCounts() }
+                    }
+                    Button(HeadroomCopy.studyImportCounts) {
+                        Task { await store.importCounts() }
+                    }
+                }
+                if let message = store.macsMessage {
+                    Text(message).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    // MARK: Friends
+
+    @ViewBuilder
+    private func friendsTab(_ snapshot: StudySnapshot) -> some View {
+        section(HeadroomCopy.studyAddFriend,
+                caption: HeadroomCopy.studyAddFriendHint) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    TextField(HeadroomCopy.studyCardField, text: $friendDraft)
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit(addDraft)
+                    Button(HeadroomCopy.studyAdd, action: addDraft)
+                        .disabled(friendDraft.trimmingCharacters(
+                            in: .whitespacesAndNewlines).isEmpty)
+                    Button(HeadroomCopy.studyPasteAndAdd) {
+                        Task { await store.addFriendFromClipboard() }
+                    }
+                }
+                if let message = store.friendMessage {
+                    Text(message).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+        if snapshot.friends.isEmpty {
+            Text(HeadroomCopy.studyNoFriends).foregroundStyle(.secondary)
+        } else {
+            ForEach(snapshot.friends) { friend in
+                friendCard(friend, mine: snapshot.card)
+            }
+        }
+    }
+
+    private func addDraft() {
+        Task {
+            if await store.addFriend(friendDraft) { friendDraft = "" }
+        }
+    }
+
+    private func friendCard(_ friend: StudyFriend, mine: StudyCard?)
+        -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                if renamingID == friend.id {
+                    TextField(HeadroomCopy.studyAliasField, text: $aliasDraft)
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit { saveAlias(friend) }
+                    Button(HeadroomCopy.studySave) { saveAlias(friend) }
+                } else {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(friend.name).font(.headline)
+                        if friend.alias != nil {
+                            Text(friend.handle)
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                Spacer()
+                Text(friend.week).font(.caption).foregroundStyle(.secondary)
+                Menu {
+                    Button(HeadroomCopy.studyRename) {
+                        aliasDraft = friend.alias ?? ""
+                        aliasMessage = nil
+                        renamingID = friend.id
+                    }
+                    Button(HeadroomCopy.studyRemove, role: .destructive) {
+                        removing = friend
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+            }
+            if renamingID == friend.id, let aliasMessage {
+                Text(aliasMessage).font(.caption).foregroundStyle(.secondary)
+            }
+            compare(mine: mine?.data, theirs: friend.data, name: friend.name)
+            if let mine, mine.week != friend.week {
+                Text(HeadroomCopy.studyStaleCard)
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardStyle()
+    }
+
+    private func saveAlias(_ friend: StudyFriend) {
+        Task {
+            if let message = await store.setAlias(friend.id, aliasDraft) {
+                aliasMessage = message
+            } else {
+                aliasMessage = nil
+                renamingID = nil
+            }
+        }
+    }
+
+    // MARK: Comparison
+    //
+    // Both columns are cards: yours is the card a friend would get from you,
+    // not your detailed numbers. Like for like, so nothing you see about a
+    // friend is finer than what they see about you.
+
+    private static let dayBlockOrder = [
+        "night_00_05", "morning_06_11", "afternoon_12_17", "evening_18_23",
+    ]
+
+    private func compare(mine: StudyCardData?, theirs: StudyCardData, name: String)
+        -> some View {
+        Grid(alignment: .topLeading, horizontalSpacing: 14, verticalSpacing: 10) {
+            GridRow {
+                Color.clear.frame(width: 84, height: 1)
+                Text(HeadroomCopy.studyYouColumn)
+                    .font(.caption).foregroundStyle(.secondary)
+                    .gridColumnAlignment(.leading)
+                Text(name)
+                    .font(.caption).foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            compareRow("Models", modelsCell(mine), modelsCell(theirs))
+            compareRow("Time of day", dayCell(mine), dayCell(theirs))
+            compareRow("Prompts", textCell(mine?.promptLenShare, unit: ""),
+                       textCell(theirs.promptLenShare, unit: ""))
+            compareRow("Replies", textCell(mine?.outPerTurnShare, unit: ""),
+                       textCell(theirs.outPerTurnShare, unit: ""))
+            compareRow("Sessions", textCell(mine?.sessionActiveMinShare, unit: " min"),
+                       textCell(theirs.sessionActiveMinShare, unit: " min"))
+            compareRow("Cache hit", cacheCell(mine), cacheCell(theirs))
+        }
+    }
+
+    private func compareRow<A: View, B: View>(
+        _ label: String, _ a: A, _ b: B
+    ) -> some View {
+        GridRow {
+            Text(label).font(.callout).foregroundStyle(.secondary)
+                .frame(width: 84, alignment: .leading)
+            a.frame(maxWidth: .infinity, alignment: .leading)
+            b.frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func modelsCell(_ d: StudyCardData?) -> some View {
+        let week = d?.weeklyModelShare.keys.sorted().last
+        let shares = week.flatMap { d?.weeklyModelShare[$0] } ?? [:]
+        return shareCell(
+            shares, order: Self.families,
+            color: { _, key in Self.color(key) },
+            text: Self.describe(shares, unit: nil))
+    }
+
+    private func dayCell(_ d: StudyCardData?) -> some View {
+        let shares = d?.timeOfDayShare ?? [:]
+        return shareCell(
+            shares, order: Self.dayBlockOrder,
+            color: { index, _ in Color.accentColor.opacity(0.3 + 0.2 * Double(index)) },
+            text: Self.describe(shares.mapKeys(Self.dayBlock), unit: nil))
+    }
+
+    private func shareCell(
+        _ shares: [String: Double], order: [String],
+        color: @escaping (Int, String) -> Color, text: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if !shares.isEmpty {
+                ShareBar(
+                    parts: order.compactMap { key in
+                        shares[key].map { (key, $0) }
+                    },
+                    color: color)
+            }
+            Text(text).font(.caption)
+        }
+    }
+
+    private func textCell(_ shares: [String: Double]?, unit: String) -> some View {
+        Text(Self.describe(shares ?? [:], unit: unit)).font(.caption)
+    }
+
+    private func cacheCell(_ d: StudyCardData?) -> some View {
+        Text(d?.cacheHitBucketPct.map { "\($0)% or more" } ?? "None")
+            .font(.caption)
+    }
+
     // MARK: Pieces
 
     private func section<Body: View>(
@@ -420,5 +682,28 @@ struct StudyView: View {
 private extension Dictionary where Key == String {
     func mapKeys(_ transform: (String) -> String) -> [String: Value] {
         Dictionary(uniqueKeysWithValues: map { (transform($0.key), $0.value) })
+    }
+}
+
+/// A row of segments sized by share. Rounded shares can add up to a little over
+/// or under one, so widths are taken as a fraction of their own sum.
+private struct ShareBar: View {
+    let parts: [(String, Double)]
+    let color: (Int, String) -> Color
+
+    var body: some View {
+        let total = max(parts.reduce(0) { $0 + $1.1 }, 0.0001)
+        GeometryReader { proxy in
+            HStack(spacing: 1) {
+                ForEach(Array(parts.enumerated()), id: \.offset) { index, part in
+                    Rectangle()
+                        .fill(color(index, part.0))
+                        .frame(width: max(
+                            2, (proxy.size.width - CGFloat(parts.count)) * part.1 / total))
+                }
+            }
+            .clipShape(Capsule())
+        }
+        .frame(height: 8)
     }
 }
