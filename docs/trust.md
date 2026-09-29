@@ -50,6 +50,14 @@ ever.
 `/agents/tasks`, `/machines/config`, `/machines/sync`, and the three Claude hook endpoints
 (`/agents/hooks/claude/{permission,question,event}`).
 
+The usage study routes are here too: `/study`, `/study/shard`, and every
+`/study/*` POST (`handle`, `friends`, `friends/alias`, `friends/remove`,
+`shard`, `shard/remove`, `refresh`). They return a person's habits, store a
+stranger's card, and write under `~/.headroom/study`. A LAN caller holding a
+valid host token gets 403 on all of them; `test_study_http.py` pins that.
+A card is untrusted input, and `study_card.decode` is the only way one gets in
+([product.md](product.md#friends-cards-and-the-usage-study)).
+
 `/agents/tasks` is here because its read response names folders on this Mac and
 its write response starts a local executable. Both methods are loopback-only;
 the phone never uses this route.

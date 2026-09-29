@@ -283,7 +283,7 @@ _NESTED = ("out_by_month", "out_by_week")
 _INT_KEYED = ("hours", "weekdays")
 
 
-def to_shard(prof, machine, now):
+def to_shard(prof, machine, now, name=None):
     """One Mac's profile as plain JSON, keyed by that Mac.
 
     A shard holds *counts*, which is what makes two Macs addable. It is for
@@ -294,6 +294,8 @@ def to_shard(prof, machine, now):
     shard = {"version": SHARD_VERSION, "machine": str(machine),
              "generated": now,
              "cost_usd": round(prof["cost_usd"], 4)}
+    if name:
+        shard["name"] = str(name)[:64]     # what a person calls this Mac
     for key in _SCALARS:
         shard[key] = prof.get(key, 0)
     for key in _COUNTERS:
@@ -426,71 +428,122 @@ def _pct(ordered, p):
     return ordered[min(len(ordered) - 1, int(p * len(ordered)))]
 
 
+WEEKLY_POINTS = 26
+
+
+def insights(prof):
+    """Everything the local view draws, as plain JSON.
+
+    This is the person's own data on their own Mac, so it carries real counts.
+    It is never a card and never leaves the Mac. `report` renders it as text;
+    the Mac app draws it. One computation, so the two cannot disagree.
+    """
+    days = sorted(prof["daily_tokens"])
+    daily = sorted(prof["daily_tokens"].values())
+    minutes = sorted(s["active_min"] for s in prof["sessions"])
+    turns = sorted(s["turns"] for s in prof["sessions"])
+    everything_in = prof["input"] + prof["cache_read"] + prof["cache_write"]
+    total_all = sum(prof["all_by_family"].values())
+    total_out = prof["output"]
+    families = list(FAMILIES) + [OTHER]
+    return {
+        "machines": prof.get("machines", 1),
+        "files": prof.get("files", 0),
+        "turns": prof["turns"],
+        "sessions": len(prof["sessions"]),
+        "active_days": len(days),
+        "first_day": days[0],
+        "last_day": days[-1],
+        "tokens": {"input": prof["input"], "output": prof["output"],
+                   "cache_read": prof["cache_read"],
+                   "cache_write": prof["cache_write"]},
+        "cache_hit_pct": (round(100 * prof["cache_read"] / everything_in, 1)
+                          if everything_in else None),
+        "output_per_1k_input": (round(1000 * prof["output"] / everything_in, 1)
+                                if everything_in else None),
+        "cost_usd_estimate": round(prof["cost_usd"], 2),
+        "rates_checked": pricing.RATES_CHECKED,
+        "models": [
+            {"family": fam,
+             "output_share": (prof["out_by_family"][fam] / total_out
+                              if total_out else 0.0),
+             "total_share": prof["all_by_family"][fam] / total_all}
+            for fam in families if prof["all_by_family"][fam]],
+        "monthly": [
+            {"month": month,
+             "output": {f: prof["out_by_month"][month][f]
+                        for f in families if prof["out_by_month"][month][f]}}
+            for month in sorted(prof["out_by_month"])],
+        "weekly": [
+            {"week": week, "output": sum(prof["out_by_week"][week].values())}
+            for week in sorted(prof["out_by_week"])[-WEEKLY_POINTS:]],
+        "daily_tokens": {"median": _pct(daily, .5), "p90": _pct(daily, .9),
+                         "max": daily[-1]},
+        "hours": [prof["hours"][h] for h in range(24)],
+        "weekdays": [prof["weekdays"][d] for d in range(7)],
+        "prompt_len": [
+            {"bin": label, "count": prof["prompt_hist"][label]}
+            for label in sorted(prof["prompt_hist"],
+                                key=lambda k: int(k.split("-")[0]))],
+        "session": {
+            "median_min": _pct(minutes, .5), "p90_min": _pct(minutes, .9),
+            "longest_min": minutes[-1],
+            "median_turns": _pct(turns, .5), "p90_turns": _pct(turns, .9)},
+        "subagent_share": prof["sidechain_turns"] / prof["turns"],
+        "tools": [{"name": k, "count": v}
+                  for k, v in prof["tools"].most_common(10)],
+    }
+
+
 def report(prof):
     """Human-readable text. Local only. Dollars are estimates and say so."""
+    d = insights(prof)
     lines = []
     add = lines.append
-    days = sorted(prof["daily_tokens"])
-    if prof.get("machines", 1) > 1:
-        add(f"combined from {prof['machines']} Macs")
-    add(f"files {prof['files']}  turns {prof['turns']:,}  "
-        f"sessions {len(prof['sessions']):,}  active days {len(days)}  "
-        f"{days[0]} .. {days[-1]}")
+    if d["machines"] > 1:
+        add(f"combined from {d['machines']} Macs")
+    add(f"files {d['files']}  turns {d['turns']:,}  sessions {d['sessions']:,}"
+        f"  active days {d['active_days']}  {d['first_day']} .. {d['last_day']}")
+    t = d["tokens"]
+    add(f"\nTOKENS  fresh-in {t['input']:,}  cache-write {t['cache_write']:,}"
+        f"  cache-read {t['cache_read']:,}  out {t['output']:,}")
+    if d["cache_hit_pct"] is not None:
+        add(f"cache hit rate (read / all input): {d['cache_hit_pct']}%")
+        add(f"output per 1k input tokens: {d['output_per_1k_input']}")
+    add(f"estimated API-equivalent cost: ${d['cost_usd_estimate']:,.0f}  "
+        f"(estimate; rates as of {d['rates_checked']})")
 
-    everything_in = prof["input"] + prof["cache_read"] + prof["cache_write"]
-    add(f"\nTOKENS  fresh-in {prof['input']:,}  cache-write "
-        f"{prof['cache_write']:,}  cache-read {prof['cache_read']:,}  "
-        f"out {prof['output']:,}")
-    if everything_in:
-        add(f"cache hit rate (read / all input): "
-            f"{prof['cache_read'] / everything_in:.1%}")
-        add(f"output per 1k input tokens: "
-            f"{1000 * prof['output'] / everything_in:.1f}")
-    add(f"estimated API-equivalent cost: ${prof['cost_usd']:,.0f}  "
-        f"(estimate; rates as of {pricing.RATES_CHECKED})")
-
-    families = list(FAMILIES) + [OTHER]
-    total_all = sum(prof["all_by_family"].values()) or 1
-    total_out = prof["output"] or 1
     add("\nMODEL MIX  share of output / share of all tokens")
-    for fam in families:
-        if prof["all_by_family"][fam]:
-            add(f"  {fam:7s} {prof['out_by_family'][fam] / total_out:6.1%}"
-                f"   {prof['all_by_family'][fam] / total_all:6.1%}")
-
+    for m in d["models"]:
+        add(f"  {m['family']:7s} {m['output_share']:6.1%}   "
+            f"{m['total_share']:6.1%}")
     add("\nMONTHLY output tokens")
-    for month in sorted(prof["out_by_month"]):
-        row = prof["out_by_month"][month]
-        add(f"  {month}  " + "  ".join(
-            f"{f} {row[f] / 1e6:6.2f}M" for f in families if row[f]))
+    for row in d["monthly"]:
+        add(f"  {row['month']}  " + "  ".join(
+            f"{f} {n / 1e6:6.2f}M" for f, n in row["output"].items()))
+    q = d["daily_tokens"]
+    add(f"\nDAILY total tokens  median {q['median'] / 1e6:.1f}M  "
+        f"p90 {q['p90'] / 1e6:.1f}M  max {q['max'] / 1e6:.1f}M")
 
-    daily = sorted(prof["daily_tokens"].values())
-    add(f"\nDAILY total tokens  median {_pct(daily, .5) / 1e6:.1f}M  "
-        f"p90 {_pct(daily, .9) / 1e6:.1f}M  max {daily[-1] / 1e6:.1f}M")
-
-    peak = max(prof["hours"].values())
+    peak = max(d["hours"])
     add("\nHOUR OF DAY (turns, local time)")
-    for hour in range(24):
-        n = prof["hours"][hour]
+    for hour, n in enumerate(d["hours"]):
         add(f"  {hour:02d} {'#' * int(40 * n / peak):40s} {n:,}")
     names = "Mon Tue Wed Thu Fri Sat Sun".split()
     add("\nDAY OF WEEK  " + "  ".join(
-        f"{names[i]} {prof['weekdays'][i] / prof['turns']:.0%}"
-        for i in range(7)))
-
+        f"{names[i]} {n / d['turns']:.0%}" for i, n in enumerate(d["weekdays"])))
     add("\nHUMAN PROMPT LENGTH (estimated tokens)")
-    for label in sorted(prof["prompt_hist"], key=lambda k: int(k.split("-")[0])):
-        add(f"  {label:>9s} {prof['prompt_hist'][label]:6,}")
+    for row in d["prompt_len"]:
+        add(f"  {row['bin']:>9s} {row['count']:6,}")
 
-    minutes = sorted(s["active_min"] for s in prof["sessions"])
-    turns = sorted(s["turns"] for s in prof["sessions"])
+    s = d["session"]
     add(f"\nSESSIONS (active time, gaps over {IDLE_CAP_MIN} min excluded)  "
-        f"median {_pct(minutes, .5):.0f} min  p90 {_pct(minutes, .9):.0f} min  "
-        f"longest {minutes[-1] / 60:.1f} h;  median turns {_pct(turns, .5)}  "
-        f"p90 {_pct(turns, .9)}")
-    add(f"sub-agent turns: {prof['sidechain_turns'] / prof['turns']:.1%}")
+        f"median {s['median_min']:.0f} min  p90 {s['p90_min']:.0f} min  "
+        f"longest {s['longest_min'] / 60:.1f} h;  median turns "
+        f"{s['median_turns']}  p90 {s['p90_turns']}")
+    add(f"sub-agent turns: {d['subagent_share']:.1%}")
     add("\nTOP TOOLS  " + ", ".join(
-        f"{k} {v:,}" for k, v in prof["tools"].most_common(10)))
+        f"{r['name']} {r['count']:,}" for r in d["tools"]))
     return "\n".join(lines)
 
 
@@ -515,7 +568,8 @@ def main(argv=None):
             print(f"no usage found under {args.root or claude_history.LOG_ROOT}")
             return 1
         with open(args.export_shard, "w") as handle:
-            json.dump(to_shard(own, machine, now), handle,
+            json.dump(to_shard(own, machine, now,
+                               machine_identity.display_name()), handle,
                       separators=(",", ":"), sort_keys=True)
         os.chmod(args.export_shard, 0o600)
         print(f"wrote {args.export_shard}  (counts; keep it between your own Macs)")

@@ -75,6 +75,7 @@ import posthog_usage
 import quota_samples
 import sentry_alerts
 import sources_config
+import study_service
 import supabase_usage
 import usb_bridge
 import vercel_builds
@@ -2041,6 +2042,7 @@ class Handler(BaseHTTPRequestHandler):
                         "/agents/claude/config", "/agents/codex/task",
                         "/agents/tasks",
                         "/machines/config",
+                        "/study", "/study/shard",
                         "/attention/events"):
             self.send_error(404)
             return
@@ -2122,6 +2124,20 @@ class Handler(BaseHTTPRequestHandler):
                 return
             self._send_json(200, icloud_sync.configuration())
             return
+        if path in ("/study", "/study/shard"):
+            # Usage habits, friends' cards and per-Mac counts. Personal, and
+            # not for the LAN, the phone or the board. Class 1 (docs/trust.md).
+            if not self._is_loopback():
+                self._send_json(403, {"ok": False, "error": "localhost only"})
+                return
+            if path == "/study":
+                self._send_json(200, study_service.get().snapshot())
+                return
+            try:
+                self._send_json(200, study_service.get().export_shard())
+            except study_service.StudyError as error:
+                self._send_json(409, {"ok": False, "error": str(error)})
+            return
         if path == "/agents/claude/config":
             if not self._is_loopback():
                 self._send_json(403, {"ok": False, "error": "localhost only"})
@@ -2196,6 +2212,34 @@ class Handler(BaseHTTPRequestHandler):
         usage, device = _bodies()
         self._send_bytes(200, device if view == "device" else usage)
 
+    def _study_post(self, path, payload):
+        """Mutations for the usage study. Every one is loopback-only."""
+        service = study_service.get()
+        try:
+            if path == "/study/handle":
+                result = service.set_handle(payload.get("handle"))
+            elif path == "/study/friends":
+                result = service.add_friend(payload.get("card"))
+            elif path == "/study/friends/alias":
+                result = service.set_alias(payload.get("id"),
+                                           payload.get("alias"))
+            elif path == "/study/friends/remove":
+                result = service.remove_friend(payload.get("id"))
+            elif path == "/study/shard":
+                result = service.import_shard(payload)
+            elif path == "/study/shard/remove":
+                result = service.remove_shard(payload.get("machine"))
+            elif path == "/study/refresh":
+                service.refresh()
+                result = {"ok": True}
+            else:
+                self.send_error(404)
+                return
+        except study_service.StudyError as error:
+            self._send_json(400, {"ok": False, "error": str(error)})
+            return
+        self._send_json(200, result)
+
     def do_POST(self):
         if self._is_browser_cross_origin():
             self._send_json(403, {"ok": False, "error": "cross-site request"})
@@ -2240,6 +2284,13 @@ class Handler(BaseHTTPRequestHandler):
             "/agents/tasks",
             "/machines/config",
             "/machines/sync",
+            "/study/handle",
+            "/study/friends",
+            "/study/friends/alias",
+            "/study/friends/remove",
+            "/study/shard",
+            "/study/shard/remove",
+            "/study/refresh",
         ) and event_response_id is None:
             if claude_permission or claude_question or claude_event:
                 pass
@@ -2311,6 +2362,11 @@ class Handler(BaseHTTPRequestHandler):
             if not self._is_loopback():
                 self._send_json(403, {"ok": False, "error": "localhost only"})
                 return
+        elif path.startswith("/study/"):
+            # Imports a stranger's card and writes to ~/.headroom/study.
+            if not self._is_loopback():
+                self._send_json(403, {"ok": False, "error": "localhost only"})
+                return
         elif claude_permission or claude_question or claude_event:
             if not self._is_loopback():
                 self._send_json(403, {"ok": False, "error": "localhost only"})
@@ -2328,8 +2384,11 @@ class Handler(BaseHTTPRequestHandler):
             # handful of peers clears 4096 immediately. Same ceiling as the
             # hook payloads rather than a third number to keep in step.
             bulk = (claude_permission or claude_question or claude_event
-                    or path == "/machines/sync")
+                    or path in ("/machines/sync", "/study/friends"))
             max_length = 128 * 1024 if bulk else 4096
+            if path == "/study/shard":
+                # Counts for months of sessions from another of your Macs.
+                max_length = 4 * 1024 * 1024
             if length <= 0 or length > max_length:
                 raise ValueError
             payload = json.loads(self.rfile.read(length))
@@ -2479,6 +2538,10 @@ class Handler(BaseHTTPRequestHandler):
             if result.get("adopted"):
                 publish()
             self._send_json(200, result)
+            return
+
+        if path.startswith("/study/"):
+            self._study_post(path, payload)
             return
 
         if path == "/machines/config":
