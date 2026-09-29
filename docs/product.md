@@ -199,3 +199,87 @@ never someone else's.
 
 This is not a limitation to fix. It is the assumption that lets the host skip
 identity entirely and lets loopback be free.
+
+It describes the **host**. It does not describe the **person**. Many people
+run Headroom on more than one Mac, and some want to compare with a friend. The
+next section records what changed for that, and what did not.
+
+## Friends, cards and the usage study
+
+Decided 2026-09-29. Two things now exist that are about a person and not about
+one Mac: the **stats card** (`host/study_card.py`) and the **usage study**
+(`host/usage_study.py`). Both read the Claude session logs and summarise how
+someone uses their agent: token mix, model families, time of day, prompt
+length, session length.
+
+What stays true: the host has one account, one token model, and free loopback.
+A friend is not a second user of your host. A card is a message you hand
+someone, not a login.
+
+What changes: the unit for this data is the **person**. That is why it is
+written down here. The rules below are what later work inherits.
+
+### Rules
+
+1. **Person, not Mac.** Usage on two Macs is disjoint sessions, so the merge is
+   a sum. Nothing is counted twice. This is not the quota problem in
+   [the unresolved one](#the-unresolved-one-whose-quota-is-it): a provider quota
+   is one pool seen from two places, and token usage is not.
+   - Merge **counts**, then round once. Rounded shares from two Macs cannot be
+     combined.
+   - One shard per machine id. If a machine appears twice, the newer stamp wins.
+     A stale copy cannot inflate a total.
+2. **Nothing leaves without being shown.** `usage_study.py` prints the exact
+   payload before anything is sent. A card holds shares in 5% steps, wide bins,
+   and no counts. A shard holds counts and is for your own Macs only.
+3. **Consent is separate from diagnostics.** Diagnostics are on by default and
+   cannot follow a Mac across weeks, on purpose
+   ([telemetry.md](telemetry.md)). The study is opt-in and off by default. A
+   card is sent by hand, by the person who made it.
+4. **Names and behaviour never join.** The card id is random and belongs to
+   friends. A study id, if one exists, belongs to the study. Neither is reused
+   in the other. A Game Center player id never goes to our Worker.
+5. **A card is untrusted input.** `study_card.decode` is the only way one gets
+   in. A friend's handle reaches your menu bar, so it is cleaned, capped and
+   never rendered as markup. Importing changes config, so the import route is
+   Class 1 (loopback only) in [trust.md](trust.md). A card is not signed: it
+   proves nothing about who sent it.
+6. **Rank on output tokens, never on raw totals.** On the maintainer's own logs
+   98.4% of input is cache reads. A total is a measure of cache reuse. Any
+   dollar figure says it is an estimate ([metering.md](metering.md)).
+7. **Friends get numbers about usage and nothing else.** No attention events,
+   no ledger, no paths, no repository names, no agent controls.
+
+### The open question: counting people on the server
+
+The Community Pulse counts **weekly active Macs, not users**. Two Macs are two
+reports, by design ([telemetry.md](telemetry.md)). That was the right unit for
+"which releases are in use". It overstates people, and anyone with two Macs is
+counted twice. For a business case about *people* this matters, so the metric
+name must say "Macs" until this is settled.
+
+Seeing one person once needs one key for that person across their Macs. The
+multi-Mac rule forbids the easy way. **A machine writes only its own record**
+([multi-mac.md](multi-mac.md)), so a shared id cannot be copied between Macs.
+Three ways out:
+
+| Option | Cost |
+|---|---|
+| **A. Merge on your Macs, upload once.** One Mac is the uploader. It reads the other Macs' shards and sends one merged contribution. | Needs a way to choose the uploader, and shards to travel between Macs. |
+| **B. Each Mac uploads its own shard. The server sums them.** | Breaks rule 2. The server needs counts, not shares, and counts are the fingerprint. |
+| **C. Derive a shared id from something both Macs know.** | Anything both Macs know is stable, and a stable id lets the server follow a person. Rule 4 says no. |
+
+Recommendation: **A.** It keeps the server blind to how many Macs one person
+has, and it keeps counts on your own machines.
+
+Until this is decided, **the study uploads nothing**. The only way data leaves a
+Mac is a card that a person copies and sends themselves.
+
+### Not built yet
+
+- The friends store, local aliases, and the card import route.
+- Shard sync between Macs. It needs a CloudKit schema change and a Console
+  redeploy ([multi-mac.md](multi-mac.md)), so it is its own piece of work.
+- Game Center, the public board, and any Settings row for any of this.
+- A `docs/privacy.md` entry for cards. It goes in when a card can leave the app,
+  not before.
