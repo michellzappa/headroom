@@ -22,6 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var store: UsageStore?
     private var statusController: StatusItemController?
     private var welcomeController: WelcomeWindowController?
+    private var studyController: StudyWindowController?
     private var wakeObserver: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -94,6 +95,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor in self?.welcomeController?.show() }
+        }
+
+        let study = StudyWindowController()
+        studyController = study
+        NotificationCenter.default.addObserver(
+            forName: .headroomShowStudy,
+            object: nil,
+            queue: .main
+        ) { _ in
+            Task { @MainActor in study.show() }
         }
     }
 

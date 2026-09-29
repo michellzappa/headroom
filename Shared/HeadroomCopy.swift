@@ -842,6 +842,47 @@ enum HeadroomCopy {
     static let telemetryPending = "Pending locally"
     static let notAvailable = "Not available"
 
+    // MARK: Your usage
+    //
+    // The window that reads the Claude Code session logs on this Mac. See
+    // docs/product.md, "Friends, cards and the usage study", and the exception
+    // under "Percent is the only unit" in docs/glossary.md.
+
+    static let studyTitle = "Your usage"
+    static let studyReading =
+        "Reading your session logs. The first pass takes a few seconds."
+    static let studyEmpty = "No Claude Code sessions found on this Mac."
+    static let studyRemoteHost =
+        "This window reads the session logs on this Mac. Point Headroom at the host on this Mac to see it."
+    static let studyTurns = "Turns"
+    static let studyActiveDays = "Active days"
+    static let studyCacheHit = "Cache hit"
+    static let studyCacheHitCaption = "of input read from cache"
+    static let studyOutputPerInput = "Output per 1k input"
+    static let studyOutputTokens = "Output tokens"
+    static let studyEstimatedCost = "Estimated cost"
+    static let studyModels = "Models"
+    static let studyModelsCaption = "Share of output tokens"
+    static let studyOutputByMonth = "Output by month"
+    static let studyWhenYouWork = "When you work"
+    static let studyPromptLength = "Prompt length"
+    static let studyPromptLengthCaption = "Estimated tokens per prompt you typed"
+    static let studySessions = "Sessions"
+    static let studyTools = "Tools"
+    static let studyCard = "Your card"
+    static let studyCardHint =
+        "This is all a friend gets: shares in coarse steps, never counts, prompts, or paths. Nothing is sent. Copy the card and send it yourself."
+    static let studyHandle = "Name on your card"
+    static let studyCopyCard = "Copy card"
+    static let studyCopied = "Copied"
+    static let studySave = "Save"
+    static func studyCombined(_ count: Int) -> String {
+        "Combined from \(count) Macs"
+    }
+    static func studyEstimateNote(ratesChecked: String) -> String {
+        "Estimate at API prices as of \(ratesChecked). Not a bill."
+    }
+
     // MARK: Widget
 
     static let openToSync = "Open to sync"

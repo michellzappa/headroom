@@ -39,9 +39,12 @@ enum HeadroomFormat {
             ?? String(format: maximumFractionDigits > 0 ? "$%.2f" : "$%.0f", value)
     }
 
-    /// "1.2k" / "3.4M". Chart axes and traffic counts, where the exact figure
-    /// is not the point and the column is narrow.
+    /// "1.2k" / "3.4M" / "19.6B". Chart axes and traffic counts, where the
+    /// exact figure is not the point and the column is narrow.
     static func compact(_ value: Int) -> String {
+        if value >= 1_000_000_000 {
+            return String(format: "%.1fB", Double(value) / 1_000_000_000)
+        }
         if value >= 1_000_000 {
             return String(format: "%.1fM", Double(value) / 1_000_000)
         }

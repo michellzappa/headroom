@@ -32,6 +32,20 @@ no "credits", no token counts. If money ever lands on a surface (`host/pricing.p
 exists and is unused by the UI), it arrives as a second, separately labelled
 axis — it does not get to reuse these words.
 
+**The one exception: Your usage.** The Mac window that reads the Claude Code
+session logs (`StudyView`) is about the thing the paragraph above flattens
+away, so it shows **token counts** and an **estimated dollar figure**. It is
+not a quota surface, and it earns the exception by staying apart:
+
+- It shows nothing about a window, a pool, or a limit, and no percentage that
+  means headroom. Its percentages are shares of the person's own usage.
+- Dollars arrive as a second, separately labelled axis. The figure is always
+  called **Estimated cost** with the date the rates were checked, and it says
+  **Not a bill**, because it will not reconcile with a provider's page
+  (`docs/metering.md`, decision 4).
+- Token counts appear only there. Popover, menu bar, iPhone, widgets, watch and
+  board keep to percent.
+
 **Voice: second person, present tense, no first person.** Headroom says *you*
 and names things; it never says *we*, *our*, or *I*, and it never apologises.
 Actions are imperative (**Refresh all**, **Add a test row**), states are

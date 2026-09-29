@@ -475,6 +475,34 @@ struct HeadroomClient: Sendable {
         )
     }
 
+    // MARK: Usage study
+    //
+    // Loopback only on the host (docs/trust.md, Class 1): a client pointed at a
+    // remote host gets a 403 with "localhost only", which `send` surfaces as
+    // the message. The window checks `isLoopback` first and says so plainly.
+
+    /// The first call starts a scan of the session logs and answers with
+    /// `status: "scanning"`. Ask again a moment later.
+    func fetchStudy() async throws -> StudySnapshot {
+        let url = try base().appendingPathComponent("study")
+        let data = try await send(request(url, timeout: 8))
+        return try JSONDecoder().decode(StudySnapshot.self, from: data)
+    }
+
+    /// `nil` clears the handle, and the host falls back to a generated one.
+    func setStudyHandle(_ handle: String?) async throws -> StudyHandleResult {
+        let url = try base()
+            .appendingPathComponent("study")
+            .appendingPathComponent("handle")
+        let payload: [String: Any] = [
+            "handle": handle.map { $0 as Any } ?? NSNull(),
+        ]
+        let body = try JSONSerialization.data(withJSONObject: payload)
+        let data = try await send(request(
+            url, method: "POST", body: body, timeout: 5))
+        return try JSONDecoder().decode(StudyHandleResult.self, from: data)
+    }
+
     func fetchClaudeHookConfiguration() async throws
         -> ClaudeHookConfiguration {
         let url = try base()
