@@ -100,6 +100,30 @@ class DeduperTests(unittest.TestCase):
         self.assertTrue(deduper.accept(rec_b))
         self.assertTrue(deduper.accept(rec_a))
 
+    def _snap(self, mid, out):
+        return {"message": {"id": mid, "model": "claude-sonnet-4-5",
+                            "usage": {"input_tokens": 10, "output_tokens": out}},
+                "timestamp": "2026-06-26T23:01:31.706Z"}
+
+    def _billed(self, outs, mid="a"):
+        deduper = claude_history.MessageDeduper()
+        total_in = total_out = 0
+        for out in outs:
+            rec = self._snap(mid, out)
+            if deduper.accept(rec):
+                _, _, inp, o, *_ = claude_history.usage_from_record(rec)
+                total_in, total_out = total_in + inp, total_out + o
+        return total_in, total_out
+
+    def test_growing_snapshots_book_the_largest_once(self):
+        self.assertEqual(self._billed([5, 5, 5, 256]), (10, 256))
+
+    def test_a_trailing_zero_snapshot_never_lowers_the_total(self):
+        self.assertEqual(self._billed([2132, 2132, 0, 0]), (10, 2132))
+
+    def test_growth_is_booked_as_a_difference(self):
+        self.assertEqual(self._billed([5, 100, 256]), (10, 256))
+
 
 if __name__ == "__main__":
     unittest.main()

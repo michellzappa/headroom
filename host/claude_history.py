@@ -43,7 +43,8 @@ SESSION_GAP_S = 30 * 60
 RETENTION_DAYS = 400
 # 2: one assistant message is billed once, not once per content block. Bumping
 # discards stores written under the inflated count and rebuilds them.
-SCHEMA_VERSION = 2
+# 3: a message streamed as growing snapshots books its largest, not its first.
+SCHEMA_VERSION = 3
 
 _lock = threading.Lock()
 _state = None
@@ -105,6 +106,15 @@ class MessageDeduper:
     the life of the process, and lets a message straddle a read boundary
     without escaping the check.
 
+    Streaming is the exception to "every line repeats the same usage". Subagent
+    logs write several snapshots of one message whose `output_tokens` grow
+    (5, 5, 5, 256), so keeping the first books 5. A repeat that raises the
+    running maximum is therefore accepted, with its usage rewritten in place
+    to just the growth — input and cache zeroed, output the increase — so the
+    caller books the difference and the message totals its largest snapshot.
+    Max, not last: a few messages end in zero-token snapshots. State stays two
+    scalars, so the O(1) argument above still holds.
+
     Records with no `message.id` are always counted. Subagent runs carry their
     own distinct ids and are genuinely separate API calls, so they survive.
 
@@ -113,10 +123,11 @@ class MessageDeduper:
     whether a line is a repeat of the one before it. Both callers use both.
     """
 
-    __slots__ = ("_last",)
+    __slots__ = ("_last", "_peak")
 
     def __init__(self):
         self._last = None
+        self._peak = 0
 
     def accept(self, rec):
         """True if this record is a new message; False if it repeats the last."""
@@ -125,9 +136,16 @@ class MessageDeduper:
         message_id = (rec.get("message") or {}).get("id")
         if message_id is None:
             return True
+        usage = (rec.get("message") or {}).get("usage")
+        out = (usage.get("output_tokens", 0) or 0) if isinstance(usage, dict) else 0
         if message_id == self._last:
-            return False
+            if out <= self._peak:
+                return False
+            growth, self._peak = out - self._peak, out
+            rec["message"] = dict(rec["message"], usage={"output_tokens": growth})
+            return True
         self._last = message_id
+        self._peak = out
         return True
 
 
