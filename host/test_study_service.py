@@ -72,7 +72,9 @@ class SnapshotTests(ServiceCase):
         self.assertEqual(svc.snapshot()["insights"]["turns"], 10)   # too soon
         clock.t += study_service.MIN_RESCAN_S + 1
         svc.snapshot()
-        svc._thread.join()
+        thread = svc._thread          # a fast scan clears it before we look
+        if thread is not None:
+            thread.join()
         self.assertEqual(svc.snapshot()["insights"]["turns"], 30)
 
     def test_a_scan_failure_is_reported_not_raised(self):
