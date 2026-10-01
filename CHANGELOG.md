@@ -7,6 +7,25 @@ are not tracked here because they move on every commit.
 Add a section here before cutting a tag. `scripts/cut-release.sh` refuses to
 tag a version that has no entry.
 
+## 2.1.8 — 2026-10-01
+
+### Fixed
+
+- **Claude token counts no longer run about 3% low on subagent-heavy
+  machines.** Subagent logs write one message as several growing snapshots
+  (output 5, 5, 5, 256), and Headroom kept the first. It now books the
+  largest, so the message totals what it actually used. History rebuilds from
+  your Claude logs on first launch. Thanks to Anton for the full-tree
+  measurement behind this (#31).
+
+### Added
+
+- **Groundwork for Your usage.** A local study of your Claude logs (token mix,
+  model families, when you work), a Your usage window that shows it with a
+  shareable stats card, and friends' and other Macs' cards. Reads and sends
+  nothing beyond loopback; the popover button stays off until friends can be
+  added.
+
 ## 2.1.7 — 2026-09-27
 
 ### Fixed
