@@ -251,11 +251,13 @@ enum MeterIconRenderer {
             }
             // While the first poll is still out (or nothing is enabled),
             // draw three empty slots so the icon is never blank.
-            // Geometry fits MenuBarPlate.field (20px @2x): 4px bars, 4px gaps.
+            // With the tile, geometry fits MenuBarPlate.field (20px @2x): 4px
+            // bars, 4px gaps. Without it the whole 36px canvas is free, so
+            // the bars take the larger size they had before the tile.
             let barCount = windows.isEmpty ? 3 : windows.count
-            let barWidthPixels = 4
-            let barHeightPixels = 20
-            let gapPixels = 4
+            let barWidthPixels = tile ? 4 : 6
+            let barHeightPixels = tile ? 20 : 30
+            let gapPixels = tile ? 4 : 5
             let groupWidth =
                 barCount * barWidthPixels
                 + max(0, barCount - 1) * gapPixels
@@ -295,7 +297,8 @@ enum MeterIconRenderer {
             }
 
             if warning {
-                let pip = PixelRect(x: 24, y: 24, width: 8, height: 8)
+                let corner = tile ? 24 : 26
+                let pip = PixelRect(x: corner, y: corner, width: 8, height: 8)
                 let color = HeadroomPalette.nsAttention(attentionLevel)
                 color.setFill()
                 NSBezierPath(ovalIn: pip.rect).fill()
