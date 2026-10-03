@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "version": "2.2.3",
-  "published": "2026-10-03T21:21:13Z",
-  "url": "https://github.com/michellzappa/headroom/releases/download/v2.2.3/Headroom-macOS.zip",
-  "sha256": "157ece5e91936e3d826f58c5349af1ae89b2da410b8389019edbfa7831877a57",
-  "size": 7182230,
+  "version": "2.2.4",
+  "published": "2026-10-03T21:30:25Z",
+  "url": "https://github.com/michellzappa/headroom/releases/download/v2.2.4/Headroom-macOS.zip",
+  "sha256": "4b7d358417f26d6ec624533b256507e28cfa63eab10b0f39acf69badc7486b31",
+  "size": 7196350,
   "min_macos": "14.0",
-  "notes_md": "### Added\n\n- **Your usage counts Codex too.** Headroom reads your Codex session logs\n  beside your Claude Code ones. Each Codex model gets its own row in the\n  Codex colour, and the totals, charts and card cover both tools. Codex is\n  priced from OpenAI's published rates; a model with no published rate is\n  named and left out of the estimate.\n- **Cards carry every model.** A card with Codex models on it needs Headroom\n  2.2.3 or newer to read. A card with Claude models only still reads on older\n  versions."
+  "notes_md": "### Changed\n\n- **Settings has pages for Host, Calendar and Menu bar icon.** General had\n  grown too long. It now keeps day boundaries, open at login and updates.\n- **The tile behind the menu bar icon is optional, and off.** Without it the\n  icon follows your menu bar's light or dark text again, with the larger bars\n  it had before the tile. Turn it on in Settings, Menu bar icon.\n\n### Fixed\n\n- **Subscribing to the reset calendar works.** Calendar could not open the\n  link Settings gave it. The button now copies a link Calendar accepts and\n  opens Calendar; choose File, New Calendar Subscription, paste it, and set\n  Location to On My Mac."
 }
