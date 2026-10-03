@@ -842,6 +842,37 @@ enum HeadroomCopy {
     static let telemetryPending = "Pending locally"
     static let notAvailable = "Not available"
 
+    // MARK: Reset calendar
+    //
+    // Settings, General. The feed itself is host/reset_calendar.py; see
+    // docs/calendar.md.
+
+    static let calendarTitle = "Calendar"
+    static let calendarEnabled = "Serve a calendar of resets"
+    static let calendarResets = "Weekly and monthly resets"
+    static let calendarShortWindows = "Session resets too"
+    static let calendarResetAlert = "Alert for resets"
+    static let calendarExpiries = "Credits and grants that expire"
+    static let calendarExpiryAlert = "Alert for expiries"
+    static let calendarSubscribe = "Subscribe in Calendar"
+    static let calendarCopyLink = "Copy link"
+    static let calendarCopied = "Link copied."
+    static let calendarHint =
+        "Calendar reads the feed from this Mac, so set Location to On My Mac when you subscribe. A subscription stored in iCloud is read by Apple's servers, which cannot reach this Mac. Events move when a provider moves a reset."
+    static let calendarRemoteHost =
+        "The calendar is served by the host on this Mac. Point Headroom at that host to set it up."
+    static let calendarUnavailable =
+        "This host does not serve a calendar yet. Update Headroom."
+    static func calendarAlertLabel(_ minutes: Int?) -> String {
+        switch minutes {
+        case nil: "None"
+        case 0: "At the time"
+        case 60: "1 hour before"
+        case 1440: "1 day before"
+        case let m?: "\(m) minutes before"
+        }
+    }
+
     // MARK: Your usage
     //
     // The window that reads the Claude Code session logs on this Mac. See

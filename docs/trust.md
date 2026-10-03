@@ -58,6 +58,12 @@ valid host token gets 403 on all of them; `test_study_http.py` pins that.
 A card is untrusted input, and `study_card.decode` is the only way one gets in
 ([product.md](product.md#friends-cards-and-the-usage-study)).
 
+The reset calendar is here too: `/calendar.ics` and `/config/calendar`.
+Calendar.app cannot send a token, so the feed answers loopback with none and
+everyone else with 403. That is also why a subscription has to be stored On My
+Mac: one stored in iCloud is fetched by Apple's servers, which get nothing
+([calendar.md](calendar.md)).
+
 `/agents/tasks` is here because its read response names folders on this Mac and
 its write response starts a local executable. Both methods are loopback-only;
 the phone never uses this route.

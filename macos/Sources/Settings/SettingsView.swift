@@ -150,6 +150,10 @@ struct SettingsView: View {
     /// answers, which is also how a host predating the route stays read-only.
     @State var timezoneDraft = ""
     @State var timezoneMessage: String?
+    /// The reset calendar feed. Nil until /config/calendar answers, which is
+    /// also how a host predating the feed keeps the section read-only.
+    @State var calendarConfig: CalendarFeedConfiguration?
+    @State var calendarMessage: String?
     @State var mobileTokenMessage: String?
     @State var mobilePermissions = MobilePermissions.allEnabled
     @State var changingMobilePermission: MobilePermission?

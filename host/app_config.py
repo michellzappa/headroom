@@ -969,6 +969,52 @@ def set_icloud_sync(enabled=None, directory=None):
     return {"enabled": icloud_sync_enabled(), "directory": icloud_dir()}
 
 
+# The reset calendar feed (reset_calendar.py, docs/calendar.md). On by default:
+# it is served to loopback only and does nothing until someone subscribes.
+CALENDAR_DEFAULTS = {
+    "enabled": True,
+    "resets": True,
+    "short_windows": False,
+    "expiries": True,
+    "reset_alert_min": None,
+    "expiry_alert_min": 1440,
+}
+CALENDAR_ALERTS = (None, 0, 15, 60, 1440)
+
+
+def calendar_settings():
+    """The calendar feed options, defaults filled in, junk dropped."""
+    stored = get("calendar")
+    out = dict(CALENDAR_DEFAULTS)
+    if isinstance(stored, dict):
+        for key, default in CALENDAR_DEFAULTS.items():
+            value = stored.get(key, default)
+            if key.endswith("_alert_min"):
+                if value in CALENDAR_ALERTS and not isinstance(value, bool):
+                    out[key] = value
+            elif isinstance(value, bool):
+                out[key] = value
+    return out
+
+
+def set_calendar(updates):
+    """Merge `updates` into the calendar options. Returns them as stored."""
+    if not isinstance(updates, dict):
+        raise ValueError("calendar settings must be an object")
+    current = calendar_settings()
+    for key, value in updates.items():
+        if key not in CALENDAR_DEFAULTS:
+            raise ValueError(f"unknown calendar setting: {key}")
+        if key.endswith("_alert_min"):
+            if isinstance(value, bool) or value not in CALENDAR_ALERTS:
+                raise ValueError(f"{key} must be one of {CALENDAR_ALERTS}")
+        elif not isinstance(value, bool):
+            raise ValueError(f"{key} must be true or false")
+        current[key] = value
+    _persist(calendar=current)
+    return calendar_settings()
+
+
 def shared_config():
     """The synced subset of config.json, as stored (absent keys omitted).
 

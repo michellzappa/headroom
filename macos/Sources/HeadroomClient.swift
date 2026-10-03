@@ -733,6 +733,28 @@ struct HeadroomClient: Sendable {
         return try JSONDecoder().decode(TimezoneConfiguration.self, from: data)
     }
 
+    func fetchCalendarConfiguration() async throws -> CalendarFeedConfiguration {
+        let url = try base()
+            .appendingPathComponent("config")
+            .appendingPathComponent("calendar")
+        let data = try await send(request(url, timeout: 8))
+        return try JSONDecoder().decode(CalendarFeedConfiguration.self, from: data)
+    }
+
+    /// Change one or more calendar feed options, sent as a JSON object. The
+    /// host refuses an unknown key or an alert it does not offer with a 400.
+    @discardableResult
+    func setCalendarConfiguration(
+        _ body: Data
+    ) async throws -> CalendarFeedConfiguration {
+        let url = try base()
+            .appendingPathComponent("config")
+            .appendingPathComponent("calendar")
+        let data = try await send(request(
+            url, method: "POST", body: body, timeout: 10))
+        return try JSONDecoder().decode(CalendarFeedConfiguration.self, from: data)
+    }
+
     func fetchDeskDisplayConfiguration() async throws -> DeskDisplayConfiguration {
         let url = try base()
             .appendingPathComponent("config")
@@ -1001,6 +1023,24 @@ struct PlausibleConfiguration: Decodable, Sendable {
     var ok: Bool?
     var configured: Bool?
     var error: String?
+}
+
+/// `/config/calendar`: what `/calendar.ics` carries. See docs/calendar.md.
+struct CalendarFeedConfiguration: Decodable, Sendable, Equatable {
+    var enabled: Bool
+    var resets: Bool
+    var shortWindows: Bool
+    var expiries: Bool
+    /// Minutes before the event, 0 for at the time, nil for no alert.
+    var resetAlertMin: Int?
+    var expiryAlertMin: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case enabled, resets, expiries
+        case shortWindows = "short_windows"
+        case resetAlertMin = "reset_alert_min"
+        case expiryAlertMin = "expiry_alert_min"
+    }
 }
 
 struct TimezoneConfiguration: Decodable, Sendable {

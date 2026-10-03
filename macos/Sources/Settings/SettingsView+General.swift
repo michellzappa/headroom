@@ -7,6 +7,8 @@ extension SettingsView {
 
             timezoneSection
 
+            calendarSection
+
             Section {
                 menuBarIconPreview
                 Picker(HeadroomCopy.menuBarIcon, selection: $menuBarIconStyle) {

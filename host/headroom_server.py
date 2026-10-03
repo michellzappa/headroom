@@ -73,6 +73,7 @@ import parent_watch
 import plausible_usage
 import posthog_usage
 import quota_samples
+import reset_calendar
 import sentry_alerts
 import sources_config
 import study_service
@@ -1814,6 +1815,10 @@ def _plausible_config_payload():
     }
 
 
+def _calendar_config_payload():
+    return {"ok": True, **app_config.calendar_settings()}
+
+
 def _timezone_config_payload():
     return {
         "ok": True,
@@ -2059,6 +2064,7 @@ class Handler(BaseHTTPRequestHandler):
                         "/config/plausible", "/config/posthog",
                         "/config/sentry", "/config/datadog", "/config/axiom",
                         "/config/timezone", "/config/display",
+                        "/config/calendar", "/calendar.ics",
                         "/agents/capabilities", "/agents/config",
                         "/agents/claude/config", "/agents/codex/task",
                         "/agents/tasks",
@@ -2069,6 +2075,29 @@ class Handler(BaseHTTPRequestHandler):
             return
         if not self._allowed():
             self._send_json(401, {"ok": False, "error": "token required"})
+            return
+        if path in ("/calendar.ics", "/config/calendar"):
+            # Loopback only. Calendar.app on this Mac is the one subscriber;
+            # it cannot send a token, and a LAN caller has no business reading
+            # this Mac's reset schedule off a URL.
+            if not self._is_loopback():
+                self._send_json(403, {"ok": False, "error": "localhost only"})
+                return
+            if path == "/config/calendar":
+                self._send_json(200, _calendar_config_payload())
+                return
+            options = app_config.calendar_settings()
+            if not options["enabled"]:
+                self.send_error(404)
+                return
+            body = reset_calendar.render(rollup(), options, time.time()) \
+                .encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/calendar; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
             return
         if path == "/github/watch":
             # Mac-local configuration, like the token it goes with.
@@ -2297,6 +2326,7 @@ class Handler(BaseHTTPRequestHandler):
             "/config/axiom",
             "/config/timezone",
             "/config/display",
+            "/config/calendar",
             "/accounts",
             "/agents/config",
             "/agents/claude/config",
@@ -2690,6 +2720,15 @@ class Handler(BaseHTTPRequestHandler):
                 return
             plausible_usage.invalidate()
             self._send_json(200, _plausible_config_payload())
+            return
+
+        if path == "/config/calendar":
+            try:
+                app_config.set_calendar(payload)
+            except ValueError as error:
+                self._send_json(400, {"ok": False, "error": str(error)})
+                return
+            self._send_json(200, _calendar_config_payload())
             return
 
         if path == "/config/timezone":
