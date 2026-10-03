@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "version": "2.1.7",
-  "published": "2026-09-27T17:42:51Z",
-  "url": "https://github.com/michellzappa/headroom/releases/download/v2.1.7/Headroom-macOS.zip",
-  "sha256": "edebb4e94e46170fdc52b16288dfec4a01696e9b3cf36e0c76b54604aadb95d2",
-  "size": 6515345,
+  "version": "2.1.8",
+  "published": "2026-10-03T20:42:03Z",
+  "url": "https://github.com/michellzappa/headroom/releases/download/v2.1.8/Headroom-macOS.zip",
+  "sha256": "6cd883ad20c1d2f3f700c76f095b6ed32e1fbc0b1c3528556f9c2c7705b5314b",
+  "size": 7028888,
   "min_macos": "14.0",
-  "notes_md": "### Fixed\n\n- **Headroom no longer asks for your keychain password over and over after\n  a Claude login dies.** It used to re-read the Claude Code Keychain item on\n  every retry, and each read prompts unless you chose Always Allow. It now\n  checks the item's modification date first and reads it again only after\n  `claude /login` rewrites it. A refresh token the server rejected is never\n  sent again, and more than 4 refreshes in 30 minutes stops refreshing until\n  you press Refresh.\n\n### Added\n\n- **Failing sources say what to do.** Every provider that stops updating now\n  shows one line of fix guidance under its error in the Mac popover and the\n  iPhone detail card (`fix` in `/usage`). `headroom.log` records when each\n  source starts failing, why, and when it recovers.\n- **Also in this release:** the menu bar icon draws its live tanks on a shared\n  16 pt dark plate, and the host tests run the same in CI as on a Mac."
+  "notes_md": "### Fixed\n\n- **Claude token counts no longer run about 3% low on subagent-heavy\n  machines.** Subagent logs write one message as several growing snapshots\n  (output 5, 5, 5, 256), and Headroom kept the first. It now books the\n  largest, so the message totals what it actually used. History rebuilds from\n  your Claude logs on first launch. Thanks to Anton for the full-tree\n  measurement behind this (#31).\n\n### Added\n\n- **Groundwork for Your usage.** A local study of your Claude logs (token mix,\n  model families, when you work), a Your usage window that shows it with a\n  shareable stats card, and friends' and other Macs' cards. Reads and sends\n  nothing beyond loopback; the popover button stays off until friends can be\n  added."
 }
