@@ -137,3 +137,62 @@ class ConfigTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CalendarHTTPTests(unittest.TestCase):
+    """The feed is loopback only, answers HEAD, and goes away when off."""
+
+    def setUp(self):
+        from unittest import mock
+        for patcher in (
+                mock.patch("headroom_server.rollup", return_value=doc()),
+                mock.patch("headroom_server.app_config.calendar_settings",
+                           side_effect=lambda: dict(self.options))):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.options = dict(DEFAULTS)
+
+    def test_get_and_head_from_loopback(self):
+        status, _, body = self.raw("GET")
+        self.assertEqual(status, 200)
+        self.assertIn(b"BEGIN:VCALENDAR", body)
+        status, _, body = self.raw("HEAD")
+        self.assertEqual(status, 200)
+        self.assertEqual(body, b"")
+
+    def test_lan_is_refused_even_with_a_token(self):
+        from unittest import mock
+        import headroom_server
+        with mock.patch.object(headroom_server.Handler, "_allowed",
+                               return_value=True):
+            status, _, _ = self.raw("GET", peer=("192.168.1.9", 4000))
+        self.assertEqual(status, 403)
+
+    def test_off_is_not_found(self):
+        self.options["enabled"] = False
+        status, _, _ = self.raw("GET")
+        self.assertEqual(status, 404)
+
+    def raw(self, method, peer=("127.0.0.1", 12345)):
+        import socket
+        from types import SimpleNamespace
+        import headroom_server
+        server, client = socket.socketpair()
+        try:
+            client.sendall(f"{method} /calendar.ics HTTP/1.0\r\n"
+                           "Host: localhost\r\n\r\n".encode())
+            client.shutdown(socket.SHUT_WR)
+            headroom_server.Handler(server, peer,
+                                    SimpleNamespace(server_port=8737))
+            server.close()
+            data = b""
+            while True:
+                chunk = client.recv(65536)
+                if not chunk:
+                    break
+                data += chunk
+        finally:
+            client.close()
+        head, _, body = data.partition(b"\r\n\r\n")
+        status = int(head.split(b" ", 2)[1])
+        return status, head, body

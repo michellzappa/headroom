@@ -2052,6 +2052,15 @@ class Handler(BaseHTTPRequestHandler):
             and permission in app_config.mobile_permissions()
         )
 
+    def do_HEAD(self):
+        """HEAD for the calendar feed only, which a calendar client may send
+        before GET to check the subscription. Every other route stays GET."""
+        path = urllib.parse.urlsplit(self.path).path.rstrip("/")
+        if path != "/calendar.ics":
+            self.send_error(501)
+            return
+        self.do_GET()
+
     def do_GET(self):
         if self._is_browser_cross_origin():
             self._send_json(403, {"ok": False, "error": "cross-site request"})
@@ -2097,7 +2106,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
-            self.wfile.write(body)
+            if self.command != "HEAD":
+                self.wfile.write(body)
             return
         if path == "/github/watch":
             # Mac-local configuration, like the token it goes with.
