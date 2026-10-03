@@ -7,6 +7,16 @@ are not tracked here because they move on every commit.
 Add a section here before cutting a tag. `scripts/cut-release.sh` refuses to
 tag a version that has no entry.
 
+## 2.2.0 — 2026-10-03
+
+### Added
+
+- **Your usage adds up your Macs on its own.** With Share settings between my
+  Macs on, each Mac sends its usage counts to the others, and Your usage
+  counts all of them with no file to move. The counts stay off the phone and
+  the desk display. Saving and adding a counts file still works for a Mac
+  with sync off.
+
 ## 2.1.9 — 2026-10-03
 
 ### Fixed
