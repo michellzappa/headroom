@@ -7,6 +7,16 @@ are not tracked here because they move on every commit.
 Add a section here before cutting a tag. `scripts/cut-release.sh` refuses to
 tag a version that has no entry.
 
+## 2.2.1 — 2026-10-03
+
+### Added
+
+- **A calendar of upcoming resets.** Headroom serves your next weekly and
+  monthly resets, and one event for each Codex credit at the time it
+  expires, with an alert a day before. Session resets are optional. Calendar
+  subscribes to it from this Mac, and events move when a provider moves a
+  reset. Settings has the options.
+
 ## 2.2.0 — 2026-10-03
 
 ### Added
