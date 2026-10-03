@@ -51,7 +51,8 @@ class SnapshotTests(ServiceCase):
         snap = svc.snapshot()
         self.assertEqual(snap["status"], "ready")
         self.assertEqual(snap["insights"]["turns"], 30)
-        self.assertTrue(snap["card_text"].startswith(study_card.PREFIX))
+        # Claude-only usage still makes a version 1 card, for older friends.
+        self.assertTrue(snap["card_text"].startswith("hrc1."))
         self.assertEqual(study_card.decode(snap["card_text"])["id"],
                          snap["card"]["id"])
         self.assertEqual(snap["payload"]["schema"], "study-1")

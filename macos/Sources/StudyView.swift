@@ -1,7 +1,7 @@
 import Charts
 import SwiftUI
 
-/// The "Your usage" window: what the Claude Code session logs on this Mac say
+/// The "Your usage" window: what the Claude Code and Codex session logs on this Mac say
 /// about how you work, and the card you can hand a friend.
 ///
 /// Everything here comes from `GET /study`. The host does the reading and the
@@ -155,7 +155,9 @@ struct StudyView: View {
                  "tokens")
             tile(HeadroomCopy.studyEstimatedCost,
                  HeadroomFormat.usd(i.costUsdEstimate),
-                 HeadroomCopy.studyEstimateNote(ratesChecked: i.ratesChecked))
+                 HeadroomCopy.studyEstimateNote(
+                     ratesChecked: i.ratesChecked,
+                     unpriced: i.unpricedModels ?? []))
         }
     }
 
@@ -176,11 +178,26 @@ struct StudyView: View {
 
     private func models(_ i: StudyInsights) -> some View {
         section(HeadroomCopy.studyModels, caption: HeadroomCopy.studyModelsCaption) {
+            let rows = i.models.sorted {
+                (Self.providerRank($0.family), -$0.outputShare)
+                    < (Self.providerRank($1.family), -$1.outputShare)
+            }
+            let grouped = Set(rows.map { Self.provider($0.family) }).count > 1
             VStack(spacing: 8) {
-                ForEach(i.models.sorted { $0.outputShare > $1.outputShare }) { model in
+                ForEach(Array(rows.enumerated()), id: \.element.id) { index, model in
+                    let provider = Self.provider(model.family)
+                    if grouped, index == 0
+                        || Self.provider(rows[index - 1].family) != provider {
+                        Text(HeadroomCopy.studyProviderName(provider))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, index == 0 ? 0 : 4)
+                    }
                     HStack(spacing: 10) {
                         Text(Self.familyName(model.family))
-                            .frame(width: 64, alignment: .leading)
+                            .lineLimit(1)
+                            .frame(width: 110, alignment: .leading)
                         GeometryReader { proxy in
                             ZStack(alignment: .leading) {
                                 Capsule().fill(.primary.opacity(0.08))
@@ -209,6 +226,7 @@ struct StudyView: View {
             last.month == current
                 ? Self.monthLabel(last.month, withYear: spansYears) : nil
         }
+        let families = ordered(i.monthly.flatMap { $0.output.keys })
         return section(HeadroomCopy.studyOutputByMonth,
                        caption: HeadroomCopy.studyOutputByMonthCaption(
                            partialMonth: partial)) {
@@ -216,7 +234,7 @@ struct StudyView: View {
                 ForEach(Array(i.monthly.enumerated()), id: \.offset) { index, month in
                     // Family order, not key order, so each bar stacks the
                     // same way the legend reads.
-                    ForEach(Self.families.filter { month.output[$0] != nil },
+                    ForEach(families.filter { month.output[$0] != nil },
                             id: \.self) { family in
                         BarMark(
                             x: .value("Month", labels[index]),
@@ -227,8 +245,8 @@ struct StudyView: View {
                 }
             }
             .chartForegroundStyleScale(
-                domain: Self.families.map(Self.familyName),
-                range: Self.families.map(familyColor))
+                domain: families.map(Self.familyName),
+                range: families.map(familyColor))
             .chartXScale(domain: labels)
             .chartYAxis { compactYAxis }
             .chartYAxisLabel(HeadroomCopy.studyOutputTokens)
@@ -587,7 +605,7 @@ struct StudyView: View {
         let week = d?.weeklyModelShare.keys.sorted().last
         let shares = week.flatMap { d?.weeklyModelShare[$0] } ?? [:]
         return shareCell(
-            shares, order: Self.families,
+            shares, order: ordered(shares.keys),
             color: { _, key in familyColor(key) },
             text: Self.describe(shares, unit: nil))
     }
@@ -653,32 +671,81 @@ struct StudyView: View {
         }
     }
 
-    /// Largest tier first. This order sets the stack, the legend, and the
-    /// lightness ramp below.
-    static let families = ["fable", "opus", "sonnet", "haiku", "other"]
+    /// Claude's families, largest tier first. This order sets the stack, the
+    /// legend, and the lightness ramp below.
+    static let claudeFamilies = ["fable", "opus", "sonnet", "haiku"]
+
+    /// Which tool a family came from. The host sends Codex models by their
+    /// own id, so anything that is not a Claude family or "other" is Codex.
+    static func provider(_ family: String) -> String {
+        if claudeFamilies.contains(family) { return "claude" }
+        return family == "other" ? "other" : "codex"
+    }
+
+    static func providerRank(_ family: String) -> Int {
+        switch provider(family) {
+        case "claude": 0
+        case "codex": 1
+        default: 2
+        }
+    }
+
+    /// Codex models by your own output, most used first. Codex tiers have no
+    /// order Headroom knows, so use sets the shade ramp instead.
+    private var codexOrder: [String] {
+        (store.snapshot?.insights?.models ?? [])
+            .filter { Self.provider($0.family) == "codex" }
+            .sorted { $0.outputShare > $1.outputShare }
+            .map(\.family)
+    }
+
+    /// Any set of families in display order: Claude by tier, Codex by your
+    /// use (a friend's model you never used goes last, by name), then other.
+    private func ordered<S: Sequence>(_ keys: S) -> [String]
+        where S.Element == String {
+        let present = Set(keys)
+        let codex = codexOrder.filter(present.contains)
+            + present.filter {
+                Self.provider($0) == "codex" && !codexOrder.contains($0)
+            }.sorted()
+        return Self.claudeFamilies.filter(present.contains) + codex
+            + (present.contains("other") ? ["other"] : [])
+    }
+
+    private func sourceRGB(_ id: String) -> HeadroomPalette.RGB {
+        HeadroomPalette.providerComponents(
+            id: id,
+            accent: usage.snapshot.providers?
+                .first(where: { $0.id == id })?.accent)
+    }
 
     /// The Claude source's colour, as picked in Settings → Sources.
-    private var claudeRGB: HeadroomPalette.RGB {
-        HeadroomPalette.providerComponents(
-            id: "claude",
-            accent: usage.snapshot.providers?
-                .first(where: { $0.id == "claude" })?.accent)
-    }
+    private var claudeRGB: HeadroomPalette.RGB { sourceRGB("claude") }
 
     private var claudeTint: Color { HeadroomPalette.rgb(claudeRGB) }
 
-    /// Model families are tiers of one provider, so they share its hue and
-    /// step in lightness: Fable darker than the source colour, Opus at it,
-    /// Sonnet and Haiku lighter. Lightness carries the tier order, so the
-    /// shades read as one provider and still separate in a stacked bar.
+    /// Models of one tool share that tool's colour and step in lightness, so
+    /// the shades read as one provider and still separate in a stacked bar.
+    /// Claude steps by tier: Fable darker than the source colour, Opus at it,
+    /// Sonnet and Haiku lighter. Codex steps by use: the most used model at
+    /// the Codex colour, each next one lighter.
     private func familyColor(_ family: String) -> Color {
-        let base = claudeRGB
-        switch family {
-        case "fable": return Self.mix(base, toward: 0, by: 0.35)
-        case "opus": return HeadroomPalette.rgb(base)
-        case "sonnet": return Self.mix(base, toward: 255, by: 0.35)
-        case "haiku": return Self.mix(base, toward: 255, by: 0.6)
-        default: return HeadroomPalette.dim
+        switch Self.provider(family) {
+        case "claude":
+            let base = claudeRGB
+            switch family {
+            case "fable": return Self.mix(base, toward: 0, by: 0.35)
+            case "opus": return HeadroomPalette.rgb(base)
+            case "sonnet": return Self.mix(base, toward: 255, by: 0.35)
+            default: return Self.mix(base, toward: 255, by: 0.6)
+            }
+        case "codex":
+            // A friend's model you never used goes after all of yours.
+            let place = codexOrder.firstIndex(of: family) ?? codexOrder.count
+            return Self.mix(sourceRGB("codex"), toward: 255,
+                            by: min(0.75, 0.22 * CGFloat(place)))
+        default:
+            return HeadroomPalette.dim
         }
     }
 
@@ -689,8 +756,10 @@ struct StudyView: View {
                             c.b + (target - c.b) * t)
     }
 
+    /// "opus" → "Opus". A Codex model keeps its id ("gpt-6-luna"), which is
+    /// what Codex itself shows.
     static func familyName(_ family: String) -> String {
-        family.capitalized
+        provider(family) == "codex" ? family : family.capitalized
     }
 
     /// A share that rounds to 0% but is not zero reads as "<1%", so a visible

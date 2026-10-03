@@ -208,9 +208,17 @@ next section records what changed for that, and what did not.
 
 Decided 2026-09-29. Two things now exist that are about a person and not about
 one Mac: the **stats card** (`host/study_card.py`) and the **usage study**
-(`host/usage_study.py`). Both read the Claude session logs and summarise how
-someone uses their agent: token mix, model families, time of day, prompt
-length, session length.
+(`host/usage_study.py`). Both read the Claude Code and Codex session logs and
+summarise how someone uses their agents: token mix, models, time of day,
+prompt length, session length.
+
+Codex was added 2026-10-03. Its models are counted as their own families
+(`gpt-6-luna`), beside Claude's four, and everything else is one combined
+total. A card whose models are all Claude's is still version 1 (`hrc1.`), so a
+friend on an older build can read it; a card that names a Codex model is
+version 2 (`hrc2.`), and an older build refuses it as a newer version. A Codex
+model with no row in `pricing.OPENAI` is left out of the cost and named as
+unpriced, never priced at a guess.
 
 What stays true: the host has one account, one token model, and free loopback.
 A friend is not a second user of your host. A card is a message you hand

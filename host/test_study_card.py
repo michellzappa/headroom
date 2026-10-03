@@ -48,10 +48,13 @@ def raw_card(**changes):
     return card
 
 
-def encode_raw(obj):
+def encode_raw(obj, version=None):
+    """A card's text. The prefix follows the card's own `v` unless told."""
     body = base64.urlsafe_b64encode(
         json.dumps(obj, separators=(",", ":")).encode()).decode().rstrip("=")
-    return study_card.PREFIX + body
+    v = version if version is not None else (
+        obj.get("v", 1) if isinstance(obj, dict) else 1)
+    return f"hrc{v}." + body
 
 
 class HandleTests(unittest.TestCase):
@@ -153,7 +156,28 @@ class DecodeRefusesTests(unittest.TestCase):
         self.refuses(encode_raw(raw_card(id=CARD_ID.upper())))
         self.refuses(encode_raw(raw_card(week="2026-W99")))
         self.refuses(encode_raw(raw_card(week="today")))
-        self.refuses(encode_raw(raw_card(v=2)))
+        self.refuses(encode_raw(raw_card(v=3)))
+        # The prefix and the body must agree on the version.
+        self.refuses(encode_raw(raw_card(v=1), version=2))
+        self.refuses(encode_raw(raw_card(v=2), version=1))
+
+    def test_version_1_refuses_a_codex_model(self):
+        card = raw_card()
+        card["data"]["weekly_model_share"] = {"2026-W30": {"gpt-6-luna": 1.0}}
+        self.refuses(encode_raw(card))
+
+    def test_version_2_takes_codex_models_and_nothing_hostile(self):
+        card = raw_card(v=2)
+        card["data"]["weekly_model_share"] = {
+            "2026-W30": {"opus": 0.5, "gpt-6-luna": 0.3, "gpt-5.6-terra": 0.2}}
+        got = study_card.decode(encode_raw(card))
+        self.assertEqual(got["v"], 2)
+        for bad in ("GPT-6", "../etc", "x" * 40, "a b", "\u202e"):
+            card["data"]["weekly_model_share"] = {"2026-W30": {bad: 1.0}}
+            self.refuses(encode_raw(card))
+        card["data"]["weekly_model_share"] = {"2026-W30": {
+            f"m{i}": 0.05 for i in range(study_card.MAX_MODEL_BINS + 1)}}
+        self.refuses(encode_raw(card))
 
     def test_unknown_data_key_and_bin(self):
         card = raw_card()
@@ -292,3 +316,15 @@ class TwoMacTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CodexCardTests(unittest.TestCase):
+    def test_codex_usage_makes_a_version_2_card_that_decodes(self):
+        from test_usage_study import CodexTests, codex_session
+        prof = CodexTests().scan(codex_session())
+        card = study_card.build(prof, CARD_ID, "nightowl", NOW)
+        self.assertEqual(card["v"], 2)
+        text = study_card.encode(card)
+        self.assertTrue(text.startswith("hrc2."))
+        week = study_card.decode(text)["data"]["weekly_model_share"]
+        self.assertIn("gpt-6-luna", next(iter(week.values())))

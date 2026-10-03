@@ -892,14 +892,14 @@ enum HeadroomCopy {
 
     // MARK: Your usage
     //
-    // The window that reads the Claude Code session logs on this Mac. See
+    // The window that reads the Claude Code and Codex session logs on this Mac. See
     // docs/product.md, "Friends, cards and the usage study", and the exception
     // under "Percent is the only unit" in docs/glossary.md.
 
     static let studyTitle = "Your usage"
     static let studyReading =
         "Reading your session logs. The first pass takes a few seconds."
-    static let studyEmpty = "No Claude Code sessions found on this Mac."
+    static let studyEmpty = "No Claude Code or Codex sessions found on this Mac."
     static let studyRemoteHost =
         "This window reads the session logs on this Mac. Point Headroom at the host on this Mac to see it."
     static let studyTurns = "Turns"
@@ -934,7 +934,7 @@ enum HeadroomCopy {
     static let studyTabFriends = "Friends"
     static let studyAddFriend = "Add a friend"
     static let studyAddFriendHint =
-        "Paste the card a friend sent you. It shows how they use Claude Code in coarse steps. Adding one sends nothing anywhere."
+        "Paste the card a friend sent you. It shows how they use Claude Code and Codex in coarse steps. Adding one sends nothing anywhere."
     static let studyCardField = "Paste a card"
     static let studyAdd = "Add"
     static let studyPasteAndAdd = "Paste and add"
@@ -972,8 +972,18 @@ enum HeadroomCopy {
     static func studyCombined(_ count: Int) -> String {
         "Combined from \(count) Macs"
     }
-    static func studyEstimateNote(ratesChecked: String) -> String {
-        "Estimate at API prices as of \(ratesChecked). Not a bill."
+    static func studyEstimateNote(ratesChecked: String,
+                                  unpriced: [String] = []) -> String {
+        let note = "Estimate at API prices as of \(ratesChecked). Not a bill."
+        guard !unpriced.isEmpty else { return note }
+        return note + " Not priced: \(unpriced.joined(separator: ", "))."
+    }
+    static func studyProviderName(_ provider: String) -> String {
+        switch provider {
+        case "claude": "Claude Code"
+        case "codex": "Codex"
+        default: "Other"
+        }
     }
 
     // MARK: Widget

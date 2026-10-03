@@ -1,4 +1,4 @@
-"""Per-model token pricing for Claude Code usage accounting.
+"""Per-model token pricing for Claude Code and Codex usage accounting.
 
 Rates are USD per 1,000,000 tokens. Cache rates follow Anthropic's caching
 economics: cache read ~= 0.1x base input, 5m cache write ~= 1.25x base input,
@@ -77,3 +77,52 @@ def cost_usd(model, *, input_tokens=0, output_tokens=0,
         + cache_write_5m * per_tok_in * CACHE_WRITE_5M_MULT
         + cache_write_1h * per_tok_in * CACHE_WRITE_1H_MULT
     )
+
+
+# ---------------------------------------------------------------- OpenAI
+#
+# Codex models, for the usage study. Standard tier, USD per 1M tokens:
+# (input, cached input, output). OpenAI prices cached input per model rather
+# than as a fixed multiple, so it is a column here, not a multiplier.
+#
+# Checked against https://developers.openai.com/api/docs/pricing. Unlike the
+# Claude table there is no fallback: a Codex model missing here is unpriced
+# and reported as such, because no OpenAI tier is a safe default for another
+# (luna and astra differ 100x).
+
+OPENAI_RATES_CHECKED = "2026-10-03"
+
+OPENAI = {
+    "gpt-6-astra": (10.00, 1.00, 50.00),
+    "gpt-6.1-sol": (2.00, 0.10, 10.00),
+    "gpt-6-sol": (2.00, 0.20, 10.00),
+    "gpt-6-luna": (0.10, 0.01, 0.50),
+    "gpt-5.6-sol": (4.00, 0.40, 20.00),
+    "gpt-5.6-terra": (2.00, 0.20, 12.00),
+    "gpt-5.6-luna": (0.20, 0.02, 1.20),
+}
+
+
+def openai_rates(model):
+    """(input, cached, output) per 1M for a Codex model id, or None."""
+    if model in OPENAI:
+        return OPENAI[model]
+    # Dated snapshots ("gpt-6-luna-2026-09-01") price as their model. Longest
+    # key first, so "gpt-6.1-sol" never matches as "gpt-6".
+    for key in sorted(OPENAI, key=len, reverse=True):
+        if model and model.startswith(key + "-"):
+            return OPENAI[key]
+    return None
+
+
+def openai_cost_usd(model, *, input_tokens=0, cached_input=0, output_tokens=0):
+    """USD for one Codex turn, or None when the model has no rates here.
+
+    `input_tokens` is fresh input only, without the cached part.
+    """
+    rates = openai_rates(model)
+    if rates is None:
+        return None
+    rate_in, rate_cached, rate_out = rates
+    return (input_tokens * rate_in + cached_input * rate_cached
+            + output_tokens * rate_out) / 1_000_000

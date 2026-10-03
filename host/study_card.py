@@ -46,7 +46,13 @@ from datetime import datetime
 
 import usage_study
 
-CARD_VERSION = 1
+# Version 2 lets a card's model shares name Codex models as well as Claude's
+# four families. A card whose models are all Claude's still goes out as
+# version 1, byte for byte what an older build expects, so a friend who has
+# not updated can read it. Only a card that needs version 2 uses it, and an
+# older build refuses that one as "a newer version", which is true.
+CARD_VERSION = 2
+VERSIONS = (1, 2)
 PREFIX = "hrc%d." % CARD_VERSION
 MAX_ENCODED = 8192          # the real card is about 1 KB; this is a ceiling
 HANDLE_MAX = 24
@@ -64,6 +70,8 @@ _BINS = {
     "time_of_day_share": {name for name, _, _ in usage_study.TIME_BLOCKS},
 }
 _MODELS = set(usage_study.FAMILIES) | {usage_study.OTHER}
+# Model bins one week of a version 2 card may carry. Real use is a handful.
+MAX_MODEL_BINS = 16
 _DATA_KEYS = set(_BINS) | {"cache_hit_bucket_pct", "weekly_model_share"}
 _CARD_KEYS = {"v", "id", "handle", "week", "data"}
 
@@ -131,19 +139,28 @@ def build(prof, card_id, handle=None, now=None):
     """A card from a profile. `now` is a datetime, so tests need no clock."""
     now = now or datetime.now().astimezone()
     year, week, _ = now.isocalendar()
+    data = {k: v for k, v in usage_study.payload(prof).items()
+            if k in _DATA_KEYS}
+    models = {m for row in data.get("weekly_model_share", {}).values()
+              for m in row}
     return {
-        "v": CARD_VERSION,
+        "v": 1 if models <= _MODELS else CARD_VERSION,
         "id": card_id,
         "handle": sanitize_handle(handle) or generated_handle(card_id),
         "week": f"{year}-W{week:02d}",
-        "data": {k: v for k, v in usage_study.payload(prof).items()
-                 if k in _DATA_KEYS},
+        "data": data,
     }
 
 
 def encode(card):
     raw = json.dumps(card, separators=(",", ":"), sort_keys=True)
-    return PREFIX + base64.urlsafe_b64encode(raw.encode()).decode().rstrip("=")
+    return ("hrc%d." % card["v"]
+            + base64.urlsafe_b64encode(raw.encode()).decode().rstrip("="))
+
+
+def _model_bin(key):
+    """Is `key` a model a version 2 card may name? Claude's or a Codex id."""
+    return key in _MODELS or bool(usage_study.CODEX_FAMILY.match(key))
 
 
 def _share_map(name, value, allowed):
@@ -157,7 +174,7 @@ def _share_map(name, value, allowed):
             raise CardError(f"{name}: share for {key!r} is not in 0..1")
 
 
-def _check_data(data):
+def _check_data(data, version=1):
     if not isinstance(data, dict) or set(data) - _DATA_KEYS:
         raise CardError("data has unknown keys")
     for name, allowed in _BINS.items():
@@ -173,7 +190,14 @@ def _check_data(data):
     for week, row in weeks.items():
         if not isinstance(week, str) or not _WEEK.match(week):
             raise CardError(f"bad week {week!r}")
-        _share_map("weekly_model_share", row, _MODELS)
+        if version == 1:
+            _share_map("weekly_model_share", row, _MODELS)
+            continue
+        if isinstance(row, dict) and len(row) > MAX_MODEL_BINS:
+            raise CardError("weekly_model_share has too many models")
+        _share_map("weekly_model_share", row,
+                   {k for k in (row if isinstance(row, dict) else {})
+                    if isinstance(k, str) and _model_bin(k)})
 
 
 def decode(text):
@@ -183,9 +207,11 @@ def decode(text):
     text = text.strip()
     if len(text) > MAX_ENCODED:
         raise CardError("card is too large")
-    if not text.startswith(PREFIX):
+    prefix = next((f"hrc{v}." for v in VERSIONS
+                   if text.startswith(f"hrc{v}.")), None)
+    if prefix is None:
         raise CardError("not a Headroom card, or a newer version")
-    body = text[len(PREFIX):]
+    body = text[len(prefix):]
     try:
         raw = base64.urlsafe_b64decode(body + "=" * (-len(body) % 4))
         card = json.loads(raw.decode("utf-8"))
@@ -193,14 +219,14 @@ def decode(text):
         raise CardError("card is not readable") from exc
     if not isinstance(card, dict) or set(card) != _CARD_KEYS:
         raise CardError("card has the wrong fields")
-    if card["v"] != CARD_VERSION:
+    if card["v"] not in VERSIONS or f"hrc{card['v']}." != prefix:
         raise CardError("unsupported card version")
     if not isinstance(card["id"], str) or not _ID.match(card["id"]):
         raise CardError("bad card id")
     if not isinstance(card["week"], str) or not _WEEK.match(card["week"]):
         raise CardError("bad week")
     handle = sanitize_handle(card["handle"])
-    _check_data(card["data"])
+    _check_data(card["data"], card["v"])
     return {"v": card["v"], "id": card["id"],
             "handle": handle or generated_handle(card["id"]),
             "week": card["week"], "data": card["data"]}

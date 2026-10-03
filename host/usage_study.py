@@ -1,6 +1,7 @@
-"""Local usage study: how a person actually uses Claude Code, from the logs.
+"""Local usage study: how a person actually uses Claude Code and Codex, from the logs.
 
-Everything here runs on this Mac, over ~/.claude/projects. Nothing is served on
+Everything here runs on this Mac, over ~/.claude/projects and the Codex
+session logs under ~/.codex. Nothing is served on
 /usage, stored, or sent. It answers two questions:
 
   1. What does my own usage look like? (`profile` → `report`)
@@ -35,6 +36,7 @@ import collections
 import json
 import math
 import os
+import re
 from datetime import datetime
 from glob import glob
 
@@ -45,6 +47,20 @@ SCHEMA = "study-1"
 
 FAMILIES = ("opus", "sonnet", "haiku", "fable")
 OTHER = "other"
+
+# Codex writes one rollout file per session. `archived_sessions` is where the
+# app moves a session you archive; a file is in one place or the other.
+CODEX_ROOTS = (os.path.expanduser("~/.codex/sessions"),
+               os.path.expanduser("~/.codex/archived_sessions"))
+# A Codex model id becomes its own family. This is what a card will accept as
+# one, so a hand-made log cannot put arbitrary text on a friend's card.
+CODEX_FAMILY = re.compile(r"^[a-z0-9][a-z0-9.-]{0,31}$")
+# Codex's approval reviewer. It runs beside your session, so its turns count as
+# sub-agent turns, like Claude's sidechains.
+CODEX_REVIEWER = "codex-auto-review"
+# User messages Codex injects itself. What is left is what a person typed.
+CODEX_INJECTED = ("<", "# AGENTS.md instructions",
+                  "The following is the Codex agent history")
 
 # A gap between two log records longer than this is idle time, not work. Wall
 # clock from first to last record measured a resumed session as 887 hours.
@@ -76,6 +92,20 @@ def model_family(model):
     if len(parts) > 1 and parts[0] == "claude" and parts[1] in FAMILIES:
         return parts[1]
     return OTHER
+
+
+def codex_family(model):
+    """'gpt-6-luna' -> 'gpt-6-luna'. Anything not shaped like a model id is 'other'."""
+    name = (model or "").strip().lower()
+    return name if CODEX_FAMILY.match(name) and name not in FAMILIES \
+        and name != OTHER else OTHER
+
+
+def provider_of(family):
+    """Which tool a family came from: 'claude', 'codex' or 'other'."""
+    if family in FAMILIES:
+        return "claude"
+    return "other" if family == OTHER else "codex"
 
 
 def bucket(n):
@@ -175,6 +205,9 @@ def _blank():
         "hours": collections.Counter(),
         "weekdays": collections.Counter(),
         "tools": collections.Counter(),
+        # Output tokens by family that have no rates, so the cost estimate can
+        # say what it left out instead of pricing it at a guess.
+        "unpriced": collections.Counter(),
         "sessions": [],
     }
 
@@ -230,25 +263,8 @@ def _scan_file(path, tz, prof):
             except (OverflowError, OSError, ValueError):
                 continue
 
-            fam = model_family(model)
-            everything = inp + out + cache_read + w5 + w1h
-            year, week, _ = local.isocalendar()
-            prof["turns"] += 1
-            prof["input"] += inp
-            prof["output"] += out
-            prof["cache_read"] += cache_read
-            prof["cache_write"] += w5 + w1h
-            prof["cost_usd"] += cost
-            prof["out_by_family"][fam] += out
-            prof["all_by_family"][fam] += everything
-            prof["out_by_month"][local.strftime("%Y-%m")][fam] += out
-            prof["out_by_week"][f"{year}-W{week:02d}"][fam] += out
-            prof["daily_tokens"][local.date().isoformat()] += everything
-            prof["out_hist"][bucket(out)] += 1
-            prof["hours"][local.hour] += 1
-            prof["weekdays"][local.weekday()] += 1
-            if rec.get("isSidechain"):
-                prof["sidechain_turns"] += 1
+            _book(prof, local, model_family(model), inp, out, cache_read,
+                  w5 + w1h, cost, sidechain=bool(rec.get("isSidechain")))
             for name in _tool_names(rec):
                 prof["tools"][name] += 1
             s_turns += 1
@@ -258,17 +274,191 @@ def _scan_file(path, tz, prof):
             {"active_min": active, "turns": s_turns, "prompts": s_prompts})
 
 
-def profile(root=None, tz=None):
-    """Fold every session file under `root` into one profile. None if empty."""
+def _book(prof, local, fam, inp, out, cache_read, cache_write, cost,
+          sidechain=False):
+    """Add one model response to the profile. Shared by both log formats."""
+    everything = inp + out + cache_read + cache_write
+    year, week, _ = local.isocalendar()
+    prof["turns"] += 1
+    prof["input"] += inp
+    prof["output"] += out
+    prof["cache_read"] += cache_read
+    prof["cache_write"] += cache_write
+    prof["cost_usd"] += cost
+    prof["out_by_family"][fam] += out
+    prof["all_by_family"][fam] += everything
+    prof["out_by_month"][local.strftime("%Y-%m")][fam] += out
+    prof["out_by_week"][f"{year}-W{week:02d}"][fam] += out
+    prof["daily_tokens"][local.date().isoformat()] += everything
+    prof["out_hist"][bucket(out)] += 1
+    prof["hours"][local.hour] += 1
+    prof["weekdays"][local.weekday()] += 1
+    if sidechain:
+        prof["sidechain_turns"] += 1
+
+
+_CODEX_FIELDS = ("input_tokens", "cached_input_tokens",
+                 "cache_write_input_tokens", "output_tokens")
+
+
+def _codex_usage(info, prev):
+    """This response's usage from a `token_count` event, or None.
+
+    Codex logs running totals per session and repeats an event now and then,
+    so the delta from the previous total is the response. A total that went
+    down means the session was compacted and the count restarted; then the
+    event's own `last_token_usage` is the response.
+    """
+    total = info.get("total_token_usage")
+    if not isinstance(total, dict):
+        return None, prev
+    if prev is not None:
+        delta = {k: _int(total.get(k)) - _int(prev.get(k)) for k in _CODEX_FIELDS}
+        if all(v >= 0 for v in delta.values()):
+            return (delta if any(delta.values()) else None), total
+    last = info.get("last_token_usage")
+    if not isinstance(last, dict):
+        return None, total
+    return {k: _int(last.get(k)) for k in _CODEX_FIELDS}, total
+
+
+def _int(value):
+    if isinstance(value, bool) or not isinstance(value, (int, float)) \
+            or value < 0:
+        return 0
+    return int(value)
+
+
+def _codex_text(payload):
+    parts = payload.get("content")
+    if not isinstance(parts, list):
+        return ""
+    return "".join(b.get("text", "") for b in parts
+                   if isinstance(b, dict) and isinstance(b.get("text"), str))
+
+
+def _scan_codex_file(path, tz, prof):
+    """One Codex rollout file into the profile.
+
+    OpenAI counts cached input inside `input_tokens` and reasoning inside
+    `output_tokens`, so fresh input is input minus the cached and written
+    parts, and output is taken as logged.
+    """
+    model = None
+    prev = None
+    first = last = None
+    active = 0.0
+    s_turns = s_prompts = 0
+    try:
+        handle = open(path, "r", errors="replace")
+    except OSError:
+        return
+    with handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                continue
+            if not isinstance(rec, dict):
+                continue
+            payload = rec.get("payload")
+            if not isinstance(payload, dict):
+                continue
+
+            when = _ts(rec)
+            if when:
+                if last:
+                    gap = (when - last).total_seconds() / 60
+                    if 0 < gap <= IDLE_CAP_MIN:
+                        active += gap
+                first = first or when
+                last = when
+
+            kind = rec.get("type")
+            if kind == "turn_context":
+                if isinstance(payload.get("model"), str):
+                    model = payload["model"]
+                continue
+            if kind == "response_item":
+                ptype = payload.get("type")
+                if ptype == "message" and payload.get("role") == "user":
+                    text = _codex_text(payload)
+                    head = text.lstrip("\n")
+                    if text and not head.startswith(CODEX_INJECTED):
+                        tokens = len(text) // CHARS_PER_TOKEN
+                        if tokens:
+                            prof["prompt_hist"][bucket(tokens)] += 1
+                            s_prompts += 1
+                elif ptype in ("function_call", "custom_tool_call"):
+                    name = str(payload.get("name") or "?")
+                    space = str(payload.get("namespace") or "")
+                    prof["tools"][
+                        "mcp" if space.startswith("mcp__")
+                        or name.startswith("mcp__") else name] += 1
+                continue
+            if kind != "event_msg" or payload.get("type") != "token_count":
+                continue
+            info = payload.get("info")
+            if not isinstance(info, dict):
+                continue
+            usage, prev = _codex_usage(info, prev)
+            if usage is None or when is None:
+                continue
+            try:
+                local = when.astimezone(tz)
+            except (OverflowError, OSError, ValueError):
+                continue
+            cached = usage["cached_input_tokens"]
+            written = usage["cache_write_input_tokens"]
+            fresh = max(0, usage["input_tokens"] - cached - written)
+            out = usage["output_tokens"]
+            fam = codex_family(model)
+            cost = pricing.openai_cost_usd(
+                model, input_tokens=fresh + written, cached_input=cached,
+                output_tokens=out)
+            if cost is None:
+                prof["unpriced"][fam] += out
+                cost = 0.0
+            _book(prof, local, fam, fresh, out, cached, written, cost,
+                  sidechain=model == CODEX_REVIEWER)
+            s_turns += 1
+
+    if first and s_turns:
+        prof["sessions"].append(
+            {"active_min": active, "turns": s_turns, "prompts": s_prompts})
+
+
+def _codex_paths(roots):
+    """Every rollout file under `roots`, once each by file name."""
+    seen = {}
+    for root in roots or ():
+        for path in glob(os.path.join(root, "**", "*.jsonl"), recursive=True):
+            seen.setdefault(os.path.basename(path), path)
+    return sorted(seen.values())
+
+
+def profile(root=None, tz=None, codex_roots=()):
+    """Fold every session file into one profile. None if empty.
+
+    `root` is the Claude Code log tree. `codex_roots` are Codex session trees,
+    empty by default so a caller that names a Claude tree reads nothing else;
+    the service passes CODEX_ROOTS.
+    """
     root = root or claude_history.LOG_ROOT
     tz = tz or datetime.now().astimezone().tzinfo
     prof = _blank()
     paths = sorted(glob(os.path.join(root, "**", "*.jsonl"), recursive=True))
     for path in paths:
         _scan_file(path, tz, prof)
+    codex = _codex_paths(codex_roots)
+    for path in codex:
+        _scan_codex_file(path, tz, prof)
     if not prof["turns"]:
         return None
-    prof["files"] = len(paths)
+    prof["files"] = len(paths) + len(codex)
     return prof
 
 
@@ -278,7 +468,7 @@ SHARD_MAX_BYTES = 8 * 1024 * 1024
 _SCALARS = ("turns", "sidechain_turns", "input", "output", "cache_read",
             "cache_write", "files")
 _COUNTERS = ("out_by_family", "all_by_family", "daily_tokens", "prompt_hist",
-             "out_hist", "hours", "weekdays", "tools")
+             "out_hist", "hours", "weekdays", "tools", "unpriced")
 _NESTED = ("out_by_month", "out_by_week")
 _INT_KEYED = ("hours", "weekdays")
 
@@ -445,7 +635,12 @@ def insights(prof):
     everything_in = prof["input"] + prof["cache_read"] + prof["cache_write"]
     total_all = sum(prof["all_by_family"].values())
     total_out = prof["output"]
-    families = list(FAMILIES) + [OTHER]
+    # Every family that produced tokens, Claude's in tier order first, then
+    # Codex models by output, then other.
+    codex = sorted((f for f in prof["all_by_family"]
+                    if provider_of(f) == "codex"),
+                   key=lambda f: (-prof["out_by_family"][f], f))
+    families = list(FAMILIES) + codex + [OTHER]
     return {
         "machines": prof.get("machines", 1),
         "files": prof.get("files", 0),
@@ -462,9 +657,15 @@ def insights(prof):
         "output_per_1k_input": (round(1000 * prof["output"] / everything_in, 1)
                                 if everything_in else None),
         "cost_usd_estimate": round(prof["cost_usd"], 2),
-        "rates_checked": pricing.RATES_CHECKED,
+        # The older of the two tables, so the caption never claims fresher
+        # rates than the stalest one used.
+        "rates_checked": (min(pricing.RATES_CHECKED,
+                              pricing.OPENAI_RATES_CHECKED)
+                          if codex else pricing.RATES_CHECKED),
+        "unpriced_models": sorted(f for f, n in prof["unpriced"].items() if n),
         "models": [
             {"family": fam,
+             "provider": provider_of(fam),
              "output_share": (prof["out_by_family"][fam] / total_out
                               if total_out else 0.0),
              "total_share": prof["all_by_family"][fam] / total_all}

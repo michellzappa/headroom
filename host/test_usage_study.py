@@ -209,3 +209,117 @@ class PayloadTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ------------------------------------------------------------------ Codex
+
+
+def codex_rec(when, kind, payload):
+    return {"timestamp": stamp(when), "type": kind, "payload": payload}
+
+
+def codex_tokens(when, total, last=None):
+    def usage(t):
+        inp, cached, out = t
+        return {"input_tokens": inp, "cached_input_tokens": cached,
+                "cache_write_input_tokens": 0, "output_tokens": out,
+                "reasoning_output_tokens": 0, "total_tokens": inp + out}
+    return codex_rec(when, "event_msg", {
+        "type": "token_count",
+        "info": {"total_token_usage": usage(total),
+                 "last_token_usage": usage(last or total)}})
+
+
+def codex_user(when, text):
+    return codex_rec(when, "response_item", {
+        "type": "message", "role": "user",
+        "content": [{"type": "input_text", "text": text}]})
+
+
+def codex_session(model="gpt-6-luna"):
+    return [
+        codex_rec(at(9), "session_meta", {"id": "s"}),
+        codex_rec(at(9), "turn_context", {"model": model}),
+        codex_user(at(9), "<environment_context>cwd</environment_context>"),
+        codex_user(at(9), "# AGENTS.md instructions for /x"),
+        codex_user(at(9, 1), "fix the failing test please " * 4),
+        codex_rec(at(9, 2), "response_item",
+                  {"type": "custom_tool_call", "name": "apply_patch"}),
+        codex_rec(at(9, 2), "response_item",
+                  {"type": "function_call", "name": "js",
+                   "namespace": "mcp__cua_repl"}),
+        codex_tokens(at(9, 2), (1000, 800, 100)),
+        codex_tokens(at(9, 2), (1000, 800, 100)),          # a repeat
+        codex_tokens(at(9, 3), (3000, 2000, 300)),
+        # Compaction restarts the totals; the event's own last usage counts.
+        codex_tokens(at(9, 4), (500, 0, 50), last=(500, 0, 50)),
+        codex_rec(at(9, 4), "event_msg", {"type": "token_count", "info": None}),
+    ]
+
+
+class CodexTests(unittest.TestCase):
+    def scan(self, records, claude=None, model="gpt-6-luna"):
+        tmp = tempfile.mkdtemp()
+        codex = Path(tmp) / "codex"
+        write(codex, "2026/07/01/rollout-a.jsonl", records)
+        claude_root = Path(tmp) / "claude"
+        claude_root.mkdir()
+        if claude:
+            write(claude_root, "p/a.jsonl", claude)
+        return usage_study.profile(root=str(claude_root), tz=TZ,
+                                   codex_roots=(str(codex),))
+
+    def test_deltas_repeats_and_compaction(self):
+        prof = self.scan(codex_session())
+        self.assertEqual(prof["turns"], 3)
+        self.assertEqual(prof["output"], 100 + 200 + 50)
+        self.assertEqual(prof["cache_read"], 800 + 1200)
+        self.assertEqual(prof["input"], 200 + 800 + 500)
+        self.assertEqual(prof["out_by_family"]["gpt-6-luna"], 350)
+
+    def test_only_typed_prompts_count(self):
+        prof = self.scan(codex_session())
+        self.assertEqual(sum(prof["prompt_hist"].values()), 1)
+        self.assertEqual(prof["tools"]["apply_patch"], 1)
+        self.assertEqual(prof["tools"]["mcp"], 1)
+
+    def test_priced_from_the_openai_table(self):
+        prof = self.scan(codex_session())
+        luna = (1500 * 0.10 + 2000 * 0.01 + 350 * 0.50) / 1e6
+        self.assertAlmostEqual(prof["cost_usd"], luna, places=9)
+        self.assertEqual(sum(prof["unpriced"].values()), 0)
+
+    def test_unpriced_model_is_named_not_guessed(self):
+        prof = self.scan(codex_session(model="codex-auto-review"))
+        self.assertEqual(prof["cost_usd"], 0)
+        self.assertEqual(prof["unpriced"]["codex-auto-review"], 350)
+        self.assertEqual(prof["sidechain_turns"], 3)       # the reviewer
+        d = usage_study.insights(prof)
+        self.assertEqual(d["unpriced_models"], ["codex-auto-review"])
+
+    def test_combined_with_claude(self):
+        prof = self.scan(codex_session(),
+                         claude=[assistant(at(10), out=40)])
+        d = usage_study.insights(prof)
+        self.assertEqual(d["turns"], 4)
+        providers = {m["family"]: m["provider"] for m in d["models"]}
+        self.assertEqual(providers, {"opus": "claude", "gpt-6-luna": "codex"})
+        self.assertEqual(d["monthly"][0]["output"],
+                         {"opus": 40, "gpt-6-luna": 350})
+        self.assertEqual(d["files"], 2)
+
+    def test_hostile_model_name_is_other(self):
+        prof = self.scan(codex_session(model="../../Evil Model"))
+        self.assertEqual(set(prof["out_by_family"]), {"other"})
+
+    def test_a_named_claude_root_reads_no_codex_by_default(self):
+        tmp = tempfile.mkdtemp()
+        write(tmp, "p/a.jsonl", [assistant(at(10))])
+        self.assertEqual(usage_study.profile(root=tmp, tz=TZ)["turns"], 1)
+
+    def test_codex_survives_a_shard_round_trip(self):
+        prof = self.scan(codex_session(model="codex-auto-review"))
+        shard = usage_study.to_shard(prof, "m", "2026-07-01T10:00:00")
+        back = usage_study.from_shard(json.loads(json.dumps(shard)))
+        self.assertEqual(back["out_by_family"]["codex-auto-review"], 350)
+        self.assertEqual(back["unpriced"]["codex-auto-review"], 350)

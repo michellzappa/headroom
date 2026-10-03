@@ -49,6 +49,9 @@ struct StudyInsights: Decodable, Sendable {
     /// An estimate, always. It is the API price of the tokens, not a bill.
     var costUsdEstimate: Double
     var ratesChecked: String
+    /// Families with output but no rates, left out of the cost. Optional
+    /// because hosts before Codex support never sent it.
+    var unpricedModels: [String]?
     var models: [Model]
     var monthly: [Month]
     var weekly: [Week]
@@ -75,12 +78,15 @@ struct StudyInsights: Decodable, Sendable {
 
     struct Model: Decodable, Sendable, Identifiable {
         var family: String
+        /// `claude`, `codex` or `other`. Nil from hosts before Codex support,
+        /// which only ever sent Claude families.
+        var provider: String?
         var outputShare: Double
         var totalShare: Double
         var id: String { family }
 
         enum CodingKeys: String, CodingKey {
-            case family
+            case family, provider
             case outputShare = "output_share"
             case totalShare = "total_share"
         }
@@ -143,6 +149,7 @@ struct StudyInsights: Decodable, Sendable {
         case outputPer1kInput = "output_per_1k_input"
         case costUsdEstimate = "cost_usd_estimate"
         case ratesChecked = "rates_checked"
+        case unpricedModels = "unpriced_models"
         case dailyTokens = "daily_tokens"
         case promptLen = "prompt_len"
         case subagentShare = "subagent_share"
