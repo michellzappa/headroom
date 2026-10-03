@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "version": "2.2.2",
-  "published": "2026-10-03T21:12:02Z",
-  "url": "https://github.com/michellzappa/headroom/releases/download/v2.2.2/Headroom-macOS.zip",
-  "sha256": "9a1e059226ed5dbbd1f9d3f4349081e554c54501a930c316065cd1be98c1db22",
-  "size": 7151946,
+  "version": "2.2.3",
+  "published": "2026-10-03T21:21:13Z",
+  "url": "https://github.com/michellzappa/headroom/releases/download/v2.2.3/Headroom-macOS.zip",
+  "sha256": "157ece5e91936e3d826f58c5349af1ae89b2da410b8389019edbfa7831877a57",
+  "size": 7182230,
   "min_macos": "14.0",
-  "notes_md": "### Fixed\n\n- **The line under the rings says which ring it is about.** It now starts\n  with the source and window, as in \"Codex weekly: 50% left · resets today\n  23:00\", instead of reading as if it described every ring. Hover a ring to\n  learn what its dot means: where an even spend would put you now. Thanks to\n  Paul McKellar for the report."
+  "notes_md": "### Added\n\n- **Your usage counts Codex too.** Headroom reads your Codex session logs\n  beside your Claude Code ones. Each Codex model gets its own row in the\n  Codex colour, and the totals, charts and card cover both tools. Codex is\n  priced from OpenAI's published rates; a model with no published rate is\n  named and left out of the estimate.\n- **Cards carry every model.** A card with Codex models on it needs Headroom\n  2.2.3 or newer to read. A card with Claude models only still reads on older\n  versions."
 }
