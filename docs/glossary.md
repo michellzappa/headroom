@@ -219,6 +219,7 @@ push turned green, the word would stop distinguishing a shipped deploy from a
 | **Daily burn** | Per-day %-point burn across providers | `by_day` |
 | **% / day** | Unit subtitle for daily burn | — |
 | **Headroom rings** | Concentric usage + pace indicator | see `docs/rings.md` |
+| **Pace dot** | The dot on a ring: where an even spend would put usage now. The overview ring explains it in a tooltip | `pace_pct` |
 | **N% used** | The rings' reading | — |
 | **N% left** | The burndown's reading (remaining) | — |
 | **On pace** / **Over pace** | Whether the current burn lands inside the window | `verdict`, `headline` |

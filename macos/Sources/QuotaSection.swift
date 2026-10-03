@@ -50,6 +50,24 @@ struct QuotaOverviewCard: View {
         )
     }
 
+
+    /// The host's headline for the pool most worth showing, with the source
+    /// and window it describes in front. Without them, a line under several
+    /// rings ("50% left · resets today 23:00") reads as belonging to all of
+    /// them, and its clock sits next to ring captions that count down.
+    private var primaryLine: String? {
+        guard let primary = snapshot.burndownPrimary,
+              let headline = primary.headline, !headline.isEmpty
+        else { return nil }
+        let provider = snapshot.providers?.first { $0.id == primary.provider }
+        let source = [provider?.title ?? primary.provider, provider?.label]
+            .compactMap { $0 }
+            .joined(separator: " ")
+        let window = primary.pool.flatMap { provider?.pools?[$0]?.title }
+            ?? primary.pool
+        return HeadroomCopy.quotaPrimaryLine(
+            source: source, window: window, headline: headline)
+    }
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(HeadroomCopy.codingQuotas)
@@ -77,8 +95,8 @@ struct QuotaOverviewCard: View {
                 }
                 .measuredWidth($rowWidth)
             }
-            if let primary = snapshot.burndownPrimary, let headline = primary.headline {
-                Text(headline)
+            if let line = primaryLine {
+                Text(line)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -370,13 +388,17 @@ struct ProviderQuotaRing: View {
         // The rings no longer carry a printed percentage, so state it here
         // rather than leaving VoiceOver with just a provider name.
         .accessibilityValue(accessibilityReading)
+        .help(provider.isBalanceOnly ? "" : HeadroomCopy.ringHelp)
     }
 
     private var accessibilityReading: String {
         if provider.isBalanceOnly {
             return windowCaption
         }
-        return headline.percent.map { "\(Int($0.rounded())) percent used" } ?? "unknown"
+        guard let used = headline.percent else { return "unknown" }
+        let reading = "\(Int(used.rounded())) percent used"
+        guard let pace = headline.pacePercent else { return reading }
+        return "\(reading), even pace \(Int(pace.rounded())) percent"
     }
 
     /// Daily account-use sparkline for prepaid providers — not a remaining-

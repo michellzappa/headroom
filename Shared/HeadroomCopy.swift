@@ -842,6 +842,23 @@ enum HeadroomCopy {
     static let telemetryPending = "Pending locally"
     static let notAvailable = "Not available"
 
+    // MARK: Coding quotas
+
+    /// Tooltip on each ring in the overview. The dot is the one mark with no
+    /// label, and it is the one people ask about.
+    static let ringHelp =
+        "The arc is what you used. The dot is where an even spend would be now. An arc past the dot means you are ahead of pace."
+
+    /// The line under the rings, which describes one pool of one source.
+    static func quotaPrimaryLine(source: String, window: String?,
+                                 headline: String) -> String {
+        let owner = [source, window?.lowercased()]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        return owner.isEmpty ? headline : "\(owner): \(headline)"
+    }
+
     // MARK: Reset calendar
     //
     // Settings, General. The feed itself is host/reset_calendar.py; see

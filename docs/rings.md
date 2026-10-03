@@ -15,7 +15,13 @@ menu bar, and the desk display.
 - The dot is the expected usage at the current point in time. It rides inside
   the band and is sized off the band thickness, so it is the same dot on inner
   and outer rings. The distance between the arc and the dot shows whether usage
-  is ahead of or behind pace.
+  is ahead of or behind pace. Nothing on the ring labels the dot, so the
+  macOS overview ring says this in its tooltip and VoiceOver reads the pace
+  after the usage.
+- Any line of text that sits under more than one ring names the source and
+  window it describes ("Codex weekly: 50% left · resets today 23:00"). A ring's
+  own caption names its window and counts down ("Weekly · 3d 6h"); it never
+  shows a clock time.
 - Missing data draws a track without inventing zero usage.
 
 ## The combined dial (Apple Watch)
