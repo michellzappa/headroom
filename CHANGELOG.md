@@ -7,6 +7,16 @@ are not tracked here because they move on every commit.
 Add a section here before cutting a tag. `scripts/cut-release.sh` refuses to
 tag a version that has no entry.
 
+## 2.2.2 — 2026-10-03
+
+### Fixed
+
+- **The line under the rings says which ring it is about.** It now starts
+  with the source and window, as in "Codex weekly: 50% left · resets today
+  23:00", instead of reading as if it described every ring. Hover a ring to
+  learn what its dot means: where an even spend would put you now. Thanks to
+  Paul McKellar for the report.
+
 ## 2.2.1 — 2026-10-03
 
 ### Added
