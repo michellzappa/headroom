@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "version": "2.2.0",
-  "published": "2026-10-03T20:55:25Z",
-  "url": "https://github.com/michellzappa/headroom/releases/download/v2.2.0/Headroom-macOS.zip",
-  "sha256": "8e028f2e3d6101d78b707dd712573b4d6d7e678734e0de764bc0a430ac48784a",
-  "size": 7072476,
+  "version": "2.2.1",
+  "published": "2026-10-03T21:04:08Z",
+  "url": "https://github.com/michellzappa/headroom/releases/download/v2.2.1/Headroom-macOS.zip",
+  "sha256": "d0740cee27332acaf6f350a2fa6341457fb273526942a5c655844507e2968413",
+  "size": 7145829,
   "min_macos": "14.0",
-  "notes_md": "### Added\n\n- **Your usage adds up your Macs on its own.** With Share settings between my\n  Macs on, each Mac sends its usage counts to the others, and Your usage\n  counts all of them with no file to move. The counts stay off the phone and\n  the desk display. Saving and adding a counts file still works for a Mac\n  with sync off."
+  "notes_md": "### Added\n\n- **A calendar of upcoming resets.** Headroom serves your next weekly and\n  monthly resets, and one event for each Codex credit at the time it\n  expires, with an alert a day before. Session resets are optional. Calendar\n  subscribes to it from this Mac, and events move when a provider moves a\n  reset. Settings has the options."
 }
