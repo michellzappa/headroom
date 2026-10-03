@@ -272,6 +272,45 @@ class TwoMacTests(ServiceCase):
         Path(shard_file).write_text("{not json")
         self.assertEqual(self.ready(desk)["insights"]["turns"], 5)
 
+    def test_synced_shards_add_up_and_are_marked(self):
+        laptop = self.mac("laptop", sample_records(n=10))
+        desk = self.mac("desk", sample_records(day=2, n=5, prefix="d"))
+        self.ready(laptop)
+        shard = laptop.own_shard()
+        self.assertEqual(desk.accept_synced([shard, None, "x", {}]), ["laptop"])
+        snap = self.ready(desk)
+        self.assertEqual(snap["insights"]["turns"], 15)
+        self.assertTrue(snap["machines"][1]["synced"])
+        self.assertFalse(snap["machines"][0].get("synced", False))
+
+    def test_an_unchanged_synced_shard_is_not_rewritten(self):
+        laptop = self.mac("laptop", sample_records(n=10))
+        desk = self.mac("desk", sample_records(day=2, n=5, prefix="d"))
+        self.ready(laptop)
+        shard = laptop.own_shard()
+        desk.accept_synced([shard])
+        self.assertEqual(desk.accept_synced([shard]), [])
+        older = dict(shard, generated="2000-01-01T00:00:00+00:00", turns=999)
+        self.assertEqual(desk.accept_synced([older]), [])
+        self.assertEqual(self.ready(desk)["insights"]["turns"], 15)
+
+    def test_own_shard_ignores_this_mac_coming_back(self):
+        desk = self.mac("desk", sample_records(n=5))
+        self.ready(desk)
+        self.assertEqual(desk.accept_synced([desk.own_shard()]), [])
+
+    def test_own_shard_is_stamped_with_the_scan_not_the_clock(self):
+        clock = Clock()
+        desk = self.mac("desk", sample_records(n=5), clock)
+        self.ready(desk)
+        first = desk.own_shard()
+        clock.t += 120
+        self.assertEqual(desk.own_shard(), first)
+
+    def test_own_shard_is_none_before_a_scan(self):
+        desk = self.mac("desk")
+        self.assertIsNone(self.ready(desk) and desk.own_shard())
+
     def test_the_mac_cap(self):
         desk = self.mac("desk", sample_records())
         old = study_service.MAX_SHARDS

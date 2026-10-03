@@ -291,6 +291,27 @@ Also never synced: anything describing one machine's disk or moment —
 `dev_root`, `codex_binary`, extra-account credential roots, the mobile pairing
 token, local servers, git commits, the Claude token log, attention events.
 
+## Usage counts travel, and are added up
+
+Each record also carries `study`: this Mac's usage-study shard, the counts
+from its own Claude Code session logs (`host/study_service.py`). Two Macs run
+disjoint sessions, so the honest merge is a sum, and "Your usage" shows one
+person instead of one machine without anyone moving a file.
+
+- The shard is stamped with its scan time, not the round's clock, so the
+  record only changes when the counts do. A round rescans the logs at most
+  once an hour (`SYNC_RESCAN_S`).
+- It is never in the beacon. The beacon is also this Mac's row in `/usage`,
+  which the phone and the board read; `_peer_view` copies a whitelist, so a
+  peer's shard never reaches `/usage` either.
+- A shard is tens of KB for a year of sessions, so `/machines/sync` takes
+  bodies up to 2 MB rather than the 128 KB hook ceiling.
+- The counts are exact. They go only where the record goes: the CloudKit
+  private database, or the folder the person chose.
+
+The file export and import in "Your usage" stay as the path for a Mac with
+sync off.
+
 ## PATs travel, by a different road
 
 Retyping a GitHub PAT on the second Mac is the chore this feature exists to

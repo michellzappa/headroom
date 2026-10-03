@@ -266,6 +266,26 @@ class CloudKitRoundTests(unittest.TestCase):
             ["not a dict", {}, {"id": 7}, None], now=1_000.0)
         self.assertEqual(result["peers"], [])
 
+    def test_study_rides_in_the_record_and_never_in_the_peer_view(self):
+        shard = {"version": 1, "machine": "peer-machine", "turns": 3}
+        peer = {"id": "peer-machine", "name": "Studio", "updated": 1_000.0,
+                "prefs": {}, "stamps": {}, "study": shard}
+        mine = {"version": 1, "machine": machine_identity.machine_id()}
+        result = icloud_sync.cloud_round([peer], now=1_010.0, study=mine)
+        self.assertEqual(result["record"]["study"], mine)
+        self.assertEqual(result["studies"], [shard])
+        self.assertNotIn("study", result["peers"][0])
+
+    def test_no_study_means_no_key(self):
+        result = icloud_sync.cloud_round([], now=1_000.0)
+        self.assertNotIn("study", result["record"])
+        self.assertEqual(result["studies"], [])
+
+    def test_folder_tick_off_never_builds_the_shard(self):
+        def boom():
+            raise AssertionError("built a shard with sync off")
+        self.assertFalse(icloud_sync.tick(now=1_000.0, study=boom)["enabled"])
+
     def test_record_fits_the_post_ceiling(self):
         """A full round of records must clear the handler's body limit."""
         record = icloud_sync.cloud_round([], now=1_000.0)["record"]

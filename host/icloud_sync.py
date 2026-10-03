@@ -41,6 +41,12 @@ accident. Also not synced: anything describing one machine's disk or moment —
 attention events. Those are *reported* per machine and shown with an owner,
 never merged. A merged list of local servers would be a fiction.
 
+One exception is added up, not merged: `study`, this Mac's usage-study shard
+(counts from its Claude Code session logs, see study_service.py). Usage on two
+Macs is disjoint sessions, so the sum is the honest total. It rides in the
+record and is handed back to the caller; it never reaches `/usage`, because
+`_peer_view` copies a whitelist.
+
 Stdlib only.
 """
 
@@ -337,7 +343,7 @@ def _write_own(record, now):
 # ------------------------------------------------------------------- round
 
 
-def _own_record(beacon, prefs, stamps, now):
+def _own_record(beacon, prefs, stamps, now, study=None):
     """This machine's published record. The same shape down either transport.
 
     A CloudKit record and a file on disk carry identical bytes on purpose: the
@@ -347,11 +353,13 @@ def _own_record(beacon, prefs, stamps, now):
     payload.update(machine_identity.describe())
     payload["prefs"] = prefs
     payload["stamps"] = stamps
+    if study is not None:
+        payload["study"] = study
     payload["updated"] = now
     return payload
 
 
-def sync(peers, beacon=None, now=None):
+def sync(peers, beacon=None, now=None, study=None):
     """One merge round against `peers`. Transport-neutral.
 
     Both transports land here. The folder reads its peers off disk; CloudKit
@@ -360,6 +368,8 @@ def sync(peers, beacon=None, now=None):
     so choosing a transport never means re-proving the merge.
 
     Returns the record this machine should publish, plus what it adopted.
+    `study` is this Mac's usage shard to publish; `studies` in the result are
+    the peers' shards, for the caller to hand to study_service.
     """
     now = time.time() if now is None else now
     peers = _dated(peers or [], now)
@@ -386,7 +396,9 @@ def sync(peers, beacon=None, now=None):
     return {
         "adopted": adopted,
         "peers": [_peer_view(peer, now) for peer in peers],
-        "record": _own_record(beacon, local, stamps, now),
+        "record": _own_record(beacon, local, stamps, now, study),
+        "studies": [peer["study"] for peer in peers
+                    if isinstance(peer.get("study"), dict)],
     }
 
 
@@ -412,7 +424,7 @@ def _dated(peers, now):
     return out
 
 
-def cloud_round(records, beacon=None, now=None):
+def cloud_round(records, beacon=None, now=None, study=None):
     """CloudKit round: peers in, this machine's record out.
 
     The Mac app owns the CloudKit half because only an entitled process can
@@ -421,12 +433,12 @@ def cloud_round(records, beacon=None, now=None):
     exists. So the app fetches changed records, posts them here, and saves back
     whatever this returns. It carries bytes and holds no opinion about them.
     """
-    result = sync(records, beacon=beacon, now=now)
+    result = sync(records, beacon=beacon, now=now, study=study)
     result["ok"] = True
     return result
 
 
-def tick(beacon=None, now=None):
+def tick(beacon=None, now=None, study=None):
     """Folder round, driven by the host's own loop.
 
     A no-op in CloudKit mode: there the app drives the schedule, because it is
@@ -439,7 +451,11 @@ def tick(beacon=None, now=None):
                 _peers.clear()
         return {"enabled": False, "peers": 0, "adopted": []}
 
-    result = sync(_read_peers(now), beacon=beacon, now=now)
+    # A callable, resolved only past the mode check: building the shard can
+    # start a scan of the session logs, which a Mac with sync off never needs.
+    if callable(study):
+        study = study()
+    result = sync(_read_peers(now), beacon=beacon, now=now, study=study)
     record = result["record"]
     wrote = _write_own(record, now)
     return {
@@ -447,6 +463,7 @@ def tick(beacon=None, now=None):
         "peers": len(result["peers"]),
         "adopted": result["adopted"],
         "wrote": wrote,
+        "studies": result["studies"],
     }
 
 

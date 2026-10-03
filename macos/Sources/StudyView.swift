@@ -412,11 +412,14 @@ struct StudyView: View {
                         Text(machine.name)
                         Text(machine.thisMac
                              ? HeadroomCopy.studyThisMac
-                             : "\(HeadroomCopy.studyAnotherMac), counts from \(machine.generated.map { String($0.prefix(10)) } ?? "an earlier day")")
+                             : "\(machine.isSynced ? HeadroomCopy.studySyncedMac : HeadroomCopy.studyAnotherMac), counts from \(machine.generated.map { String($0.prefix(10)) } ?? "an earlier day")")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Spacer()
-                        if !machine.thisMac {
+                        // A synced Mac comes back on the next round, so
+                        // Remove would only flicker. Turning sync off there
+                        // is what stops it.
+                        if !machine.thisMac && !machine.isSynced {
                             Button(HeadroomCopy.studyRemove) {
                                 Task { await store.removeMachine(machine.id) }
                             }

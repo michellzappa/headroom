@@ -901,7 +901,8 @@ enum HeadroomCopy {
     static let studyThisMac = "This Mac"
     static let studyAnotherMac = "Another Mac"
     static let studyMacsHint =
-        "Your usage adds up across your Macs. Save this Mac's counts, move the file to your other Mac, and add it there. The file holds exact counts, so keep it between your own Macs."
+        "Your usage adds up across your Macs. With Share settings between my Macs on (Settings, Other Macs), each Mac sends its counts to the others on its own. Without it, save this Mac's counts and add the file on your other Mac. The counts are exact, so keep them between your own Macs."
+    static let studySyncedMac = "Synced"
     static let studyExportCounts = "Save this Mac's counts"
     static let studyImportCounts = "Add another Mac's counts"
     static let studyExportPanelMessage =

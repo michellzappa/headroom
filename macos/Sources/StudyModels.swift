@@ -193,9 +193,14 @@ struct StudyMachine: Decodable, Sendable, Identifiable {
     var thisMac: Bool
     var hasUsage: Bool
     var generated: String?
+    /// Arrived in a multi-Mac sync record, not a file. Optional because older
+    /// hosts never sent it.
+    var synced: Bool?
+
+    var isSynced: Bool { synced ?? false }
 
     enum CodingKeys: String, CodingKey {
-        case id, name, generated
+        case id, name, generated, synced
         case thisMac = "this_mac"
         case hasUsage = "has_usage"
     }

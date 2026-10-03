@@ -16,7 +16,10 @@ data. This module is the stateful half, and it owns four things:
     never leaves this Mac.
   * **Peer shards.** The counts from your other Macs, so this Mac can show one
     person and not one machine. One file per Mac; a newer stamp replaces an
-    older one.
+    older one. They arrive two ways: a file the person carries over, or the
+    multi-Mac sync record (`icloud_sync`), which carries each Mac's shard
+    beside its settings. Nothing here makes that call; the sync round hands
+    shards in and takes this Mac's out.
 
 Everything lives under ~/.headroom/study, mode 0600. Nothing here makes a
 network call. Every route that reaches this is Class 1 (docs/trust.md).
@@ -42,6 +45,9 @@ STUDY_DIR = os.path.expanduser("~/.headroom/study")
 MIN_RESCAN_S = 300
 MAX_FRIENDS = 200
 MAX_SHARDS = 16
+# A sync round asks for this Mac's shard every minute. A full scan reads the
+# whole log tree, so a round only triggers one when the last is this old.
+SYNC_RESCAN_S = 3600
 
 
 class StudyError(ValueError):
@@ -143,7 +149,7 @@ class StudyService:
         if wait and thread is not None:
             thread.join()
 
-    def _maybe_rescan(self):
+    def _maybe_rescan(self, min_age=MIN_RESCAN_S):
         """Start a scan if there is none yet, or the logs changed and it is old.
 
         Peer shards are not part of this. They are merged from disk on every
@@ -153,7 +159,7 @@ class StudyService:
         with self._lock:
             first = self._seen is None
             changed = fp != self._seen
-            aged = self._clock() - self._scanned_at >= MIN_RESCAN_S
+            aged = self._clock() - self._scanned_at >= min_age
             if first or (changed and aged):
                 self._start_scan(fp)
 
@@ -181,8 +187,13 @@ class StudyService:
             shards.append(own_shard)
         return usage_study.merge(shards) if shards else None
 
-    def import_shard(self, shard):
-        """Store the counts from another of your Macs."""
+    def import_shard(self, shard, synced=False):
+        """Store the counts from another of your Macs.
+
+        `synced` marks a shard that came in a sync record rather than a file.
+        The next round brings it back anyway, so the window offers no Remove
+        for it.
+        """
         try:
             usage_study.from_shard(shard)
         except (ValueError, TypeError, KeyError, AttributeError) as exc:
@@ -192,6 +203,9 @@ class StudyService:
         key = _shard_file(shard["machine"])
         path = self._path("shards", key)
         clean = dict(shard)
+        clean.pop("synced", None)
+        if synced:
+            clean["synced"] = True
         if isinstance(clean.get("name"), str):
             clean["name"] = study_card.sanitize_handle(clean["name"])
         with self._io:
@@ -207,6 +221,45 @@ class StudyService:
             _atomic_write(path, json.dumps(clean, separators=(",", ":"),
                                            sort_keys=True))
         return {"ok": True, "machine": shard["machine"]}
+
+    def accept_synced(self, shards):
+        """Store the shards that arrived in peer sync records.
+
+        Best effort, one shard at a time: a bad or stale shard from one Mac
+        must not cost the others. An unchanged shard is not rewritten, so an
+        idle round touches no file. Returns the machine ids stored.
+        """
+        stored = []
+        for shard in shards or []:
+            if not isinstance(shard, dict):
+                continue
+            machine = shard.get("machine")
+            if not isinstance(machine, str) or machine == self._machine():
+                continue
+            held = _read_json(self._path("shards", _shard_file(machine)), {})
+            if held and str(held.get("generated", "")) >= str(
+                    shard.get("generated", "")):
+                continue
+            try:
+                self.import_shard(shard, synced=True)
+            except StudyError:
+                continue
+            stored.append(machine)
+        return stored
+
+    def own_shard(self):
+        """This Mac's counts for its sync record, or None. Never blocks.
+
+        Stamped with the scan time, not the clock, so the record only changes
+        when the counts do and an idle Mac writes nothing to iCloud.
+        """
+        self._maybe_rescan(min_age=SYNC_RESCAN_S)
+        with self._lock:
+            own, as_of = self._own, self._as_of
+        if own is None or not as_of:
+            return None
+        return usage_study.to_shard(own, self._machine(), as_of,
+                                    self._machine_name())
 
     def remove_shard(self, machine):
         try:
@@ -367,6 +420,7 @@ class StudyService:
             rows.append({"id": shard["machine"],
                          "name": shard.get("name") or "Another Mac",
                          "this_mac": False, "has_usage": True,
+                         "synced": shard.get("synced") is True,
                          "generated": shard.get("generated")})
         return rows
 

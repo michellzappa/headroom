@@ -1044,6 +1044,27 @@ def _compute_doc():
     return doc
 
 
+def _study_shard():
+    """This Mac's usage counts for its sync record, or None.
+
+    Never in the beacon: the beacon is also this Mac's row in `/usage`, which
+    the phone and the board read, and exact counts stay Mac-local.
+    """
+    try:
+        return study_service.get().own_shard()
+    except Exception as exc:          # the round must not depend on the study
+        print("multi-mac study shard error:", exc, flush=True)
+        return None
+
+
+def _accept_studies(result):
+    """Store the usage counts other Macs published in their records."""
+    try:
+        study_service.get().accept_synced((result or {}).get("studies"))
+    except Exception as exc:
+        print("multi-mac study import error:", exc, flush=True)
+
+
 def _machine_beacon(doc):
     """What this Mac tells the others about itself.
 
@@ -2386,6 +2407,10 @@ class Handler(BaseHTTPRequestHandler):
             bulk = (claude_permission or claude_question or claude_event
                     or path in ("/machines/sync", "/study/friends"))
             max_length = 128 * 1024 if bulk else 4096
+            if path == "/machines/sync":
+                # Each peer record carries its usage-study shard, tens of KB
+                # for a year of sessions, so a few Macs outgrow the bulk cap.
+                max_length = 2 * 1024 * 1024
             if path == "/study/shard":
                 # Counts for months of sessions from another of your Macs.
                 max_length = 4 * 1024 * 1024
@@ -2531,10 +2556,14 @@ class Handler(BaseHTTPRequestHandler):
                 return
             try:
                 result = icloud_sync.cloud_round(
-                    records or [], beacon=_machine_beacon(rollup()))
+                    records or [], beacon=_machine_beacon(rollup()),
+                    study=_study_shard())
             except Exception as exc:
                 self._send_json(500, {"ok": False, "error": str(exc)})
                 return
+            _accept_studies(result)
+            # Stored above. The app only carries `record` back to CloudKit.
+            result.pop("studies", None)
             if result.get("adopted"):
                 publish()
             self._send_json(200, result)
@@ -2557,7 +2586,8 @@ class Handler(BaseHTTPRequestHandler):
             # up to a minute: switching this on and seeing nothing happen is
             # indistinguishable from it not working.
             try:
-                icloud_sync.tick(beacon=_machine_beacon(rollup()))
+                _accept_studies(icloud_sync.tick(
+                    beacon=_machine_beacon(rollup()), study=_study_shard))
             except Exception as exc:
                 print("multi-mac sync error:", exc, flush=True)
             publish()
@@ -3216,7 +3246,9 @@ def _sync_loop():
     """
     while True:
         try:
-            result = icloud_sync.tick(beacon=_machine_beacon(rollup()))
+            result = icloud_sync.tick(
+                beacon=_machine_beacon(rollup()), study=_study_shard)
+            _accept_studies(result)
             if result.get("adopted"):
                 # Settings arriving from another Mac change what this one
                 # polls and how it is painted, so the document has to be
