@@ -90,7 +90,8 @@ tag a version that has no entry.
   (output 5, 5, 5, 256), and Headroom kept the first. It now books the
   largest, so the message totals what it actually used. History rebuilds from
   your Claude logs on first launch. Thanks to Anton for the full-tree
-  measurement behind this (#31).
+  measurement behind this (#31), and to zerone0x, whose pull request found
+  the same fix first (#33).
 
 ### Added
 
