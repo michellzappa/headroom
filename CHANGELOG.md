@@ -7,6 +7,20 @@ are not tracked here because they move on every commit.
 Add a section here before cutting a tag. `scripts/cut-release.sh` refuses to
 tag a version that has no entry.
 
+## 2.1.9 — 2026-10-03
+
+### Fixed
+
+- **Your usage charts say what they measure.** Each chart names its unit,
+  months read "Jun" instead of "2026-06", and the current month says it is in
+  progress. When you work states local time, and the weekday chart shows the
+  average day, so a weekday the range holds one more of no longer looks
+  busier. Axis numbers read "10k", and a share under half a percent reads
+  "<1%" instead of "0%".
+- **Model colours follow your Claude colour.** The models take the colour you
+  chose for Claude in Settings, in lighter and darker shades by tier, instead
+  of four unrelated colours and the system blue.
+
 ## 2.1.8 — 2026-10-01
 
 ### Fixed
