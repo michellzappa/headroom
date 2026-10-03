@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "version": "2.2.1",
-  "published": "2026-10-03T21:04:08Z",
-  "url": "https://github.com/michellzappa/headroom/releases/download/v2.2.1/Headroom-macOS.zip",
-  "sha256": "d0740cee27332acaf6f350a2fa6341457fb273526942a5c655844507e2968413",
-  "size": 7145829,
+  "version": "2.2.2",
+  "published": "2026-10-03T21:12:02Z",
+  "url": "https://github.com/michellzappa/headroom/releases/download/v2.2.2/Headroom-macOS.zip",
+  "sha256": "9a1e059226ed5dbbd1f9d3f4349081e554c54501a930c316065cd1be98c1db22",
+  "size": 7151946,
   "min_macos": "14.0",
-  "notes_md": "### Added\n\n- **A calendar of upcoming resets.** Headroom serves your next weekly and\n  monthly resets, and one event for each Codex credit at the time it\n  expires, with an alert a day before. Session resets are optional. Calendar\n  subscribes to it from this Mac, and events move when a provider moves a\n  reset. Settings has the options."
+  "notes_md": "### Fixed\n\n- **The line under the rings says which ring it is about.** It now starts\n  with the source and window, as in \"Codex weekly: 50% left · resets today\n  23:00\", instead of reading as if it described every ring. Hover a ring to\n  learn what its dot means: where an even spend would put you now. Thanks to\n  Paul McKellar for the report."
 }
