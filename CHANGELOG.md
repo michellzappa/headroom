@@ -7,6 +7,23 @@ are not tracked here because they move on every commit.
 Add a section here before cutting a tag. `scripts/cut-release.sh` refuses to
 tag a version that has no entry.
 
+## 2.2.4 — 2026-10-03
+
+### Changed
+
+- **Settings has pages for Host, Calendar and Menu bar icon.** General had
+  grown too long. It now keeps day boundaries, open at login and updates.
+- **The tile behind the menu bar icon is optional, and off.** Without it the
+  icon follows your menu bar's light or dark text again, with the larger bars
+  it had before the tile. Turn it on in Settings, Menu bar icon.
+
+### Fixed
+
+- **Subscribing to the reset calendar works.** Calendar could not open the
+  link Settings gave it. The button now copies a link Calendar accepts and
+  opens Calendar; choose File, New Calendar Subscription, paste it, and set
+  Location to On My Mac.
+
 ## 2.2.3 — 2026-10-03
 
 ### Added
