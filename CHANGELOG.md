@@ -7,6 +7,19 @@ are not tracked here because they move on every commit.
 Add a section here before cutting a tag. `scripts/cut-release.sh` refuses to
 tag a version that has no entry.
 
+## 2.2.3 — 2026-10-03
+
+### Added
+
+- **Your usage counts Codex too.** Headroom reads your Codex session logs
+  beside your Claude Code ones. Each Codex model gets its own row in the
+  Codex colour, and the totals, charts and card cover both tools. Codex is
+  priced from OpenAI's published rates; a model with no published rate is
+  named and left out of the estimate.
+- **Cards carry every model.** A card with Codex models on it needs Headroom
+  2.2.3 or newer to read. A card with Claude models only still reads on older
+  versions.
+
 ## 2.2.2 — 2026-10-03
 
 ### Fixed
