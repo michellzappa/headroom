@@ -13,6 +13,12 @@ extension Notification.Name {
 final class StudyWindowController: NSObject, NSWindowDelegate {
     private var window: NSWindow?
     private let store = StudyStore()
+    /// Read for the Claude source's colour, which the model shades derive from.
+    private let usage: UsageStore
+
+    init(usage: UsageStore) {
+        self.usage = usage
+    }
 
     func show() {
         if let window {
@@ -27,7 +33,7 @@ final class StudyWindowController: NSObject, NSWindowDelegate {
             defer: false
         )
         window.title = HeadroomCopy.studyTitle
-        window.contentView = NSHostingView(rootView: StudyView(store: store))
+        window.contentView = NSHostingView(rootView: StudyView(store: store, usage: usage))
         window.delegate = self
         window.center()
         window.isReleasedWhenClosed = false

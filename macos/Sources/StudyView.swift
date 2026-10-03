@@ -10,6 +10,9 @@ import SwiftUI
 /// and how much coarser it is.
 struct StudyView: View {
     @ObservedObject var store: StudyStore
+    /// Only for the Claude source's colour. Model shades derive from it, so a
+    /// colour picked in Settings carries into this window.
+    @ObservedObject var usage: UsageStore
     @State private var tab: Tab = .you
     @State private var friendDraft = ""
     @State private var renamingID: String?
@@ -174,21 +177,21 @@ struct StudyView: View {
     private func models(_ i: StudyInsights) -> some View {
         section(HeadroomCopy.studyModels, caption: HeadroomCopy.studyModelsCaption) {
             VStack(spacing: 8) {
-                ForEach(i.models) { model in
+                ForEach(i.models.sorted { $0.outputShare > $1.outputShare }) { model in
                     HStack(spacing: 10) {
-                        Text(model.family.capitalized)
+                        Text(Self.familyName(model.family))
                             .frame(width: 64, alignment: .leading)
                         GeometryReader { proxy in
                             ZStack(alignment: .leading) {
                                 Capsule().fill(.primary.opacity(0.08))
                                 Capsule()
-                                    .fill(Self.color(model.family))
+                                    .fill(familyColor(model.family))
                                     .frame(width: max(
                                         3, proxy.size.width * model.outputShare))
                             }
                         }
                         .frame(height: 8)
-                        Text(String(format: "%.0f%%", model.outputShare * 100))
+                        Text(Self.percent(model.outputShare))
                             .monospacedDigit()
                             .frame(width: 40, alignment: .trailing)
                     }
@@ -199,23 +202,36 @@ struct StudyView: View {
     }
 
     private func monthly(_ i: StudyInsights) -> some View {
-        section(HeadroomCopy.studyOutputByMonth) {
+        let spansYears = Set(i.monthly.map { $0.month.prefix(4) }).count > 1
+        let labels = i.monthly.map { Self.monthLabel($0.month, withYear: spansYears) }
+        let current = Self.monthKey(Date())
+        let partial = i.monthly.last.flatMap { last in
+            last.month == current
+                ? Self.monthLabel(last.month, withYear: spansYears) : nil
+        }
+        return section(HeadroomCopy.studyOutputByMonth,
+                       caption: HeadroomCopy.studyOutputByMonthCaption(
+                           partialMonth: partial)) {
             Chart {
-                ForEach(i.monthly) { month in
-                    ForEach(month.output.sorted(by: { $0.key < $1.key }),
-                            id: \.key) { family, tokens in
+                ForEach(Array(i.monthly.enumerated()), id: \.offset) { index, month in
+                    // Family order, not key order, so each bar stacks the
+                    // same way the legend reads.
+                    ForEach(Self.families.filter { month.output[$0] != nil },
+                            id: \.self) { family in
                         BarMark(
-                            x: .value("Month", month.month),
-                            y: .value("Output tokens", tokens)
+                            x: .value("Month", labels[index]),
+                            y: .value("Output tokens", month.output[family] ?? 0)
                         )
-                        .foregroundStyle(by: .value("Model", family))
+                        .foregroundStyle(by: .value("Model", Self.familyName(family)))
                     }
                 }
             }
             .chartForegroundStyleScale(
-                domain: Self.families,
-                range: Self.families.map(Self.color))
+                domain: Self.families.map(Self.familyName),
+                range: Self.families.map(familyColor))
+            .chartXScale(domain: labels)
             .chartYAxis { compactYAxis }
+            .chartYAxisLabel(HeadroomCopy.studyOutputTokens)
             .frame(height: 170)
         }
     }
@@ -227,17 +243,22 @@ struct StudyView: View {
     ]
 
     private func rhythm(_ i: StudyInsights) -> some View {
-        section(HeadroomCopy.studyWhenYouWork) {
+        let perDay = Self.weekdayAverages(i.weekdays, from: i.firstDay, to: i.lastDay)
+        return section(HeadroomCopy.studyWhenYouWork,
+                       caption: HeadroomCopy.studyWhenYouWorkCaption) {
             VStack(alignment: .leading, spacing: 14) {
                 Chart {
                     ForEach(Array(i.hours.enumerated()), id: \.offset) { hour, n in
                         BarMark(x: .value("Hour", hour),
                                 y: .value("Turns", n))
-                            .foregroundStyle(Color.accentColor)
+                            .foregroundStyle(claudeTint)
                     }
                 }
+                // Half an hour of room each side, so the 00 and 23 bars do
+                // not sit on the axis labels.
+                .chartXScale(domain: -1...24)
                 .chartXAxis {
-                    AxisMarks(values: [0, 6, 12, 18, 23]) { value in
+                    AxisMarks(values: [0, 6, 12, 18]) { value in
                         AxisGridLine()
                         AxisValueLabel {
                             if let hour = value.as(Int.self) {
@@ -247,17 +268,19 @@ struct StudyView: View {
                     }
                 }
                 .chartYAxis { compactYAxis }
+                .chartYAxisLabel(HeadroomCopy.studyTurnsByHour)
                 .frame(height: 110)
 
                 Chart {
-                    ForEach(Array(i.weekdays.enumerated()), id: \.offset) { day, n in
+                    ForEach(Array(perDay.enumerated()), id: \.offset) { day, n in
                         BarMark(x: .value("Day", Self.weekdayNames[day]),
-                                y: .value("Turns", n))
-                            .foregroundStyle(Color.accentColor)
+                                y: .value("Turns per day", n))
+                            .foregroundStyle(claudeTint)
                     }
                 }
                 .chartXScale(domain: Self.weekdayNames)
                 .chartYAxis { compactYAxis }
+                .chartYAxisLabel(HeadroomCopy.studyTurnsPerWeekday)
                 .frame(height: 90)
             }
         }
@@ -271,11 +294,13 @@ struct StudyView: View {
                 ForEach(Array(i.promptLen.enumerated()), id: \.offset) { index, bin in
                     BarMark(x: .value("Tokens", labels[index]),
                             y: .value("Prompts", bin.count))
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(claudeTint)
                 }
             }
             .chartXScale(domain: labels)
             .chartYAxis { compactYAxis }
+            .chartYAxisLabel(HeadroomCopy.studyPrompts)
+            .chartXAxisLabel(HeadroomCopy.studyTokensPerPrompt, alignment: .center)
             .frame(height: 120)
         }
     }
@@ -560,7 +585,7 @@ struct StudyView: View {
         let shares = week.flatMap { d?.weeklyModelShare[$0] } ?? [:]
         return shareCell(
             shares, order: Self.families,
-            color: { _, key in Self.color(key) },
+            color: { _, key in familyColor(key) },
             text: Self.describe(shares, unit: nil))
     }
 
@@ -568,7 +593,7 @@ struct StudyView: View {
         let shares = d?.timeOfDayShare ?? [:]
         return shareCell(
             shares, order: Self.dayBlockOrder,
-            color: { index, _ in Color.accentColor.opacity(0.3 + 0.2 * Double(index)) },
+            color: { index, _ in claudeTint.opacity(0.3 + 0.2 * Double(index)) },
             text: Self.describe(shares.mapKeys(Self.dayBlock), unit: nil))
     }
 
@@ -618,24 +643,113 @@ struct StudyView: View {
         AxisMarks { value in
             AxisGridLine()
             AxisValueLabel {
-                if let n = value.as(Int.self) {
-                    Text(HeadroomFormat.compact(n))
+                if let n = value.as(Double.self) {
+                    Text(Self.axisNumber(n))
                 }
             }
         }
     }
 
-    // Model families are not providers, so they take neutral picks from the
-    // palette rather than a provider's brand colour.
-    static let families = ["opus", "sonnet", "haiku", "fable", "other"]
+    /// Largest tier first. This order sets the stack, the legend, and the
+    /// lightness ramp below.
+    static let families = ["fable", "opus", "sonnet", "haiku", "other"]
 
-    static func color(_ family: String) -> Color {
+    /// The Claude source's colour, as picked in Settings → Sources.
+    private var claudeRGB: HeadroomPalette.RGB {
+        HeadroomPalette.providerComponents(
+            id: "claude",
+            accent: usage.snapshot.providers?
+                .first(where: { $0.id == "claude" })?.accent)
+    }
+
+    private var claudeTint: Color { HeadroomPalette.rgb(claudeRGB) }
+
+    /// Model families are tiers of one provider, so they share its hue and
+    /// step in lightness: Fable darker than the source colour, Opus at it,
+    /// Sonnet and Haiku lighter. Lightness carries the tier order, so the
+    /// shades read as one provider and still separate in a stacked bar.
+    private func familyColor(_ family: String) -> Color {
+        let base = claudeRGB
         switch family {
-        case "opus": HeadroomPalette.claude
-        case "sonnet": HeadroomPalette.amber
-        case "haiku": HeadroomPalette.local
-        case "fable": HeadroomPalette.git
-        default: HeadroomPalette.dim
+        case "fable": return Self.mix(base, toward: 0, by: 0.35)
+        case "opus": return HeadroomPalette.rgb(base)
+        case "sonnet": return Self.mix(base, toward: 255, by: 0.35)
+        case "haiku": return Self.mix(base, toward: 255, by: 0.6)
+        default: return HeadroomPalette.dim
+        }
+    }
+
+    private static func mix(_ c: HeadroomPalette.RGB, toward target: CGFloat,
+                            by t: CGFloat) -> Color {
+        HeadroomPalette.rgb(c.r + (target - c.r) * t,
+                            c.g + (target - c.g) * t,
+                            c.b + (target - c.b) * t)
+    }
+
+    static func familyName(_ family: String) -> String {
+        family.capitalized
+    }
+
+    /// A share that rounds to 0% but is not zero reads as "<1%", so a visible
+    /// sliver never sits next to "0%".
+    static func percent(_ share: Double) -> String {
+        if share > 0 && share < 0.005 { return "<1%" }
+        return String(format: "%.0f%%", share * 100)
+    }
+
+    /// "10k", not "10.0k". Axis ticks are round numbers, so the decimal only
+    /// adds noise; values in between keep it.
+    static func axisNumber(_ value: Double) -> String {
+        let text = HeadroomFormat.compact(Int(value.rounded()))
+        return text.replacingOccurrences(of: ".0", with: "")
+    }
+
+    private static let monthParser: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM"
+        return formatter
+    }()
+
+    static func monthKey(_ date: Date) -> String {
+        monthParser.string(from: date)
+    }
+
+    /// "2026-06" → "Jun", or "Jun 2026" when the chart crosses a year.
+    static func monthLabel(_ key: String, withYear: Bool) -> String {
+        guard let date = monthParser.date(from: key) else { return key }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = withYear ? "MMM yyyy" : "MMM"
+        return formatter.string(from: date)
+    }
+
+    /// Turns per weekday divided by how many of that weekday fall in the
+    /// range, Monday first. A raw total favours whichever weekday the range
+    /// happens to hold one more of.
+    static func weekdayAverages(_ totals: [Int], from first: String, to last: String)
+        -> [Double] {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        let parser = DateFormatter()
+        parser.locale = Locale(identifier: "en_US_POSIX")
+        parser.calendar = calendar
+        parser.dateFormat = "yyyy-MM-dd"
+        guard totals.count == 7,
+              var day = parser.date(from: first),
+              let end = parser.date(from: last), day <= end
+        else { return totals.map(Double.init) }
+        var occurrences = [Int](repeating: 0, count: 7)
+        while day <= end {
+            // Calendar weekday is 1 = Sunday; the host counts 0 = Monday.
+            let index = (calendar.component(.weekday, from: day) + 5) % 7
+            occurrences[index] += 1
+            guard let next = calendar.date(byAdding: .day, value: 1, to: day)
+            else { break }
+            day = next
+        }
+        return zip(totals, occurrences).map { total, count in
+            count > 0 ? Double(total) / Double(count) : 0
         }
     }
 

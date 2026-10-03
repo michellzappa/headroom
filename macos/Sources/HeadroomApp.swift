@@ -97,7 +97,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Task { @MainActor in self?.welcomeController?.show() }
         }
 
-        let study = StudyWindowController()
+        let study = StudyWindowController(usage: store)
         studyController = study
         NotificationCenter.default.addObserver(
             forName: .headroomShowStudy,

@@ -865,6 +865,12 @@ enum HeadroomCopy {
     static let studyModelsCaption = "Share of output tokens"
     static let studyOutputByMonth = "Output by month"
     static let studyWhenYouWork = "When you work"
+    static let studyWhenYouWorkCaption =
+        "Turns by hour, and the average day of each week. Local time."
+    static let studyTurnsByHour = "Turns"
+    static let studyTurnsPerWeekday = "Turns per day"
+    static let studyPrompts = "Prompts"
+    static let studyTokensPerPrompt = "Tokens per prompt, at least"
     static let studyPromptLength = "Prompt length"
     static let studyPromptLengthCaption = "Estimated tokens per prompt you typed"
     static let studySessions = "Sessions"
@@ -906,6 +912,13 @@ enum HeadroomCopy {
     static let studyMacAdded = "Added. Your usage now includes that Mac."
     static func studyRemoveFriendTitle(_ name: String) -> String {
         "Remove \(name)?"
+    }
+    /// The current month has only the days so far, so its bar is short for a
+    /// reason that is not a drop in use.
+    static func studyOutputByMonthCaption(partialMonth: String?) -> String {
+        let base = "Output tokens each month, by model."
+        guard let partialMonth else { return base }
+        return base + " \(partialMonth) so far."
     }
     static func studyCombined(_ count: Int) -> String {
         "Combined from \(count) Macs"
