@@ -1,6 +1,6 @@
 """Upcoming resets and grant expiries as an iCalendar feed.
 
-Calendar.app subscribes to `webcal://127.0.0.1:8737/calendar.ics` and polls
+Calendar.app subscribes to `http://127.0.0.1:8737/calendar.ics` and polls
 it on its own schedule. Every poll rebuilds the feed from the current `/usage`
 document, so an event moves when a provider moves its reset and disappears
 when a grant is spent. Nothing is stored.

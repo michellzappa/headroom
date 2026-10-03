@@ -8,13 +8,17 @@ extension SettingsView {
     /// Values the host accepts for an alert, in the order the menu shows them.
     static let calendarAlertChoices: [Int?] = [nil, 0, 15, 60, 1440]
 
-    /// `webcal://127.0.0.1:8737/calendar.ics`, from the endpoint this app
+    /// `http://127.0.0.1:8737/calendar.ics`, from the endpoint this app
     /// talks to. Nil against a remote host: the feed is loopback only.
+    ///
+    /// Not `webcal://`. Calendar turns a webcal link into HTTPS and never
+    /// falls back, and the host has no certificate. Given `http://` it tries
+    /// TLS, then fetches over plain HTTP, which works.
     var calendarFeedURL: URL? {
         guard !endpointIsRemote,
               var parts = URLComponents(string: endpoint)
         else { return nil }
-        parts.scheme = "webcal"
+        parts.scheme = "http"
         parts.path = "/calendar.ics"
         parts.query = nil
         parts.fragment = nil
@@ -46,13 +50,17 @@ extension SettingsView {
                     .disabled(!config.expiries)
                     if let url = calendarFeedURL {
                         HStack {
+                            // Opening an http link would go to the browser,
+                            // and a webcal link fails (see calendarFeedURL).
+                            // So copy the link and bring Calendar forward.
                             Button(HeadroomCopy.calendarSubscribe) {
-                                NSWorkspace.shared.open(url)
+                                copyCalendarLink(url)
+                                NSWorkspace.shared.open(URL(
+                                    fileURLWithPath: "/System/Applications/Calendar.app"))
+                                calendarMessage = HeadroomCopy.calendarSubscribeSteps
                             }
                             Button(HeadroomCopy.calendarCopyLink) {
-                                NSPasteboard.general.clearContents()
-                                NSPasteboard.general.setString(
-                                    url.absoluteString, forType: .string)
+                                copyCalendarLink(url)
                                 calendarMessage = HeadroomCopy.calendarCopied
                             }
                             Spacer()
@@ -98,6 +106,11 @@ extension SettingsView {
             set: { new in
                 Task { await saveCalendar([key: new.map { $0 as Any } ?? NSNull()]) }
             })
+    }
+
+    private func copyCalendarLink(_ url: URL) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(url.absoluteString, forType: .string)
     }
 
     func reloadCalendar() async {

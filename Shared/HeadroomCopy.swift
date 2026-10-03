@@ -875,11 +875,13 @@ enum HeadroomCopy {
     static let calendarResetAlert = "Alert for resets"
     static let calendarExpiries = "Credits and grants that expire"
     static let calendarExpiryAlert = "Alert for expiries"
-    static let calendarSubscribe = "Subscribe in Calendar"
+    static let calendarSubscribe = "Copy link and open Calendar"
+    static let calendarSubscribeSteps =
+        "Link copied. In Calendar, choose File, New Calendar Subscription, paste the link, and set Location to On My Mac."
     static let calendarCopyLink = "Copy link"
     static let calendarCopied = "Link copied."
     static let calendarHint =
-        "Calendar reads the feed from this Mac, so set Location to On My Mac when you subscribe. A subscription stored in iCloud is read by Apple's servers, which cannot reach this Mac. Events move when a provider moves a reset."
+        "Calendar reads the feed from this Mac, so set Location to On My Mac when you subscribe. A subscription stored in iCloud is read by Apple's servers, which cannot reach this Mac, and stays empty. Events move when a provider moves a reset."
     static let calendarRemoteHost =
         "The calendar is served by the host on this Mac. Point Headroom at that host to set it up."
     static let calendarUnavailable =

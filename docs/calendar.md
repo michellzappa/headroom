@@ -1,8 +1,17 @@
 # Reset calendar
 
 Headroom serves upcoming resets and grant expiries as an iCalendar feed that
-Calendar.app subscribes to. Settings → Calendar sets the options and
-has a **Subscribe in Calendar** button.
+Calendar.app subscribes to, at `http://127.0.0.1:8737/calendar.ics`.
+Settings → Calendar sets the options, copies the link and opens Calendar;
+the subscription itself is File → New Calendar Subscription, with Location
+set to On My Mac.
+
+**The link is `http://`, never `webcal://`.** Calendar turns a webcal link
+into HTTPS and gives up when TLS fails; the host has no certificate. Given an
+`http://` link, Calendar tries TLS, then fetches over plain HTTP, and that
+works (seen from a probe on 2026-10-03: two TLS handshakes, then
+`GET /calendar.ics` from `dataaccessd`). Calendar may send `HEAD` first, so
+the route answers it.
 
 ## What is in it
 
