@@ -88,7 +88,8 @@ final class StatusItemController: NSObject {
             healthy: healthy,
             attentionLevel: showPip ? attention?.level : nil,
             style: style,
-            invert: invert
+            invert: invert,
+            tile: MenuBarIconStyle.tile
         )
         if !healthy {
             // "Backend" is not a word this product uses anywhere else, and
@@ -170,14 +171,18 @@ final class StatusItemController: NSObject {
     }
 }
 
-/// Draws the menu bar glyph in the house style shared with Cargo and Tessellate:
-/// a dark gradient plate with white marks on it. The marks stay live (quota tanks
-/// or pace dots); the plate makes it read as an app, not a system indicator.
+/// Draws the menu bar glyph: live marks (quota tanks or pace dots), by default
+/// as a template image in the menu bar's own ink. With Tile on, it takes the
+/// house style shared with Cargo and Tessellate instead: a dark gradient plate
+/// with white marks, so it reads as an app rather than a system indicator.
 enum MeterIconRenderer {
     private static let outputScale: CGFloat = 2
     private static let canvasPixels = 36
-    /// Everything drawn on the plate uses this ink — the plate is always dark.
-    private static let ink = NSColor.white
+    /// The marks' ink. On the plate, always white: the plate is always dark.
+    /// Without it, the label colour, which a template image is tinted from.
+    private static func ink(tile: Bool) -> NSColor {
+        tile ? .white : .labelColor
+    }
 
     private struct PixelRect {
         let x: Int
@@ -200,7 +205,8 @@ enum MeterIconRenderer {
         healthy: Bool,
         attentionLevel: String? = nil,
         style: MenuBarIconStyle = .current,
-        invert: Bool = MenuBarIconStyle.invert
+        invert: Bool = MenuBarIconStyle.invert,
+        tile: Bool = MenuBarIconStyle.tile
     ) -> NSImage {
         // Settings subset only — never invent Claude/Codex/Cursor when
         // every quota source is off. The host picks which 3 (pinned
@@ -215,6 +221,7 @@ enum MeterIconRenderer {
             attentionLevel: attentionLevel,
             style: style,
             invert: invert,
+            tile: tile,
             accessibilityDescription: accessibilityLabel(
                 snapshot: snapshot,
                 style: style,
@@ -232,12 +239,16 @@ enum MeterIconRenderer {
         attentionLevel: String? = nil,
         style: MenuBarIconStyle = .current,
         invert: Bool = MenuBarIconStyle.invert,
+        tile: Bool = MenuBarIconStyle.tile,
         accessibilityDescription: String? = nil
     ) -> NSImage {
+        let ink = Self.ink(tile: tile)
         let size = NSSize(width: 18, height: 18)
         let warning = attentionLevel == "warn" || attentionLevel == "critical"
         let image = NSImage(size: size, flipped: false) { _ in
-            if let ctx = NSGraphicsContext.current?.cgContext { MenuBarPlate.drawPlate(ctx) }
+            if tile, let ctx = NSGraphicsContext.current?.cgContext {
+                MenuBarPlate.drawPlate(ctx)
+            }
             // While the first poll is still out (or nothing is enabled),
             // draw three empty slots so the icon is never blank.
             // Geometry fits MenuBarPlate.field (20px @2x): 4px bars, 4px gaps.
@@ -274,11 +285,13 @@ enum MeterIconRenderer {
                         used: window?.percent,
                         healthy: healthy,
                         unavailable: window?.percent == nil,
-                        invert: invert
+                        invert: invert,
+                        ink: ink
                     )
                 }
             case .pace:
-                drawPaceGlyph(slots: slots, healthy: healthy, invert: invert)
+                drawPaceGlyph(slots: slots, healthy: healthy, invert: invert,
+                              ink: ink)
             }
 
             if warning {
@@ -289,8 +302,10 @@ enum MeterIconRenderer {
             }
             return true
         }
-        // Full-color plate, never template-tinted — it should read as the app icon.
-        image.isTemplate = false
+        // The tile is full colour and never template-tinted, so it reads as
+        // the app icon. Without it the glyph is a template, except while the
+        // coloured attention pip is up, which a template would flatten.
+        image.isTemplate = !tile && !warning
         image.accessibilityDescription = accessibilityDescription
         return image
     }
@@ -317,14 +332,16 @@ enum MeterIconRenderer {
     private static func drawPaceGlyph(
         slots: [(PixelRect, MeterWindow?)],
         healthy: Bool,
-        invert: Bool
+        invert: Bool,
+        ink: NSColor
     ) {
         guard let first = slots.first, let last = slots.last else { return }
         for (rect, window) in slots {
             drawSlotTrack(
                 rect: rect,
                 healthy: healthy,
-                unavailable: window?.percent == nil || window?.pacePercent == nil
+                unavailable: window?.percent == nil || window?.pacePercent == nil,
+                ink: ink
             )
         }
 
@@ -368,7 +385,8 @@ enum MeterIconRenderer {
     private static func drawSlotTrack(
         rect pixelRect: PixelRect,
         healthy: Bool,
-        unavailable: Bool
+        unavailable: Bool,
+        ink: NSColor
     ) {
         let base = ink
         let alpha: CGFloat = unavailable ? 0.45 : 1
@@ -409,7 +427,8 @@ enum MeterIconRenderer {
         used: Double?,
         healthy: Bool,
         unavailable: Bool = false,
-        invert: Bool = false
+        invert: Bool = false,
+        ink: NSColor
     ) {
         let base = ink
         let alpha: CGFloat = unavailable ? 0.45 : 1

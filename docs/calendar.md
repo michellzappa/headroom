@@ -1,7 +1,7 @@
 # Reset calendar
 
 Headroom serves upcoming resets and grant expiries as an iCalendar feed that
-Calendar.app subscribes to. Settings → General → Calendar sets the options and
+Calendar.app subscribes to. Settings → Calendar sets the options and
 has a **Subscribe in Calendar** button.
 
 ## What is in it

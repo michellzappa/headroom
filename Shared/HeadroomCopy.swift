@@ -44,6 +44,7 @@ enum HeadroomCopy {
     // friendlier rail titles for the same ideas (see `SettingsDestination`).
 
     static let settingsGeneral = "General"
+    static let settingsHost = "Host"
     static let settingsSources = "Providers"
     static let settingsiPhone = "iPhone"
     static let settingsSync = "Sync"
@@ -124,7 +125,7 @@ enum HeadroomCopy {
     static let hostLocalLaunchAgent = "Local LaunchAgent"
     static let hostLocalProcess = "Local process"
     static let hostRemoteEndpoint = "Remote endpoint"
-    /// Host lifecycle (Settings → General → Host).
+    /// Host lifecycle (Settings → Host).
     static let hostKeepRunning = "Keep the host running when Headroom is closed"
     static let hostKeepRunningOn = "A background service starts at login and serves the board, iPhone and Watch whether or not Headroom is open."
     static let hostKeepRunningOff = "The host starts and stops with Headroom. Quitting the app stops the board, iPhone and Watch too."
@@ -156,8 +157,11 @@ enum HeadroomCopy {
     /// macOS Settings → General. Matches System Settings → Login Items wording.
     static let openAtLogin = "Open at Login"
     static let openLoginItemsSettings = "Open Login Items…"
-    /// macOS Settings → General. Menu-bar glyph style (fuel vs pace).
+    /// macOS Settings → Menu bar icon. Glyph style (fuel vs pace) and the tile.
     static let menuBarIcon = "Menu bar icon"
+    static let menuBarIconTile = "Show a tile behind the icon"
+    static let menuBarIconTileHint =
+        "A dark tile, like the app icon, so Headroom stands out from the system icons. Off, the icon follows the menu bar's light or dark text."
     static let menuBarIconRemaining = "Remaining"
     static let menuBarIconPace = "Pace"
     static let menuBarIconInvert = "Invert"
@@ -861,13 +865,13 @@ enum HeadroomCopy {
 
     // MARK: Reset calendar
     //
-    // Settings, General. The feed itself is host/reset_calendar.py; see
+    // Settings → Calendar. The feed itself is host/reset_calendar.py; see
     // docs/calendar.md.
 
     static let calendarTitle = "Calendar"
     static let calendarEnabled = "Serve a calendar of resets"
     static let calendarResets = "Weekly and monthly resets"
-    static let calendarShortWindows = "Session resets too"
+    static let calendarShortWindows = "Session resets"
     static let calendarResetAlert = "Alert for resets"
     static let calendarExpiries = "Credits and grants that expire"
     static let calendarExpiryAlert = "Alert for expiries"

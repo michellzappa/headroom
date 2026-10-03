@@ -208,6 +208,8 @@ struct SettingsView: View {
     var menuBarIconStyle = MenuBarIconStyle.remaining.rawValue
     @AppStorage(MenuBarIconStyle.invertDefaultsKey)
     var menuBarIconInvert = false
+    @AppStorage(MenuBarIconStyle.tileDefaultsKey)
+    var menuBarIconTile = false
     @State var updateInstallMessage: String?
 
     var client: HeadroomClient { HeadroomClient(endpoint: endpoint) }
@@ -314,6 +316,12 @@ struct SettingsView: View {
         switch dest {
         case .general:
             generalPane
+        case .host:
+            Form { hostSection }.formStyle(.grouped)
+        case .calendar:
+            Form { calendarSection }.formStyle(.grouped)
+        case .menuBarIcon:
+            menuBarIconPane
         case .otherMacs:
             otherMacsPane
         case .deskDisplay:

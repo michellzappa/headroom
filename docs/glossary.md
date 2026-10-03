@@ -461,7 +461,7 @@ Say **top 3** in user-facing copy, not "focus" — that word is API vocabulary.
 
 ### Menu bar icon
 
-Mac Settings → General → **Menu bar icon** picks the glyph’s reading. Same
+Mac Settings → **Menu bar icon** picks the glyph’s reading. Same
 three slots either way; only the mark changes. **Invert** is a separate
 toggle that flips whichever style is active.
 

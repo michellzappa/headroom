@@ -22,7 +22,7 @@ struct WelcomePane: Identifiable, Hashable {
     static let helper = WelcomePane(
         id: "helper",
         railTitle: "Background helper",
-        symbol: SettingsDestination.general.symbol)
+        symbol: SettingsDestination.host.symbol)
     static let privacy = WelcomePane(
         id: "privacy", railTitle: "Your data", symbol: "lock")
     static let sources = WelcomePane(

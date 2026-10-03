@@ -3,25 +3,7 @@ import SwiftUI
 extension SettingsView {
     var generalPane: some View {
         Form {
-            hostSection
-
             timezoneSection
-
-            calendarSection
-
-            Section {
-                menuBarIconPreview
-                Picker(HeadroomCopy.menuBarIcon, selection: $menuBarIconStyle) {
-                    Text(HeadroomCopy.menuBarIconRemaining)
-                        .tag(MenuBarIconStyle.remaining.rawValue)
-                    Text(HeadroomCopy.menuBarIconPace)
-                        .tag(MenuBarIconStyle.pace.rawValue)
-                }
-                .pickerStyle(.segmented)
-                Toggle(HeadroomCopy.menuBarIconInvert, isOn: $menuBarIconInvert)
-            } footer: {
-                Text(HeadroomCopy.menuBarIconHint)
-            }
 
             Section {
                 Toggle(HeadroomCopy.openAtLogin, isOn: Binding(
@@ -56,6 +38,31 @@ extension SettingsView {
         .formStyle(.grouped)
     }
 
+    /// Settings → Menu bar icon: what the glyph reads, and how it is drawn.
+    var menuBarIconPane: some View {
+        Form {
+            Section {
+                menuBarIconPreview
+                Picker(HeadroomCopy.menuBarIcon, selection: $menuBarIconStyle) {
+                    Text(HeadroomCopy.menuBarIconRemaining)
+                        .tag(MenuBarIconStyle.remaining.rawValue)
+                    Text(HeadroomCopy.menuBarIconPace)
+                        .tag(MenuBarIconStyle.pace.rawValue)
+                }
+                .pickerStyle(.segmented)
+                Toggle(HeadroomCopy.menuBarIconInvert, isOn: $menuBarIconInvert)
+            } footer: {
+                Text(HeadroomCopy.menuBarIconHint)
+            }
+            Section {
+                Toggle(HeadroomCopy.menuBarIconTile, isOn: $menuBarIconTile)
+            } footer: {
+                Text(HeadroomCopy.menuBarIconTileHint)
+            }
+        }
+        .formStyle(.grouped)
+    }
+
     /// The glyph as the menu bar draws it, on a strip that reads as one.
     /// Drawn by the real renderer at the real 18pt, so the picker cannot
     /// describe a mark the status item does not paint.
@@ -70,6 +77,7 @@ extension SettingsView {
                         style: MenuBarIconStyle(rawValue: menuBarIconStyle)
                             ?? .remaining,
                         invert: menuBarIconInvert,
+                        tile: menuBarIconTile,
                         accessibilityDescription: HeadroomCopy.menuBarIcon
                     ))
                     // Neighbours and a clock, dimmed: they place the glyph in

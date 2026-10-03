@@ -93,7 +93,7 @@ fingerprint so clearing on one surface clears the same warning everywhere.
 ## ESP32 USB fallback
 
 Wi-Fi is the normal board transport. To use the ESP32 over its USB CDC serial
-connection, open **Headroom → Settings → General → Host** and enable **Use USB
+connection, open **Headroom → Settings → Host** and enable **Use USB
 fallback for the ESP32**. Headroom restarts the current host supervisor with
 `HEADROOM_ENABLE_USB=1`, then reports the detected and active `/dev/cu.*` device
 in the same section.
@@ -104,8 +104,8 @@ needs exclusive access to the same device.
 
 ## Who owns the host process
 
-Two modes, same `headroom_server.py` on the same port. **Settings → General →
-Host → Keep the host running when Headroom is closed.**
+Two modes, same `headroom_server.py` on the same port. **Settings → Host →
+Keep the host running when Headroom is closed.**
 
 | Mode | Owner | Quitting Headroom | Default |
 |---|---|---|---|
@@ -134,7 +134,7 @@ Logs go to `~/.headroom/logs/headroom.log` and `.err` in both modes.
 
 ### Leaving cleanly
 
-**Settings → General → Host → Remove background service.** It stops the host,
+**Settings → Host → Remove background service.** It stops the host,
 boots out and deletes the plist for both the current and the legacy label, and
 quits Headroom. It appears only while a plist exists.
 

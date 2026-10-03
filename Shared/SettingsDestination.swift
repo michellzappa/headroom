@@ -15,6 +15,13 @@ import Foundation
 /// - General ↔ Welcome “Background helper” (the host this Mac runs)
 enum SettingsDestination: Hashable, Sendable {
     case general
+    /// The background host: who runs it, the token, USB. Its own root
+    /// because it outgrew General.
+    case host
+    /// The reset calendar feed (docs/calendar.md).
+    case calendar
+    /// The menu bar glyph: Remaining or Pace, Invert, and the tile.
+    case menuBarIcon
     case sources
     case codingAgents
     case iPhone
@@ -43,8 +50,8 @@ enum SettingsDestination: Hashable, Sendable {
     /// "Sync" row: a person looking for phone permissions searches for the
     /// word iPhone, and onboarding's phone step points at `.iPhone`.
     static let macRoots: [SettingsDestination] = [
-        .general, .sources, .integrations, .codingAgents, .iPhone, .otherMacs,
-        .deskDisplay, .telemetry, .about,
+        .general, .menuBarIcon, .host, .sources, .integrations, .codingAgents, .iPhone,
+        .otherMacs, .deskDisplay, .calendar, .telemetry, .about,
     ]
 
     /// iPhone Settings tab roots. Connection is the phone’s view of pairing;
@@ -59,6 +66,9 @@ enum SettingsDestination: Hashable, Sendable {
     var title: String {
         switch self {
         case .general: return HeadroomCopy.settingsGeneral
+        case .host: return HeadroomCopy.settingsHost
+        case .calendar: return HeadroomCopy.calendarTitle
+        case .menuBarIcon: return HeadroomCopy.menuBarIcon
         case .sources: return HeadroomCopy.settingsSources
         case .codingAgents: return HeadroomCopy.codingAgents
         case .iPhone: return HeadroomCopy.settingsiPhone
@@ -76,6 +86,9 @@ enum SettingsDestination: Hashable, Sendable {
     var symbol: String {
         switch self {
         case .general: return "gearshape"
+        case .host: return "server.rack"
+        case .calendar: return "calendar"
+        case .menuBarIcon: return "menubar.rectangle"
         case .sources: return "checklist"
         case .codingAgents: return "cpu"
         case .iPhone: return "iphone"
@@ -98,8 +111,8 @@ enum SettingsDestination: Hashable, Sendable {
     /// typing a key, and keys are never entered on the phone.
     var isMacOnly: Bool {
         switch self {
-        case .general, .codingAgents, .telemetry, .otherMacs, .deskDisplay,
-             .integration:
+        case .general, .host, .calendar, .menuBarIcon, .codingAgents, .telemetry, .otherMacs,
+             .deskDisplay, .integration:
             return true
         case .integrations, .sources, .iPhone, .about, .connection,
              .permissions:

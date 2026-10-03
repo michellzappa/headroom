@@ -26,6 +26,15 @@ enum MenuBarIconStyle: String, CaseIterable, Sendable {
         UserDefaults.standard.bool(forKey: invertDefaultsKey)
     }
 
+    /// Draw the dark house tile (MenuBarPlate) behind the marks. Off by
+    /// default: without it the glyph is a template image and follows the
+    /// menu bar's own light or dark ink like every other status item.
+    static let tileDefaultsKey = "menuBarIconTile"
+
+    static var tile: Bool {
+        UserDefaults.standard.bool(forKey: tileDefaultsKey)
+    }
+
     /// Maps `used% − pace%` onto (−1, +1) for vertical placement.
     /// `invert` flips the sign so over-pace sits below the rail instead.
     static func paceOffset(
