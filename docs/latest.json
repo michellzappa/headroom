@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "version": "2.1.9",
-  "published": "2026-10-03T20:46:42Z",
-  "url": "https://github.com/michellzappa/headroom/releases/download/v2.1.9/Headroom-macOS.zip",
-  "sha256": "e46523be465ce7d0027d6e982a9fd253ac4dad0af0a471cb80f57dc50e681b0c",
-  "size": 7069772,
+  "version": "2.2.0",
+  "published": "2026-10-03T20:55:25Z",
+  "url": "https://github.com/michellzappa/headroom/releases/download/v2.2.0/Headroom-macOS.zip",
+  "sha256": "8e028f2e3d6101d78b707dd712573b4d6d7e678734e0de764bc0a430ac48784a",
+  "size": 7072476,
   "min_macos": "14.0",
-  "notes_md": "### Fixed\n\n- **Your usage charts say what they measure.** Each chart names its unit,\n  months read \"Jun\" instead of \"2026-06\", and the current month says it is in\n  progress. When you work states local time, and the weekday chart shows the\n  average day, so a weekday the range holds one more of no longer looks\n  busier. Axis numbers read \"10k\", and a share under half a percent reads\n  \"<1%\" instead of \"0%\".\n- **Model colours follow your Claude colour.** The models take the colour you\n  chose for Claude in Settings, in lighter and darker shades by tier, instead\n  of four unrelated colours and the system blue."
+  "notes_md": "### Added\n\n- **Your usage adds up your Macs on its own.** With Share settings between my\n  Macs on, each Mac sends its usage counts to the others, and Your usage\n  counts all of them with no file to move. The counts stay off the phone and\n  the desk display. Saving and adding a counts file still works for a Mac\n  with sync off."
 }
