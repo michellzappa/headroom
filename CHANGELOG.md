@@ -7,6 +7,19 @@ are not tracked here because they move on every commit.
 Add a section here before cutting a tag. `scripts/cut-release.sh` refuses to
 tag a version that has no entry.
 
+## 2.2.7 — 2026-10-04
+
+### Added
+
+- **Your usage counts more coding agents.** Besides Claude Code and Codex,
+  Headroom now reads the local logs of OpenCode, Gemini CLI, Qwen Code, Kimi
+  CLI and Goose. Each tool gets its own heading and colour, and its models go
+  on your card. The readers follow each tool's own published source; a
+  record they do not recognise is skipped, not guessed. Gemini, Qwen and
+  Kimi models are not priced yet, and the cost caption names them. Copilot
+  CLI, Factory Droid and Amp are not read, because their log formats are not
+  public.
+
 ## 2.2.6 — 2026-10-04
 
 ### Added
