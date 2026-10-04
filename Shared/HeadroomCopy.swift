@@ -917,14 +917,14 @@ enum HeadroomCopy {
 
     // MARK: Your usage
     //
-    // The window that reads the Claude Code and Codex session logs on this Mac. See
+    // The window that reads the coding agents' session logs on this Mac. See
     // docs/product.md, "Friends, cards and the usage study", and the exception
     // under "Percent is the only unit" in docs/glossary.md.
 
     static let studyTitle = "Your usage"
     static let studyReading =
         "Reading your session logs. The first pass takes a few seconds."
-    static let studyEmpty = "No Claude Code or Codex sessions found on this Mac."
+    static let studyEmpty = "No coding agent sessions found on this Mac."
     static let studyRemoteHost =
         "This window reads the session logs on this Mac. Point Headroom at the host on this Mac to see it."
     static let studyTurns = "Turns"
@@ -959,7 +959,7 @@ enum HeadroomCopy {
     static let studyTabFriends = "Friends"
     static let studyAddFriend = "Add a friend"
     static let studyAddFriendHint =
-        "Paste the card a friend sent you. It shows how they use Claude Code and Codex in coarse steps. Adding one sends nothing anywhere."
+        "Paste the card a friend sent you. It shows how they use their coding agents in coarse steps. Adding one sends nothing anywhere."
     static let studyCardField = "Paste a card"
     static let studyAdd = "Add"
     static let studyPasteAndAdd = "Paste and add"
@@ -1007,6 +1007,11 @@ enum HeadroomCopy {
         switch provider {
         case "claude": "Claude Code"
         case "codex": "Codex"
+        case "opencode": "OpenCode"
+        case "gemini": "Gemini CLI"
+        case "qwen": "Qwen Code"
+        case "kimi": "Kimi CLI"
+        case "goose": "Goose"
         default: "Other"
         }
     }

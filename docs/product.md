@@ -220,6 +220,16 @@ version 2 (`hrc2.`), and an older build refuses it as a newer version. A Codex
 model with no row in `pricing.OPENAI` is left out of the cost and named as
 unpriced, never priced at a guess.
 
+OpenCode, Gemini CLI, Qwen Code, Kimi CLI and Goose were added 2026-10-04
+(`host/agent_logs.py`). Their families carry the tool in front
+(`opencode.claude-sonnet-4-5`), so two tools running one model stay apart;
+Codex keeps bare ids so older cards still read. These parsers follow each
+tool's open-source code at a pinned commit and were tested against fixtures,
+not real installs, so they skip what they do not understand rather than
+guess. Closed-source agents (Copilot CLI, Factory Droid, Amp) are not read:
+their format is known only from third-party trackers. Crush keeps only a
+running cost, and Cursor keeps no tokens on disk.
+
 What stays true: the host has one account, one token model, and free loopback.
 A friend is not a second user of your host. A card is a message you hand
 someone, not a login.

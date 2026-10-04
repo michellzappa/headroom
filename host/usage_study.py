@@ -1,4 +1,4 @@
-"""Local usage study: how a person actually uses Claude Code and Codex, from the logs.
+"""Local usage study: how a person actually uses their coding agents, from the logs.
 
 Everything here runs on this Mac, over ~/.claude/projects and the Codex
 session logs under ~/.codex. Nothing is served on
@@ -40,6 +40,7 @@ import re
 from datetime import datetime
 from glob import glob
 
+import agent_logs
 import claude_history
 import pricing
 
@@ -102,10 +103,21 @@ def codex_family(model):
 
 
 def provider_of(family):
-    """Which tool a family came from: 'claude', 'codex' or 'other'."""
+    """Which tool a family came from: 'claude', 'codex', one of
+    agent_logs.TOOLS, or 'other'.
+
+    Codex families are bare model ids for compatibility with cards made
+    before other tools were read; every other tool prefixes its own name
+    ('opencode.claude-sonnet-4-5'), so two tools running one model stay apart.
+    """
     if family in FAMILIES:
         return "claude"
-    return "other" if family == OTHER else "codex"
+    if family == OTHER:
+        return "other"
+    head = family.split(".", 1)[0]
+    if "." in family and head in agent_logs.TOOLS:
+        return head
+    return "codex"
 
 
 def bucket(n):
@@ -431,6 +443,71 @@ def _scan_codex_file(path, tz, prof):
             {"active_min": active, "turns": s_turns, "prompts": s_prompts})
 
 
+def _price(model, fresh, cache_read, cache_write, output):
+    """USD for one response from another tool, or None when unpriced.
+
+    Claude models price from the Claude table only when it knows them, and
+    OpenAI models from the OpenAI table; anything else (Gemini, Qwen, Kimi)
+    is left unpriced and named, never priced at a guess.
+    """
+    name = str(model or "").lower().rsplit("/", 1)[-1]
+    if name.startswith("claude-") and pricing.is_known(name):
+        return pricing.cost_usd(name, input_tokens=fresh,
+                                output_tokens=output, cache_read=cache_read,
+                                cache_write_5m=cache_write)
+    return pricing.openai_cost_usd(name, input_tokens=fresh + cache_write,
+                                   cached_input=cache_read,
+                                   output_tokens=output)
+
+
+class Sink:
+    """Where agent_logs reports. Turns tool records into profile counts."""
+
+    def __init__(self, prof, tz):
+        self.prof = prof
+        self.tz = tz
+        self._turns = collections.Counter()
+        self._prompts = collections.Counter()
+
+    def turn(self, tool, model, when, *, fresh, cache_read, cache_write,
+             output, session, sidechain=False):
+        try:
+            local = when.astimezone(self.tz)
+        except (OverflowError, OSError, ValueError):
+            return
+        fam = agent_logs.tool_family(tool, model)
+        cost = _price(model, fresh, cache_read, cache_write, output)
+        if cost is None:
+            self.prof["unpriced"][fam] += output
+            cost = 0.0
+        _book(self.prof, local, fam, fresh, output, cache_read, cache_write,
+              cost, sidechain=sidechain)
+        self._turns[session] += 1
+
+    def prompt(self, text, *, session):
+        tokens = len(text or "") // CHARS_PER_TOKEN
+        if tokens:
+            self.prof["prompt_hist"][bucket(tokens)] += 1
+            self._prompts[session] += 1
+
+    def tool(self, name):
+        name = str(name)
+        self.prof["tools"]["mcp" if name.startswith("mcp__") else name] += 1
+
+    def session(self, key, stamps):
+        if not self._turns[key]:
+            return
+        active = 0.0
+        ordered = sorted(stamps)
+        for before, after in zip(ordered, ordered[1:]):
+            gap = (after - before).total_seconds() / 60
+            if 0 < gap <= IDLE_CAP_MIN:
+                active += gap
+        self.prof["sessions"].append(
+            {"active_min": active, "turns": self._turns[key],
+             "prompts": self._prompts[key]})
+
+
 def _codex_paths(roots):
     """Every rollout file under `roots`, once each by file name."""
     seen = {}
@@ -440,12 +517,13 @@ def _codex_paths(roots):
     return sorted(seen.values())
 
 
-def profile(root=None, tz=None, codex_roots=()):
+def profile(root=None, tz=None, codex_roots=(), agent_roots=None):
     """Fold every session file into one profile. None if empty.
 
     `root` is the Claude Code log tree. `codex_roots` are Codex session trees,
     empty by default so a caller that names a Claude tree reads nothing else;
-    the service passes CODEX_ROOTS.
+    the service passes CODEX_ROOTS. `agent_roots` maps each of
+    agent_logs.TOOLS to its log root, likewise empty unless passed.
     """
     root = root or claude_history.LOG_ROOT
     tz = tz or datetime.now().astimezone().tzinfo
@@ -456,9 +534,15 @@ def profile(root=None, tz=None, codex_roots=()):
     codex = _codex_paths(codex_roots)
     for path in codex:
         _scan_codex_file(path, tz, prof)
+    agent_files = 0
+    sink = Sink(prof, tz)
+    for tool, tool_root in (agent_roots or {}).items():
+        if tool in agent_logs.TOOLS:
+            agent_files += len(agent_logs.files(tool, tool_root))
+            agent_logs.scan(tool, tool_root, sink)
     if not prof["turns"]:
         return None
-    prof["files"] = len(paths) + len(codex)
+    prof["files"] = len(paths) + len(codex) + agent_files
     return prof
 
 
@@ -637,9 +721,10 @@ def insights(prof):
     total_out = prof["output"]
     # Every family that produced tokens, Claude's in tier order first, then
     # Codex models by output, then other.
-    codex = sorted((f for f in prof["all_by_family"]
-                    if provider_of(f) == "codex"),
-                   key=lambda f: (-prof["out_by_family"][f], f))
+    tools = ("codex",) + agent_logs.TOOLS
+    codex = [f for tool in tools for f in sorted(
+        (f for f in prof["all_by_family"] if provider_of(f) == tool),
+        key=lambda f: (-prof["out_by_family"][f], f))]
     families = list(FAMILIES) + codex + [OTHER]
     return {
         "machines": prof.get("machines", 1),

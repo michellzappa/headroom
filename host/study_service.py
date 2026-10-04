@@ -36,6 +36,7 @@ import threading
 import time
 from datetime import datetime
 
+import agent_logs
 import claude_history
 import machine_identity
 import study_card
@@ -78,12 +79,16 @@ def _shard_file(machine):
 
 
 def _fingerprint(*roots):
-    """(files, total bytes, newest mtime): cheap, and enough to notice change."""
+    """(files, total bytes, newest mtime): cheap, and enough to notice change.
+
+    Counts the JSON logs and the SQLite stores (with their write-ahead logs)
+    other agents keep, so a new turn in any of them triggers a rescan.
+    """
     count = size = newest = 0
     for root in roots:
         for base, _dirs, names in os.walk(root):
             for name in names:
-                if not name.endswith(".jsonl"):
+                if not name.endswith((".jsonl", ".json", ".db", ".db-wal")):
                     continue
                 try:
                     st = os.stat(os.path.join(base, name))
@@ -97,13 +102,18 @@ def _fingerprint(*roots):
 
 class StudyService:
     def __init__(self, log_root=None, state_dir=None, clock=time.time,
-                 tz=None, machine=None, machine_name=None, codex_roots=None):
+                 tz=None, machine=None, machine_name=None, codex_roots=None,
+                 agent_roots=None):
         self.log_root = log_root or claude_history.LOG_ROOT
         # Codex logs are read by default only when the Claude tree is too, so
         # a service pointed at a test tree never reads this Mac's ~/.codex.
         if codex_roots is None:
             codex_roots = usage_study.CODEX_ROOTS if log_root is None else ()
         self.codex_roots = tuple(codex_roots)
+        if agent_roots is None:
+            agent_roots = (agent_logs.default_roots() if log_root is None
+                           else {})
+        self.agent_roots = dict(agent_roots)
         self.dir = state_dir or STUDY_DIR
         self._clock = clock
         self._tz = tz
@@ -126,7 +136,8 @@ class StudyService:
     def _scan(self, fingerprint):
         try:
             own = usage_study.profile(root=self.log_root, tz=self._tz,
-                                      codex_roots=self.codex_roots)
+                                      codex_roots=self.codex_roots,
+                                      agent_roots=self.agent_roots)
             error = None
         except Exception as exc:          # a scan must never take down the host
             own, error = None, str(exc)
@@ -149,7 +160,8 @@ class StudyService:
 
     def refresh(self, wait=False):
         """Rescan now, whatever the fingerprint says. `wait` for tests and CLIs."""
-        fp = _fingerprint(self.log_root, *self.codex_roots)
+        fp = _fingerprint(self.log_root, *self.codex_roots,
+                          *self.agent_roots.values())
         with self._lock:
             self._start_scan(fp)
             thread = self._thread
@@ -162,7 +174,8 @@ class StudyService:
         Peer shards are not part of this. They are merged from disk on every
         read, so importing one needs no rescan of the logs.
         """
-        fp = _fingerprint(self.log_root, *self.codex_roots)
+        fp = _fingerprint(self.log_root, *self.codex_roots,
+                          *self.agent_roots.values())
         with self._lock:
             first = self._seen is None
             changed = fp != self._seen

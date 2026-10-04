@@ -1,7 +1,7 @@
 import Charts
 import SwiftUI
 
-/// The "Your usage" window: what the Claude Code and Codex session logs on this Mac say
+/// The "Your usage" window: what the coding agents' session logs on this Mac say
 /// about how you work, and the card you can hand a friend.
 ///
 /// Everything here comes from `GET /study`. The host does the reading and the
@@ -675,41 +675,56 @@ struct StudyView: View {
     /// legend, and the lightness ramp below.
     static let claudeFamilies = ["fable", "opus", "sonnet", "haiku"]
 
-    /// Which tool a family came from. The host sends Codex models by their
-    /// own id, so anything that is not a Claude family or "other" is Codex.
+    /// The other agents the host reads, in display order. Mirrors
+    /// `agent_logs.TOOLS` in the host; their families arrive as
+    /// "<tool>.<model>" ("opencode.claude-sonnet-4-5").
+    static let agentTools = ["opencode", "gemini", "qwen", "kimi", "goose"]
+
+    /// Every group the window shows, in order.
+    static let toolOrder = ["claude", "codex"] + agentTools + ["other"]
+
+    /// Which tool a family came from. Claude's four are Claude Code's, an
+    /// agent tool names itself before a dot, "other" is other, and a bare
+    /// model id is Codex's (cards made before other tools were read).
     static func provider(_ family: String) -> String {
         if claudeFamilies.contains(family) { return "claude" }
-        return family == "other" ? "other" : "codex"
+        if family == "other" { return "other" }
+        if let dot = family.firstIndex(of: "."),
+           agentTools.contains(String(family[..<dot])) {
+            return String(family[..<dot])
+        }
+        return "codex"
     }
 
     static func providerRank(_ family: String) -> Int {
-        switch provider(family) {
-        case "claude": 0
-        case "codex": 1
-        default: 2
-        }
+        toolOrder.firstIndex(of: provider(family)) ?? toolOrder.count
     }
 
-    /// Codex models by your own output, most used first. Codex tiers have no
-    /// order Headroom knows, so use sets the shade ramp instead.
-    private var codexOrder: [String] {
+    /// One tool's models by your own output, most used first. Only Claude
+    /// has tiers Headroom knows, so for every other tool use sets the order
+    /// and the shade ramp.
+    private func useOrder(_ tool: String) -> [String] {
         (store.snapshot?.insights?.models ?? [])
-            .filter { Self.provider($0.family) == "codex" }
+            .filter { Self.provider($0.family) == tool }
             .sorted { $0.outputShare > $1.outputShare }
             .map(\.family)
     }
 
-    /// Any set of families in display order: Claude by tier, Codex by your
-    /// use (a friend's model you never used goes last, by name), then other.
+    /// Any set of families in display order: Claude by tier, each other tool
+    /// by your use (a friend's model you never used goes last, by name), then
+    /// other.
     private func ordered<S: Sequence>(_ keys: S) -> [String]
         where S.Element == String {
         let present = Set(keys)
-        let codex = codexOrder.filter(present.contains)
-            + present.filter {
-                Self.provider($0) == "codex" && !codexOrder.contains($0)
+        var out = Self.claudeFamilies.filter(present.contains)
+        for tool in ["codex"] + Self.agentTools {
+            let mine = useOrder(tool)
+            out += mine.filter(present.contains)
+            out += present.filter {
+                Self.provider($0) == tool && !mine.contains($0)
             }.sorted()
-        return Self.claudeFamilies.filter(present.contains) + codex
-            + (present.contains("other") ? ["other"] : [])
+        }
+        return out + (present.contains("other") ? ["other"] : [])
     }
 
     private func sourceRGB(_ id: String) -> HeadroomPalette.RGB {
@@ -719,18 +734,35 @@ struct StudyView: View {
                 .first(where: { $0.id == id })?.accent)
     }
 
+    /// A tool's colour: its Headroom source's when there is one (Codex,
+    /// Gemini), else a fixed pick from the Settings palette, chosen to stay
+    /// apart from Claude's coral and Codex's green.
+    private func toolRGB(_ tool: String) -> HeadroomPalette.RGB {
+        if usage.snapshot.providers?.contains(where: { $0.id == tool }) == true
+            || HeadroomPalette.builtinComponents(id: tool) != nil {
+            return sourceRGB(tool)
+        }
+        let fixed = [
+            "opencode": "#34A5A0", "gemini": "#5B7FD4", "qwen": "#9FA84A",
+            "kimi": "#C7A03F", "goose": "#7FB050",
+        ]
+        return HeadroomPalette.components(hex: fixed[tool])
+            ?? HeadroomPalette.dimRGB
+    }
+
     /// The Claude source's colour, as picked in Settings → Sources.
     private var claudeRGB: HeadroomPalette.RGB { sourceRGB("claude") }
 
     private var claudeTint: Color { HeadroomPalette.rgb(claudeRGB) }
 
     /// Models of one tool share that tool's colour and step in lightness, so
-    /// the shades read as one provider and still separate in a stacked bar.
+    /// the shades read as one tool and still separate in a stacked bar.
     /// Claude steps by tier: Fable darker than the source colour, Opus at it,
-    /// Sonnet and Haiku lighter. Codex steps by use: the most used model at
-    /// the Codex colour, each next one lighter.
+    /// Sonnet and Haiku lighter. Every other tool steps by use: the most used
+    /// model at the tool's colour, each next one lighter.
     private func familyColor(_ family: String) -> Color {
-        switch Self.provider(family) {
+        let tool = Self.provider(family)
+        switch tool {
         case "claude":
             let base = claudeRGB
             switch family {
@@ -739,13 +771,14 @@ struct StudyView: View {
             case "sonnet": return Self.mix(base, toward: 255, by: 0.35)
             default: return Self.mix(base, toward: 255, by: 0.6)
             }
-        case "codex":
-            // A friend's model you never used goes after all of yours.
-            let place = codexOrder.firstIndex(of: family) ?? codexOrder.count
-            return Self.mix(sourceRGB("codex"), toward: 255,
-                            by: min(0.75, 0.22 * CGFloat(place)))
-        default:
+        case "other":
             return HeadroomPalette.dim
+        default:
+            // A friend's model you never used goes after all of yours.
+            let mine = useOrder(tool)
+            let place = mine.firstIndex(of: family) ?? mine.count
+            return Self.mix(toolRGB(tool), toward: 255,
+                            by: min(0.75, 0.22 * CGFloat(place)))
         }
     }
 
@@ -756,10 +789,18 @@ struct StudyView: View {
                             c.b + (target - c.b) * t)
     }
 
-    /// "opus" → "Opus". A Codex model keeps its id ("gpt-6-luna"), which is
-    /// what Codex itself shows.
+    /// "opus" → "Opus". Any other tool's model keeps its id ("gpt-6-luna"),
+    /// which is what the tool itself shows, without the tool prefix the
+    /// group heading already says ("opencode.claude-sonnet-4-5" →
+    /// "claude-sonnet-4-5").
     static func familyName(_ family: String) -> String {
-        provider(family) == "codex" ? family : family.capitalized
+        switch provider(family) {
+        case "claude", "other": return family.capitalized
+        case "codex": return family
+        default:
+            return family.firstIndex(of: ".")
+                .map { String(family[family.index(after: $0)...]) } ?? family
+        }
     }
 
     /// A share that rounds to 0% but is not zero reads as "<1%", so a visible
