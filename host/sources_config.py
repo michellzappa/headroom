@@ -1780,15 +1780,32 @@ def ordered_sources():
         s for s in SOURCES if s.kind != "quota")
 
 
+def is_balance_only(source_id):
+    """True for a source whose only meters are prepaid balances.
+
+    OpenRouter and AI Gateway are registered as quota sources so they share
+    the pool machinery, but a balance has no window, no ring and no pace: it
+    is account use, drawn on Activity, not a coding quota.
+    """
+    source = BY_ID.get(source_id) or BASE_BY_ID.get(
+        str(source_id).split(":", 1)[0])
+    pools = source.pools if source is not None else ()
+    return bool(pools) and all(spec.kind == KIND_BALANCE for spec in pools)
+
+
 def focus_ids(limit=FOCUS_LIMIT):
     """The first `limit` *enabled* providers in pinned order.
 
     Menu bar, widget and the ESP32 glance all render this list rather than
     each slicing their own top-N — that is what keeps the three surfaces
     showing the same providers between polls.
+
+    Balance-only sources never take a slot. With two coding quotas on, the
+    focus is two providers, not two plus a prepaid balance to fill the row.
     """
     enabled = enabled_map()
-    picked = [sid for sid in order_ids() if enabled.get(sid, True)]
+    picked = [sid for sid in order_ids()
+              if enabled.get(sid, True) and not is_balance_only(sid)]
     return picked[:limit]
 
 

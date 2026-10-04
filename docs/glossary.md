@@ -456,6 +456,8 @@ The providers the compact surfaces draw: menu-bar icon, the iOS widget, and
 the ESP32 glance slots. Picked host-side from the pinned order (enabled only,
 `sources_config.FOCUS_LIMIT`) and served as `focus` in `/usage`, so no surface
 computes its own top-N. Drag to reorder under Mac Settings → Providers.
+Prepaid balances (OpenRouter, AI Gateway) never take a slot: they have no
+window to draw. With two coding quotas on, the top 3 is two.
 
 Say **top 3** in user-facing copy, not "focus" — that word is API vocabulary.
 

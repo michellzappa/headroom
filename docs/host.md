@@ -34,7 +34,8 @@ a stale embedded host. For first-run setup see [setup.md](setup.md).
 Seeded from local detection on first run, then written by Settings. Three keys:
 
 - `enabled` — `{id: bool}`
-- `order` — pinned provider ids; the first three enabled become `focus`
+- `order` — pinned provider ids; the first three enabled coding quotas become
+  `focus` (balance-only sources such as OpenRouter are skipped)
 - `integrations_order` — pinned Integrations catalog ids (code and deploys,
   balances, services, local servers/builds). Activity lays out the subset that
   paints blocks in this order, including OpenRouter / AI Gateway account-use

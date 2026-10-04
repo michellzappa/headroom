@@ -129,6 +129,15 @@ class ProviderOrderTests(unittest.TestCase):
         self.assertEqual(
             len(sources_config.focus_ids()), sources_config.FOCUS_LIMIT)
 
+    def test_balances_never_fill_a_quota_slot(self):
+        order = list(sources_config.BURN_SOURCE_IDS)
+        sources_config.set_order(order)
+        keep = {"claude", "codex", "openrouter", "ai-gateway"}
+        sources_config.set_enabled({sid: sid in keep for sid in order})
+        self.assertEqual(sources_config.focus_ids(), ["claude", "codex"])
+        self.assertTrue(sources_config.is_balance_only("openrouter"))
+        self.assertFalse(sources_config.is_balance_only("claude"))
+
     def test_disabled_providers_are_skipped_but_keep_their_place(self):
         order = list(sources_config.BURN_SOURCE_IDS)
         sources_config.set_order(order)
