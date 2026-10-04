@@ -271,6 +271,34 @@ blits, not a lookalike in a desktop font. Change layout in
 `firmware/src/main.cpp` and change it in the renderer too, or the previews
 start lying.
 
+## The reset calendar
+
+Two ways out ([docs/calendar.md](docs/calendar.md)): an .ics feed on this Mac,
+and an EventKit writer that reaches the iPhone. Three traps cost real time.
+
+**Calendar turns `webcal://` into HTTPS and never falls back.** The host has
+no certificate, so a `webcal://` link fails with *"The request for … failed"*
+and no detail. Given `http://`, Calendar tries TLS first, then fetches over
+plain HTTP (`dataaccessd`), and that works. The Settings button copies an
+`http://` link for this reason. Do not switch it back to `webcal://` because
+it looks more correct.
+
+**The host silences request logs, so a client that fails leaves no trace.**
+`log_message` is overridden to print nothing. To see what a client actually
+sends, put a small logging server on a spare port that peeks the first bytes
+of each connection (TLS starts `\x16\x03`) and proxies to `:8737`, then point
+the client at it. That is how the HTTPS upgrade above was found. Stop it after,
+and make sure nobody is left subscribed to its port.
+
+**A subscription stored in iCloud stays empty.** Apple's servers fetch it,
+and they cannot reach a feed on this Mac. The subscription has to be On My
+Mac. The iPhone needs the EventKit path (`ResetCalendarSync`), not the feed.
+
+The EventKit writer needs `com.apple.security.personal-information.calendars`
+in `Headroom.entitlements` under Hardened Runtime. Without it, access is
+refused with no prompt. It is not a restricted entitlement, so unlike the
+iCloud ones it needs no profile.
+
 ## Versioning
 
 **Writing code and shipping it are two different jobs, and by default only
@@ -373,6 +401,17 @@ write. It cannot recurse: a push made with `GITHUB_TOKEN` does not trigger
 workflows. Do not hand-edit that file; `scripts/write-update-feed.sh` owns it.
 And do not remove `docs/CNAME` — every shipped build polls the hostname it was
 compiled with, forever, and nothing can reach the old ones to change it.
+
+**Each release adds a commit you did not write**, the `chore(feed)` commit
+above, so `origin/main` moves after every release. Shipping several sets in
+a row means `git pull --rebase` (on your unpushed chain) before each push, or
+the next push is rejected.
+
+**A notarization 403 is paperwork, not code.** *"HTTP status code: 403. A
+required agreement is missing or has expired"* from `notarytool` means the
+Apple developer agreement needs accepting by the Account Holder, at
+developer.apple.com/account. No build change fixes it. Once it is accepted,
+`gh run rerun <id>` on the failed Release run ships that version as it was.
 
 **The tag appears before the release is green.** The workflow tags early and
 notarizes afterwards, so `v1.2.9` existed for several minutes while its build
