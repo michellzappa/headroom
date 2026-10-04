@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "version": "2.2.5",
-  "published": "2026-10-04T07:41:58Z",
-  "url": "https://github.com/michellzappa/headroom/releases/download/v2.2.5/Headroom-macOS.zip",
-  "sha256": "41fd9caf50d13b3956221731e400751fd605c21345f7508febdc90ebd37b72f6",
-  "size": 7199575,
+  "version": "2.2.6",
+  "published": "2026-10-04T07:51:23Z",
+  "url": "https://github.com/michellzappa/headroom/releases/download/v2.2.6/Headroom-macOS.zip",
+  "sha256": "a13512a946c81f4f04b1d72d3dab35090fb9d8d593a523014ebab89e2d1ca6a9",
+  "size": 7251182,
   "min_macos": "14.0",
-  "notes_md": "### Added\n\n- **You can hide the attention dot on the menu bar icon.** Settings, Menu\n  bar icon has a switch for the coloured dot the icon shows when something\n  needs attention. It stays on unless you turn it off, and the popover still\n  lists what needs attention either way."
+  "notes_md": "### Added\n\n- **Your reset calendar reaches your iPhone.** Turn on Settings, Calendar,\n  On your iPhone, and Headroom keeps a calendar named Headroom in your\n  iCloud account with your upcoming resets and expiring credits, so they\n  show on your phone. Headroom asks for calendar access once, changes only\n  the events it made, and keeps past resets as a record. If you also\n  subscribed to the calendar link on this Mac, remove that subscription so\n  events do not show twice."
 }
