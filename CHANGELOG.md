@@ -7,6 +7,18 @@ are not tracked here because they move on every commit.
 Add a section here before cutting a tag. `scripts/cut-release.sh` refuses to
 tag a version that has no entry.
 
+## 2.2.6 — 2026-10-04
+
+### Added
+
+- **Your reset calendar reaches your iPhone.** Turn on Settings, Calendar,
+  On your iPhone, and Headroom keeps a calendar named Headroom in your
+  iCloud account with your upcoming resets and expiring credits, so they
+  show on your phone. Headroom asks for calendar access once, changes only
+  the events it made, and keeps past resets as a record. If you also
+  subscribed to the calendar link on this Mac, remove that subscription so
+  events do not show twice.
+
 ## 2.2.5 — 2026-10-04
 
 ### Added
