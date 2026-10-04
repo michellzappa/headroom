@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "version": "2.2.4",
-  "published": "2026-10-03T21:30:25Z",
-  "url": "https://github.com/michellzappa/headroom/releases/download/v2.2.4/Headroom-macOS.zip",
-  "sha256": "4b7d358417f26d6ec624533b256507e28cfa63eab10b0f39acf69badc7486b31",
-  "size": 7196350,
+  "version": "2.2.5",
+  "published": "2026-10-04T07:41:58Z",
+  "url": "https://github.com/michellzappa/headroom/releases/download/v2.2.5/Headroom-macOS.zip",
+  "sha256": "41fd9caf50d13b3956221731e400751fd605c21345f7508febdc90ebd37b72f6",
+  "size": 7199575,
   "min_macos": "14.0",
-  "notes_md": "### Changed\n\n- **Settings has pages for Host, Calendar and Menu bar icon.** General had\n  grown too long. It now keeps day boundaries, open at login and updates.\n- **The tile behind the menu bar icon is optional, and off.** Without it the\n  icon follows your menu bar's light or dark text again, with the larger bars\n  it had before the tile. Turn it on in Settings, Menu bar icon.\n\n### Fixed\n\n- **Subscribing to the reset calendar works.** Calendar could not open the\n  link Settings gave it. The button now copies a link Calendar accepts and\n  opens Calendar; choose File, New Calendar Subscription, paste it, and set\n  Location to On My Mac."
+  "notes_md": "### Added\n\n- **You can hide the attention dot on the menu bar icon.** Settings, Menu\n  bar icon has a switch for the coloured dot the icon shows when something\n  needs attention. It stays on unless you turn it off, and the popover still\n  lists what needs attention either way."
 }
