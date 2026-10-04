@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "version": "2.2.6",
-  "published": "2026-10-04T07:51:23Z",
-  "url": "https://github.com/michellzappa/headroom/releases/download/v2.2.6/Headroom-macOS.zip",
-  "sha256": "a13512a946c81f4f04b1d72d3dab35090fb9d8d593a523014ebab89e2d1ca6a9",
-  "size": 7251182,
+  "version": "2.2.7",
+  "published": "2026-10-04T08:01:21Z",
+  "url": "https://github.com/michellzappa/headroom/releases/download/v2.2.7/Headroom-macOS.zip",
+  "sha256": "ed06fa1ffdfabc6bc7ff67323ad3f26481964e774c3ae233c6f00034ee2bece6",
+  "size": 7260379,
   "min_macos": "14.0",
-  "notes_md": "### Added\n\n- **Your reset calendar reaches your iPhone.** Turn on Settings, Calendar,\n  On your iPhone, and Headroom keeps a calendar named Headroom in your\n  iCloud account with your upcoming resets and expiring credits, so they\n  show on your phone. Headroom asks for calendar access once, changes only\n  the events it made, and keeps past resets as a record. If you also\n  subscribed to the calendar link on this Mac, remove that subscription so\n  events do not show twice."
+  "notes_md": "### Added\n\n- **Your usage counts more coding agents.** Besides Claude Code and Codex,\n  Headroom now reads the local logs of OpenCode, Gemini CLI, Qwen Code, Kimi\n  CLI and Goose. Each tool gets its own heading and colour, and its models go\n  on your card. The readers follow each tool's own published source; a\n  record they do not recognise is skipped, not guessed. Gemini, Qwen and\n  Kimi models are not priced yet, and the cost caption names them. Copilot\n  CLI, Factory Droid and Amp are not read, because their log formats are not\n  public."
 }
