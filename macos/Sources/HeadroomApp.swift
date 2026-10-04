@@ -48,6 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         store.start()
+        ResetCalendarSync.shared.start()
         // Tokens stored before iCloud Keychain sync shipped are local-only, and
         // a local-only item is invisible to the synced query the host now runs.
         TokenStore.adoptSyncForStoredTokens()

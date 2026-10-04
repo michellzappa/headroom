@@ -107,6 +107,19 @@ class RenderTests(unittest.TestCase):
         self.assertIn("\r\n ", text)
 
 
+class PayloadTests(unittest.TestCase):
+    def test_payload_resolves_alerts_and_ignores_enabled(self):
+        options = dict(DEFAULTS, enabled=False, reset_alert_min=15)
+        got = reset_calendar.payload(doc(), options, NOW)["events"]
+        self.assertEqual(len(got), 3)
+        by_kind = {e["kind"]: e for e in got}
+        self.assertEqual(by_kind["reset"]["alert_min"], 15)
+        self.assertEqual(by_kind["expiry"]["alert_min"], 1440)
+        for e in got:
+            self.assertEqual(e["end"] - e["start"],
+                             reset_calendar.EVENT_MINUTES * 60)
+
+
 class ConfigTests(unittest.TestCase):
     def setUp(self):
         import tempfile, os
@@ -168,18 +181,27 @@ class CalendarHTTPTests(unittest.TestCase):
             status, _, _ = self.raw("GET", peer=("192.168.1.9", 4000))
         self.assertEqual(status, 403)
 
+    def test_json_for_the_app(self):
+        import json
+        status, _, body = self.raw("GET", path="/calendar.json")
+        self.assertEqual(status, 200)
+        self.assertEqual(len(json.loads(body)["events"]), 3)
+        status, _, _ = self.raw("GET", path="/calendar.json",
+                                peer=("192.168.1.9", 4000))
+        self.assertNotEqual(status, 200)
+
     def test_off_is_not_found(self):
         self.options["enabled"] = False
         status, _, _ = self.raw("GET")
         self.assertEqual(status, 404)
 
-    def raw(self, method, peer=("127.0.0.1", 12345)):
+    def raw(self, method, peer=("127.0.0.1", 12345), path="/calendar.ics"):
         import socket
         from types import SimpleNamespace
         import headroom_server
         server, client = socket.socketpair()
         try:
-            client.sendall(f"{method} /calendar.ics HTTP/1.0\r\n"
+            client.sendall(f"{method} {path} HTTP/1.0\r\n"
                            "Host: localhost\r\n\r\n".encode())
             client.shutdown(socket.SHUT_WR)
             headroom_server.Handler(server, peer,

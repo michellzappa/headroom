@@ -128,3 +128,33 @@ extension SettingsView {
         }
     }
 }
+
+/// Settings → Calendar, the EventKit half: write the same events into a
+/// calendar that syncs to the iPhone. Its own view so it can observe the
+/// sync object's status.
+struct CalendarWriteSection: View {
+    @ObservedObject var sync: ResetCalendarSync
+    @AppStorage(ResetCalendarSync.enabledKey) private var enabled = false
+
+    var body: some View {
+        Section {
+            Toggle(HeadroomCopy.calendarWrite, isOn: Binding(
+                get: { enabled },
+                set: { new in Task { await sync.setEnabled(new) } }))
+            if let status = sync.status {
+                Text(status)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if sync.accessDenied {
+                Button(HeadroomCopy.calendarOpenPrivacy) {
+                    sync.openPrivacySettings()
+                }
+            }
+        } header: {
+            Text(HeadroomCopy.calendarWriteTitle)
+        } footer: {
+            Text(HeadroomCopy.calendarWriteHint)
+        }
+    }
+}

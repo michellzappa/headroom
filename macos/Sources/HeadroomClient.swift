@@ -733,6 +733,13 @@ struct HeadroomClient: Sendable {
         return try JSONDecoder().decode(TimezoneConfiguration.self, from: data)
     }
 
+    /// The reset calendar's events, for `ResetCalendarSync` to write.
+    func fetchCalendarEvents() async throws -> [CalendarFeedEvent] {
+        let url = try base().appendingPathComponent("calendar.json")
+        let data = try await send(request(url, timeout: 10))
+        return try JSONDecoder().decode(CalendarFeedEvents.self, from: data).events
+    }
+
     func fetchCalendarConfiguration() async throws -> CalendarFeedConfiguration {
         let url = try base()
             .appendingPathComponent("config")
@@ -1023,6 +1030,27 @@ struct PlausibleConfiguration: Decodable, Sendable {
     var ok: Bool?
     var configured: Bool?
     var error: String?
+}
+
+/// `GET /calendar.json`: the feed's events with their alerts resolved.
+struct CalendarFeedEvents: Decodable, Sendable {
+    var events: [CalendarFeedEvent]
+}
+
+struct CalendarFeedEvent: Decodable, Sendable {
+    var uid: String
+    var start: Double
+    var end: Double
+    var title: String
+    var description: String
+    var kind: String
+    /// Minutes before the event, 0 for at the time, nil for no alert.
+    var alertMin: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case uid, start, end, title, description, kind
+        case alertMin = "alert_min"
+    }
 }
 
 /// `/config/calendar`: what `/calendar.ics` carries. See docs/calendar.md.

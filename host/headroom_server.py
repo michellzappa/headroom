@@ -2073,7 +2073,7 @@ class Handler(BaseHTTPRequestHandler):
                         "/config/plausible", "/config/posthog",
                         "/config/sentry", "/config/datadog", "/config/axiom",
                         "/config/timezone", "/config/display",
-                        "/config/calendar", "/calendar.ics",
+                        "/config/calendar", "/calendar.ics", "/calendar.json",
                         "/agents/capabilities", "/agents/config",
                         "/agents/claude/config", "/agents/codex/task",
                         "/agents/tasks",
@@ -2085,7 +2085,7 @@ class Handler(BaseHTTPRequestHandler):
         if not self._allowed():
             self._send_json(401, {"ok": False, "error": "token required"})
             return
-        if path in ("/calendar.ics", "/config/calendar"):
+        if path in ("/calendar.ics", "/calendar.json", "/config/calendar"):
             # Loopback only. Calendar.app on this Mac is the one subscriber;
             # it cannot send a token, and a LAN caller has no business reading
             # this Mac's reset schedule off a URL.
@@ -2096,6 +2096,10 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json(200, _calendar_config_payload())
                 return
             options = app_config.calendar_settings()
+            if path == "/calendar.json":
+                self._send_json(200, reset_calendar.payload(
+                    rollup(), options, time.time()))
+                return
             if not options["enabled"]:
                 self.send_error(404)
                 return

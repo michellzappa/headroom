@@ -16,6 +16,12 @@
 		<string>$(TeamIdentifierPrefix)group.com.centaur-labs.headroom</string>
 	</array>
 
+	<!-- Hardened Runtime blocks Calendar access unless the app declares it.
+	     Not a restricted entitlement: no profile needed. The reset calendar
+	     writes through EventKit (macos/Sources/ResetCalendarSync.swift). -->
+	<key>com.apple.security.personal-information.calendars</key>
+	<true/>
+
 	<!-- Multi-Mac CloudKit entitlements are deliberately NOT here. They are
 	     `com.apple.developer.*`, which is the restricted family: a signature
 	     carrying one without a provisioning profile that authorizes it is

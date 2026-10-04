@@ -889,6 +889,22 @@ enum HeadroomCopy {
         "The calendar is served by the host on this Mac. Point Headroom at that host to set it up."
     static let calendarUnavailable =
         "This host does not serve a calendar yet. Update Headroom."
+    static let calendarWriteTitle = "On your iPhone"
+    static let calendarWrite = "Add events to a Headroom calendar"
+    static let calendarWriteHint =
+        "Headroom writes the same events into a calendar named Headroom in your iCloud account, so they reach your iPhone. It needs access to your calendars, and only ever changes events it made."
+    static let calendarWriteDenied =
+        "Headroom does not have access to your calendars. Allow it in System Settings, Privacy & Security, Calendars."
+    static let calendarWriteStopped =
+        "Stopped. The Headroom calendar keeps the events it has; delete it in Calendar if you no longer want it."
+    static let calendarWriteNoSource =
+        "No calendar account on this Mac can hold a new calendar."
+    static let calendarOpenPrivacy = "Open Privacy Settings"
+    static func calendarWriteStatus(calendar: String, changed: Int) -> String {
+        changed == 0
+            ? "Up to date in \(calendar)."
+            : "Updated \(changed) event\(changed == 1 ? "" : "s") in \(calendar)."
+    }
     static func calendarAlertLabel(_ minutes: Int?) -> String {
         switch minutes {
         case nil: "None"

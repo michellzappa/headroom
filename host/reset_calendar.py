@@ -143,6 +143,22 @@ def _expiries(doc, pid, name, pool_id, title, pool, measured):
     return out
 
 
+def payload(doc, options, now):
+    """The events as JSON for the Mac app, which writes them to Calendar.
+
+    Same events as the feed, with each one's alert already resolved, so the
+    app carries them and decides nothing. Independent of `enabled`, which
+    only governs the .ics feed.
+    """
+    out = []
+    for event in events(doc, options, now):
+        alert = options.get("expiry_alert_min" if event["kind"] == "expiry"
+                            else "reset_alert_min")
+        out.append({**event, "end": event["start"] + EVENT_MINUTES * 60,
+                    "alert_min": alert})
+    return {"ok": True, "events": out}
+
+
 # ------------------------------------------------------------------ iCal
 
 

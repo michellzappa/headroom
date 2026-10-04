@@ -58,6 +58,7 @@ targets:
         INFOPLIST_KEY_LSUIElement: YES
         INFOPLIST_KEY_CFBundleDisplayName: Headroom
         INFOPLIST_KEY_NSHumanReadableCopyright: "Copyright © 2026"
+        INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription: "Headroom adds your upcoming quota resets and expiring credits to a calendar named Headroom, so they reach your iPhone."
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: Headroom.entitlements

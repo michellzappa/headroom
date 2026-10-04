@@ -321,7 +321,11 @@ struct SettingsView: View {
         case .host:
             Form { hostSection }.formStyle(.grouped)
         case .calendar:
-            Form { calendarSection }.formStyle(.grouped)
+            Form {
+                calendarSection
+                CalendarWriteSection(sync: ResetCalendarSync.shared)
+            }
+            .formStyle(.grouped)
         case .menuBarIcon:
             menuBarIconPane
         case .otherMacs:
