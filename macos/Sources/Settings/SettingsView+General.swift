@@ -59,6 +59,13 @@ extension SettingsView {
             } footer: {
                 Text(HeadroomCopy.menuBarIconTileHint)
             }
+            Section {
+                Toggle(HeadroomCopy.menuBarIconAttentionDot, isOn: Binding(
+                    get: { !menuBarIconHideAttentionDot },
+                    set: { menuBarIconHideAttentionDot = !$0 }))
+            } footer: {
+                Text(HeadroomCopy.menuBarIconAttentionDotHint)
+            }
         }
         .formStyle(.grouped)
     }

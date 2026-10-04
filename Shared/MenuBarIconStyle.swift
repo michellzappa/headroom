@@ -35,6 +35,15 @@ enum MenuBarIconStyle: String, CaseIterable, Sendable {
         UserDefaults.standard.bool(forKey: tileDefaultsKey)
     }
 
+    /// Hide the attention dot on the icon. Stored as "hide" so the default,
+    /// an unset key, keeps the dot. The popover and the tooltip still say
+    /// what needs attention; this only stops the icon from showing it.
+    static let hideAttentionDotDefaultsKey = "menuBarIconHideAttentionDot"
+
+    static var hideAttentionDot: Bool {
+        UserDefaults.standard.bool(forKey: hideAttentionDotDefaultsKey)
+    }
+
     /// Maps `used% − pace%` onto (−1, +1) for vertical placement.
     /// `invert` flips the sign so over-pace sits below the rail instead.
     static func paceOffset(

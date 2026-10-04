@@ -210,6 +210,8 @@ struct SettingsView: View {
     var menuBarIconInvert = false
     @AppStorage(MenuBarIconStyle.tileDefaultsKey)
     var menuBarIconTile = false
+    @AppStorage(MenuBarIconStyle.hideAttentionDotDefaultsKey)
+    var menuBarIconHideAttentionDot = false
     @State var updateInstallMessage: String?
 
     var client: HeadroomClient { HeadroomClient(endpoint: endpoint) }

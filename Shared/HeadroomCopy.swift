@@ -160,6 +160,9 @@ enum HeadroomCopy {
     /// macOS Settings → Menu bar icon. Glyph style (fuel vs pace) and the tile.
     static let menuBarIcon = "Menu bar icon"
     static let menuBarIconTile = "Show a tile behind the icon"
+    static let menuBarIconAttentionDot = "Show a dot when something needs attention"
+    static let menuBarIconAttentionDotHint =
+        "The dot appears on the icon when Attention has a warning. Off, the popover still lists what needs attention."
     static let menuBarIconTileHint =
         "A dark tile, like the app icon, so Headroom stands out from the system icons. Off, the icon follows the menu bar's light or dark text."
     static let menuBarIconRemaining = "Remaining"

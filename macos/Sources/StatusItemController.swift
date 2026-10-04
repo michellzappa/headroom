@@ -83,10 +83,11 @@ final class StatusItemController: NSObject {
         let showPip = attention?.isWarning == true
         let style = MenuBarIconStyle.current
         let invert = MenuBarIconStyle.invert
+        let drawPip = showPip && !MenuBarIconStyle.hideAttentionDot
         statusItem.button?.image = MeterIconRenderer.render(
             snapshot: snapshot,
             healthy: healthy,
-            attentionLevel: showPip ? attention?.level : nil,
+            attentionLevel: drawPip ? attention?.level : nil,
             style: style,
             invert: invert,
             tile: MenuBarIconStyle.tile
