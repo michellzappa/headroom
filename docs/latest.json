@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "version": "2.2.7",
-  "published": "2026-10-04T08:01:21Z",
-  "url": "https://github.com/michellzappa/headroom/releases/download/v2.2.7/Headroom-macOS.zip",
-  "sha256": "ed06fa1ffdfabc6bc7ff67323ad3f26481964e774c3ae233c6f00034ee2bece6",
-  "size": 7260379,
+  "version": "2.2.8",
+  "published": "2026-10-04T08:28:05Z",
+  "url": "https://github.com/michellzappa/headroom/releases/download/v2.2.8/Headroom-macOS.zip",
+  "sha256": "28eecfaee7e72182d9f9ce040c85746eceecd97769662d8a6d2315e86c082fe9",
+  "size": 7260759,
   "min_macos": "14.0",
-  "notes_md": "### Added\n\n- **Your usage counts more coding agents.** Besides Claude Code and Codex,\n  Headroom now reads the local logs of OpenCode, Gemini CLI, Qwen Code, Kimi\n  CLI and Goose. Each tool gets its own heading and colour, and its models go\n  on your card. The readers follow each tool's own published source; a\n  record they do not recognise is skipped, not guessed. Gemini, Qwen and\n  Kimi models are not priced yet, and the cost caption names them. Copilot\n  CLI, Factory Droid and Amp are not read, because their log formats are not\n  public."
+  "notes_md": "### Fixed\n\n- **Prepaid balances no longer fill a quota slot.** With two coding quotas\n  on, the desk display, the menu bar icon and the widget showed OpenRouter or\n  AI Gateway in the third slot. Balances have no window to draw, so they now\n  stay under Activity, and two coding quotas show as two slots."
 }
