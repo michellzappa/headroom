@@ -7,6 +7,15 @@ are not tracked here because they move on every commit.
 Add a section here before cutting a tag. `scripts/cut-release.sh` refuses to
 tag a version that has no entry.
 
+## 2.2.8 — 2026-10-04
+
+### Fixed
+
+- **Prepaid balances no longer fill a quota slot.** With two coding quotas
+  on, the desk display, the menu bar icon and the widget showed OpenRouter or
+  AI Gateway in the third slot. Balances have no window to draw, so they now
+  stay under Activity, and two coding quotas show as two slots.
+
 ## 2.2.7 — 2026-10-04
 
 ### Added
