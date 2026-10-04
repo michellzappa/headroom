@@ -7,6 +7,15 @@ are not tracked here because they move on every commit.
 Add a section here before cutting a tag. `scripts/cut-release.sh` refuses to
 tag a version that has no entry.
 
+## 2.2.5 — 2026-10-04
+
+### Added
+
+- **You can hide the attention dot on the menu bar icon.** Settings, Menu
+  bar icon has a switch for the coloured dot the icon shows when something
+  needs attention. It stays on unless you turn it off, and the popover still
+  lists what needs attention either way.
+
 ## 2.2.4 — 2026-10-03
 
 ### Changed
