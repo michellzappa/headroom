@@ -1,41 +1,22 @@
+import HouseKit
 import SwiftUI
 
 extension SettingsView {
+    /// The house General pane: Launch at login (HouseKit reads `SMAppService`
+    /// itself) and Updates, then Headroom's time zone and the welcome window.
     var generalPane: some View {
-        Form {
+        GeneralSettingsPane(updates: updates) {
             timezoneSection
-
-            Section {
-                Toggle(HeadroomCopy.openAtLogin, isOn: Binding(
-                    get: { openAtLogin },
-                    set: { setOpenAtLogin($0) }
-                ))
-                if openAtLoginNeedsApproval {
-                    Button(HeadroomCopy.openLoginItemsSettings) {
-                        LaunchAtLogin.openLoginItemsSettings()
-                    }
-                }
-            } footer: {
-                if let openAtLoginMessage {
-                    Text(openAtLoginMessage)
-                } else if openAtLoginNeedsApproval {
-                    Text("macOS is waiting for you to allow Headroom in Login Items.")
-                } else {
-                    Text("Start the menu bar when you log in. The background host is separate and keeps its own LaunchAgent.")
-                }
-            }
-            .onAppear(perform: refreshOpenAtLogin)
-
-            updatesSection
 
             Section {
                 Button(HeadroomCopy.showWelcome) {
                     NotificationCenter.default.post(
                         name: .headroomShowWelcome, object: nil)
                 }
+            } footer: {
+                Text("Launch at login starts the menu bar when you log in. The background host is separate and keeps its own LaunchAgent.")
             }
         }
-        .formStyle(.grouped)
     }
 
     /// Settings → Menu bar icon: what the glyph reads, and how it is drawn.
@@ -227,64 +208,6 @@ extension SettingsView {
         } catch {
             timezoneMessage = error.localizedDescription
         }
-    }
-
-    var updatesSection: some View {
-        Section {
-            LabeledContent(HeadroomCopy.appUpdatesCurrent) {
-                Text(UpdateCheck.installedVersion)
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
-            }
-            LabeledContent(HeadroomCopy.appUpdatesLatest) {
-                Text(updatesLatestLabel)
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
-            }
-            Toggle(HeadroomCopy.automaticUpdateChecks, isOn: $automaticUpdateChecks)
-            Button(
-                updates.isChecking
-                    ? HeadroomCopy.checkingForUpdates
-                    : HeadroomCopy.checkForUpdates
-            ) {
-                Task { await updates.check() }
-            }
-            .disabled(updates.isChecking)
-
-            if let found = updates.available, UpdateCheck.canSelfUpdate {
-                Button(HeadroomCopy.installUpdate) {
-                    do {
-                        try UpdateInstaller.install(found)
-                    } catch {
-                        updateInstallMessage = error.localizedDescription
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-            }
-        } header: {
-            Text(HeadroomCopy.appUpdates)
-        } footer: {
-            // A manual check still runs from a copy that cannot install what
-            // it finds, so say why the result will not turn into a button
-            // rather than leaving a dead end.
-            if let updateInstallMessage {
-                Text(updateInstallMessage)
-            } else if !UpdateCheck.canSelfUpdate {
-                Text(HeadroomCopy.updatesNotFromHere)
-            } else if updates.lastError != nil {
-                Text(HeadroomCopy.updateCheckFailed)
-            } else if updates.available == nil, updates.lastChecked != nil {
-                Text(HeadroomCopy.upToDate)
-            } else {
-                Text("Headroom looks weekly for a newer notarized build, and asks before installing one.")
-            }
-        }
-    }
-
-    /// Feed version when known; otherwise the same "Not available" the host
-    /// rows use for a field that has not been filled yet.
-    var updatesLatestLabel: String {
-        updates.latestVersion ?? HeadroomCopy.notAvailable
     }
 
     var hostSection: some View {
@@ -590,22 +513,6 @@ extension SettingsView {
         } catch {
             hostHealth = nil
             hostHealthMessage = error.localizedDescription
-        }
-    }
-
-    func refreshOpenAtLogin() {
-        openAtLogin = LaunchAtLogin.isRequested
-        openAtLoginNeedsApproval = LaunchAtLogin.needsApproval
-    }
-
-    func setOpenAtLogin(_ enabled: Bool) {
-        openAtLoginMessage = nil
-        do {
-            try LaunchAtLogin.setEnabled(enabled)
-            refreshOpenAtLogin()
-        } catch {
-            refreshOpenAtLogin()
-            openAtLoginMessage = error.localizedDescription
         }
     }
 }

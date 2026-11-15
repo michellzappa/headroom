@@ -362,7 +362,6 @@ final class ContractTests: XCTestCase {
         XCTAssertEqual(HeadroomCopy.dismissAll, "Dismiss all")
         XCTAssertEqual(HeadroomCopy.clearAttention, HeadroomCopy.dismissAll)
         XCTAssertEqual(HeadroomCopy.githubActions, "GitHub Actions")
-        XCTAssertEqual(HeadroomCopy.openAtLogin, "Open at Login")
         XCTAssertEqual(HeadroomCopy.poolBurndown("Weekly"), "Weekly burndown")
         XCTAssertEqual(HeadroomCopy.resets("3d"), "Resets 3d")
     }

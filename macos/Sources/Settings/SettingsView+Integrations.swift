@@ -1,3 +1,4 @@
+import HouseKit
 import SwiftUI
 
 extension SettingsView {
@@ -36,19 +37,9 @@ extension SettingsView {
             // Mark + title + chevron open the leaf; drag handle and toggle
             // stay their own targets (same split as Coding agents rows).
             if let kind {
-                Button {
-                    leaf = .integration(kind)
-                } label: {
-                    HStack(spacing: 8) {
-                        catalogIdentity(watch, title: title)
-                        Spacer(minLength: 8)
-                        Image(systemName: "chevron.right")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.tertiary)
-                    }
-                    .contentShape(Rectangle())
+                SettingsLeafLink(integrationLeaf(kind)) {
+                    catalogIdentity(watch, title: title)
                 }
-                .buttonStyle(.plain)
                 .help("Open")
             } else {
                 catalogIdentity(watch, title: title)
@@ -134,16 +125,9 @@ extension SettingsView {
     /// symbols of different widths — a bare `Label`/`Spacer`/`Text` stack
     /// opts that out and leaves titles drifting row to row.
     func integrationRow(_ kind: SettingsIntegration) -> some View {
-        Button {
-            leaf = .integration(kind)
-        } label: {
+        SettingsLeafLink(integrationLeaf(kind)) {
             LabeledContent {
-                HStack(spacing: 6) {
-                    integrationStatus(kind).label()
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.tertiary)
-                }
+                integrationStatus(kind).label()
             } label: {
                 Label {
                     Text(kind.title)
@@ -156,7 +140,6 @@ extension SettingsView {
                 }
             }
         }
-        .buttonStyle(.plain)
     }
 
     /// "Connected" is the wrong word for the two that need no credential, so
@@ -361,14 +344,19 @@ extension SettingsView {
         }
     }
 
+    /// The house About pane. The publisher shares the credit line; the
+    /// open-source note stays as the last footer.
     var aboutPane: some View {
-        Form {
+        AboutSettingsPane(
+            appName: HeadroomCopy.product,
+            credit: "\(HeadroomCopy.createdBy)\n\(HeadroomCopy.publisher)",
+            repository: "michellzappa/headroom",
+            links: [AboutLink(HeadroomCopy.aboutCommunityPulse, url: HeadroomTelemetry.communityURL)]
+        ) {
             Section {
-                AboutHeadroomView()
             } footer: {
                 Text(HeadroomCopy.aboutOpenSourceFooter)
             }
         }
-        .formStyle(.grouped)
     }
 }

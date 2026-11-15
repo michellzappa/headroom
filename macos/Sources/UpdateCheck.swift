@@ -1,4 +1,6 @@
 import Foundation
+import HouseKit
+import Observation
 
 /// Learning that a newer Headroom.app exists. See docs/updater.md.
 ///
@@ -217,36 +219,43 @@ enum UpdateInstaller {
 /// more often: releases are days apart at best, and this is a menu bar app
 /// that should not be spending anyone's battery on a JSON file.
 @MainActor
-final class UpdateChecker: ObservableObject {
+@Observable
+final class UpdateChecker {
     /// One per app. The poll loop runs from `AppDelegate` whether or not
     /// Settings is open, and Settings has to show what that loop found rather
     /// than starting a second one that checks again on every visit.
-    static let shared = UpdateChecker()
+    @ObservationIgnored static let shared = UpdateChecker()
 
     /// Off by default is wrong here — an update nobody hears about is the
     /// problem this exists to solve — but it stays a preference, because a Mac
     /// that manages its own software should be allowed to say so.
-    static let automaticKey = "automaticUpdateChecks"
+    @ObservationIgnored static let automaticKey = "automaticUpdateChecks"
 
-    @Published private(set) var available: AvailableUpdate?
+    private(set) var available: AvailableUpdate?
     /// Version string from the last successful feed fetch, whether or not it
     /// is newer than this copy. Settings always shows it next to Current;
     /// `available` is only set when that version is worth installing.
-    @Published private(set) var latestVersion: String?
-    @Published private(set) var lastChecked: Date?
-    @Published private(set) var lastError: String?
-    @Published private(set) var isChecking = false
+    private(set) var latestVersion: String?
+    private(set) var lastChecked: Date?
+    private(set) var lastError: String?
+    private(set) var isChecking = false
 
-    private static let interval: TimeInterval = 7 * 24 * 60 * 60
+    @ObservationIgnored private static let interval: TimeInterval = 7 * 24 * 60 * 60
 
-    private let session: URLSession
+    @ObservationIgnored private let session: URLSession
 
     init(session: URLSession = .shared) {
         self.session = session
     }
 
-    var automaticChecksEnabled: Bool {
-        UserDefaults.standard.object(forKey: Self.automaticKey) as? Bool ?? true
+    /// Stored, not read from defaults on each access, so the Settings toggle
+    /// redraws when it changes. The defaults key is the same one older
+    /// builds wrote through `@AppStorage`.
+    var automaticChecksEnabled: Bool =
+        UserDefaults.standard.object(forKey: UpdateChecker.automaticKey) as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(automaticChecksEnabled, forKey: Self.automaticKey)
+        }
     }
 
     /// Poll loop. Sleeps first so launch is never slowed by a network call
@@ -312,5 +321,27 @@ final class UpdateChecker: ObservableObject {
             lastError = error.localizedDescription
             return nil
         }
+    }
+}
+
+// MARK: - Settings
+
+/// The house Updates section (HouseKit `UpdatesSection`) reads Headroom's
+/// checker through this.
+extension UpdateChecker: UpdateChecking {
+    var installedVersion: String { UpdateCheck.installedVersion }
+    var availableVersion: String? { available?.version }
+    var automaticChecks: Bool {
+        get { automaticChecksEnabled }
+        set { automaticChecksEnabled = newValue }
+    }
+    var canInstall: Bool { UpdateCheck.canSelfUpdate }
+    var policyNote: String {
+        "Headroom looks weekly for a newer notarized build, and asks before installing one."
+    }
+    func checkForUpdates() async { await check() }
+    func installUpdate() throws {
+        guard let available else { return }
+        try UpdateInstaller.install(available)
     }
 }

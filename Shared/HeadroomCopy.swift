@@ -154,9 +154,6 @@ enum HeadroomCopy {
     /// Toggle / multi-Mac trailing captions.
     static let on = "On"
     static let off = "Off"
-    /// macOS Settings → General. Matches System Settings → Login Items wording.
-    static let openAtLogin = "Open at Login"
-    static let openLoginItemsSettings = "Open Login Items…"
     /// macOS Settings → Menu bar icon. Glyph style (fuel vs pace) and the tile.
     static let menuBarIcon = "Menu bar icon"
     static let menuBarIconTile = "Show a tile behind the icon"
@@ -732,18 +729,8 @@ enum HeadroomCopy {
 
     // MARK: Updates
 
-    /// App updates. The host has its own version skew story and its own words
-    /// (`HostSkew`); these are only ever about the .app.
-    static let appUpdates = "App updates"
-    /// This copy's `CFBundleShortVersionString`. Always shown in Settings.
-    static let appUpdatesCurrent = "Current"
-    /// What the update feed last reported. Always shown once a check has run.
-    static let appUpdatesLatest = "Latest"
-    static let automaticUpdateChecks = "Check automatically"
-    static let checkForUpdates = "Check for updates"
-    static let checkingForUpdates = "Checking…"
-    static let upToDate = "Up to date"
-    static let installUpdate = "Install and restart"
+    /// The Settings → General → Updates section is HouseKit's
+    /// `UpdatesSection`, with its own words. These are the popover's.
     /// Popover footer and Settings status when a newer build is on the feed.
     /// Left is what this copy is; right is what the feed offers.
     static func newVersionAvailable(from installed: String, to latest: String) -> String {
@@ -755,11 +742,6 @@ enum HeadroomCopy {
     ) -> String {
         "New version available: \(installed) to \(latest), install Headroom \(latest)"
     }
-    /// Said to a copy that is not in /Applications, so it must not replace
-    /// itself. Names the reason rather than greying a button with no comment.
-    static let updatesNotFromHere =
-        "Updates install to /Applications. This copy runs from somewhere else."
-    static let updateCheckFailed = "Could not reach the update feed."
 
     // MARK: Telemetry
 

@@ -104,7 +104,7 @@ struct WelcomeView: View {
             HStack(spacing: 10) {
                 if let icon = NSImage(named: "AboutAppIcon") {
                     // AboutAppIcon is the full-bleed artwork; the corner is ours
-                    // to apply here, the same way AboutHeadroomView does.
+                    // to apply here, the same way the iPhone's AboutHeadroomView does.
                     Image(nsImage: icon)
                         .resizable()
                         .frame(width: 36, height: 36)

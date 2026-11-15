@@ -121,13 +121,13 @@ surface-specific (see the end of this file), but the shape does not.
 | **Local servers** | Listening ports panel | macOS, iOS |
 | **Xcode builds** | Active `xcodebuild` / IDE compiles on this Mac | macOS, iOS |
 | **Settings** | Preferences | macOS window, iOS tab |
-| **General** | Host endpoint and runtime details, host lifecycle, Open at Login, welcome, App updates | macOS Settings |
+| **General** | The house General pane (HouseKit): Launch at login, Updates, then the time zone and the welcome window | macOS Settings |
 | **Keep the host running when Headroom is closed** | Who supervises the host. On, launchd owns it and it serves the board, iPhone and Watch whether or not the app is open. Off, the app owns it and quitting Headroom stops it. On by default. See [host.md](host.md) | macOS Settings |
 | **Remove background service…** | Stops the host, removes its LaunchAgent for both the current and legacy label, and quits. Shown only while a plist exists. The way to leave cleanly before deleting the app | macOS Settings |
-| **Open at Login** | Start the menu bar app when you log in to this Mac | macOS Settings |
-| **App updates** | Whether a newer Headroom.app exists, and installing it. Always lists **Current** (this copy) and **Latest** (the update feed) | macOS Settings |
-| **Current** | This Mac's installed Headroom.app version | macOS Settings → App updates |
-| **Latest** | Version the update feed last reported | macOS Settings → App updates |
+| **Launch at login** | Start the menu bar app when you log in to this Mac. The words are HouseKit's, the same in every house app | macOS Settings |
+| **Updates** | Whether a newer Headroom.app exists, and installing it. Always lists **This version** (this copy) and **Latest** (the update feed). HouseKit's `UpdatesSection` | macOS Settings |
+| **This version** | This Mac's installed Headroom.app version | macOS Settings → Updates |
+| **Latest** | Version the update feed last reported | macOS Settings → Updates |
 | **Providers** | AI coding-quota meters Headroom draws rings for. Order and focus live here. Claude Code / Codex connection settings live under Agents. OpenRouter and AI Gateway are prepaid balances under Integrations → Activity, not here | macOS Settings, iOS Settings, Welcome |
 | **What to watch** | Welcome rail title for the Providers step | macOS Welcome |
 | **Integrations** | Catalog of what you watch on Activity (and connect): Git, GitHub Actions, Vercel, OpenRouter, AI Gateway, Supabase, Plausible, PostHog, Sentry, Datadog, Axiom, local servers, Xcode builds. One reorderable list — enable, status, open leaf. Activity follows the same order for rows that paint a block (including OpenRouter / AI Gateway account use). Activity row count lives here; Local servers density on the Local leaf; projects and sites on each other Integration page. Claude Code and Codex live under **Agents**, not here | macOS Settings, iOS Settings |

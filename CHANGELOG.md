@@ -7,6 +7,17 @@ are not tracked here because they move on every commit.
 Add a section here before cutting a tag. `scripts/cut-release.sh` refuses to
 tag a version that has no entry.
 
+## Unreleased
+
+### Changed
+
+- **Settings uses the house settings window.** Headroom's Mac Settings now
+  runs on HouseKit's shared shell, the same window Sift uses. Every pane and
+  integration page is where it was. General shows Launch at login and
+  Updates first, then the time zone and the welcome window. Some labels take
+  the house words, for example "This version" for "Current". The iPhone app
+  does not change.
+
 ## 2.2.8 — 2026-10-04
 
 ### Fixed

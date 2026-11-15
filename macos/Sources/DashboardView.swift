@@ -19,7 +19,7 @@ struct DashboardView: View {
     /// `NavigationStack` — the latter's chrome is unreliable inside an
     /// `NSPopover`, and a Back that returns to the mode you left is clearer.
     @State private var serviceDetail: ServiceDetailSelection?
-    @ObservedObject private var updates = UpdateChecker.shared
+    private let updates = UpdateChecker.shared
     @State private var updateInstallMessage: String?
     @AppStorage("confirmServerStops")
     private var confirmServerStops = true

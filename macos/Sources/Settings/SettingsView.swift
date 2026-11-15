@@ -1,9 +1,11 @@
 import AppKit
+import HouseKit
 import SwiftUI
 
-/// Mac Settings: sidebar of intent panes + detail Forms, nested Integrations
-/// and Sync. Same taxonomy as iOS (`SettingsDestination`); accessory
-/// apps keep the system `Settings` scene so SettingsLink / ⌘, keep working.
+/// Mac Settings in the house shell (HouseKit `HouseSettingsView`): a sidebar
+/// of intent panes, detail Forms, and integration leaves pushed on top. Same
+/// taxonomy as iOS (`SettingsDestination`); accessory apps keep the system
+/// `Settings` scene so SettingsLink / ⌘, keep working.
 struct SettingsView: View {
     @AppStorage("usageEndpoint")
     var endpoint = "http://127.0.0.1:8737/usage"
@@ -173,9 +175,6 @@ struct SettingsView: View {
     @State var multiMac = MultiMacConfiguration.unknown
     @State var multiMacMessage: String?
     @State var changingMultiMac = false
-    @State var openAtLogin = LaunchAtLogin.isRequested
-    @State var openAtLoginNeedsApproval = LaunchAtLogin.needsApproval
-    @State var openAtLoginMessage: String?
     @State var hostKeepRunning = HostLifecycle.current == .launchAgent
     @State var hostLifecycleBusy = false
     @State var hostLifecycleMessage: String?
@@ -192,18 +191,10 @@ struct SettingsView: View {
     @State var savingDeskDisplay = false
     @State var usbTransportBusy = false
     @State var usbTransportMessage: String?
-    @State var selection: SettingsDestination? = .general
-    /// The pushed leaf under the selected root (one
-    /// integration under Integrations/Coding agents). A `NavigationStack`
-    /// nested inside `NavigationSplitView`'s detail can't dock its automatic
-    /// Back control into the window's real toolbar here, so it fell back to
-    /// drawing its own — a chevron floating in the content instead of sitting
-    /// in the title bar. Tracking the leaf ourselves and drawing our own Back
-    /// button removes that fallback rendering entirely.
-    @State var leaf: SettingsDestination?
-    @State var columnVisibility = NavigationSplitViewVisibility.all
-    @ObservedObject var updates = UpdateChecker.shared
-    @AppStorage(UpdateChecker.automaticKey) var automaticUpdateChecks = true
+    /// Selected pane and pushed leaf. Held here so a caller can select a
+    /// pane with `navigation.show(pane:)`.
+    @State var navigation = SettingsNavigation(selection: SettingsPane.generalID)
+    let updates = UpdateChecker.shared
     @AppStorage(MenuBarIconStyle.defaultsKey)
     var menuBarIconStyle = MenuBarIconStyle.remaining.rawValue
     @AppStorage(MenuBarIconStyle.invertDefaultsKey)
@@ -212,7 +203,6 @@ struct SettingsView: View {
     var menuBarIconTile = false
     @AppStorage(MenuBarIconStyle.hideAttentionDotDefaultsKey)
     var menuBarIconHideAttentionDot = false
-    @State var updateInstallMessage: String?
 
     var client: HeadroomClient { HeadroomClient(endpoint: endpoint) }
 
@@ -224,57 +214,11 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            List(selection: $selection) {
-                Section {
-                    ForEach(SettingsDestination.macRoots, id: \.self) { dest in
-                        Label(dest.title, systemImage: dest.symbol)
-                            .tag(dest)
-                    }
-                }
-            }
-            .listStyle(.sidebar)
-            .navigationTitle(HeadroomCopy.settings)
-            .toolbar(removing: .sidebarToggle)
-            .navigationSplitViewColumnWidth(min: 220, ideal: 220, max: 220)
-        } detail: {
-            Group {
-                if let leaf {
-                    pane(for: leaf)
-                        .navigationTitle(leaf.title)
-                        .toolbar {
-                            ToolbarItem(placement: .navigation) {
-                                Button {
-                                    self.leaf = nil
-                                } label: {
-                                    Image(systemName: "chevron.left")
-                                }
-                                .help("Back to \((selection ?? .general).title)")
-                            }
-                        }
-                } else {
-                    let dest = selection ?? .general
-                    pane(for: dest)
-                        .navigationTitle(dest.title)
-                }
-            }
-            // Identity the detail on the root so a sidebar click always
-            // rebuilds the pane — without this, SwiftUI can keep showing the
-            // previous root's body when selection updates race a leftover leaf.
-            .id(leaf.map { "leaf-\($0.title)" } ?? "root-\((selection ?? .general).title)")
-        }
-        .frame(width: 820, height: 600)
-        .formStyle(.grouped)
-        .background(SettingsWindowConfigurator())
-        .onChange(of: selection) { _, _ in
-            // Sidebar swapped the root; drop any pushed leaf so Back isn't
-            // left pointing at a pane that is no longer under it.
-            //
-            // Do not attach a TapGesture to sidebar rows: on macOS it races
-            // List(selection:) and often swallows the click, so the highlight
-            // moves (or doesn't) while the detail stays put.
-            leaf = nil
-        }
+        HouseSettingsView(
+            appName: HeadroomCopy.product,
+            panes: SettingsDestination.macRoots.map { settingsPane($0) },
+            navigation: navigation
+        )
         .task {
             tokenStored = TokenStore.supabase.exists()
             plausibleTokenStored = TokenStore.plausible.exists()
@@ -287,7 +231,6 @@ struct SettingsView: View {
             openrouterTokenStored = TokenStore.openrouter.exists()
             aiGatewayTokenStored = TokenStore.aiGateway.exists()
             hostTokenStored = TokenStore.host.exists()
-            refreshOpenAtLogin()
             await reloadSources()
             await reloadMobilePermissions()
             await reloadAgentGateway()
@@ -302,14 +245,23 @@ struct SettingsView: View {
             await reloadPostHogConfiguration()
             await reloadHostHealth()
         }
-        .onReceive(NotificationCenter.default.publisher(
-            for: NSApplication.didBecomeActiveNotification
-        )) { _ in
-            // Login Items approval happens in System Settings; re-read on return.
-            refreshOpenAtLogin()
-        }
         .onChange(of: endpoint) { _, _ in
             Task { await reloadHostHealth() }
+        }
+    }
+
+    /// One sidebar row of the house shell for a Mac root.
+    func settingsPane(_ dest: SettingsDestination) -> SettingsPane {
+        SettingsPane(id: dest.settingsID, title: dest.title, symbol: dest.symbol) {
+            pane(for: dest)
+        }
+    }
+
+    /// The page an integration row pushes, with a Back button to its pane.
+    func integrationLeaf(_ kind: SettingsIntegration) -> SettingsLeaf {
+        let dest = SettingsDestination.integration(kind)
+        return SettingsLeaf(id: dest.settingsID, title: dest.title) {
+            integrationPane(kind)
         }
     }
 
@@ -319,13 +271,12 @@ struct SettingsView: View {
         case .general:
             generalPane
         case .host:
-            Form { hostSection }.formStyle(.grouped)
+            Form { hostSection }
         case .calendar:
             Form {
                 calendarSection
                 CalendarWriteSection(sync: ResetCalendarSync.shared)
             }
-            .formStyle(.grouped)
         case .menuBarIcon:
             menuBarIconPane
         case .otherMacs:
@@ -349,6 +300,29 @@ struct SettingsView: View {
         case .connection, .permissions:
             // iOS-only destinations — Mac never selects them.
             EmptyView()
+        }
+    }
+}
+
+extension SettingsDestination {
+    /// Stable id for the house shell's pane and leaf selection.
+    var settingsID: String {
+        switch self {
+        case .general: return SettingsPane.generalID
+        case .about: return SettingsPane.aboutID
+        case .host: return "host"
+        case .calendar: return "calendar"
+        case .menuBarIcon: return "menu-bar-icon"
+        case .sources: return "sources"
+        case .codingAgents: return "coding-agents"
+        case .iPhone: return "iphone"
+        case .telemetry: return "telemetry"
+        case .integrations: return "integrations"
+        case .otherMacs: return "other-macs"
+        case .deskDisplay: return "desk-display"
+        case .integration(let kind): return "integration-\(kind.rawValue)"
+        case .connection: return "connection"
+        case .permissions: return "permissions"
         }
     }
 }

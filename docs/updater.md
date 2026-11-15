@@ -152,8 +152,7 @@ New `macos/Sources/UpdateCheck.swift`.
 - A pref to turn automatic checks off. Manual check stays available.
 
 UI home: `appVersionLabel` in [SetupView.swift:143](../macos/Sources/SetupView.swift#L143)
-already renders the version, and [Shared/AboutHeadroomView.swift](../Shared/AboutHeadroomView.swift)
-reads it too. The app is `LSUIElement`, so there is no app menu to hang
+already renders the version, and Settings → About (HouseKit's `AboutSettingsPane`) reads it too. The app is `LSUIElement`, so there is no app menu to hang
 "Check for Updates…" from — it belongs next to the version string.
 
 ## Phase 4 — the handoff

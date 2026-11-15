@@ -15,7 +15,7 @@ does not hold.
 `Headroom.app` sets `INFOPLIST_KEY_LSUIElement`
 ([project.yml:53](../macos/project.yml#L53)) and registers as a login item
 through `SMAppService.mainApp`
-([LaunchAtLogin.swift](../macos/Sources/LaunchAtLogin.swift)). It runs in the
+(HouseKit's `LaunchAtLogin`). It runs in the
 same `gui/$uid` session as the LaunchAgent. Both start at login. Both stop at
 logout. **Availability is already equal.** The app is quit only by a deliberate
 act or by a crash.
