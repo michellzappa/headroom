@@ -34,6 +34,34 @@ users recognise. Acceptable at this size. Revisit if the zip gets large.
 Also relevant: `macos/project.yml` has no SPM packages at all today. Sparkle
 would be the first, in a repo whose host is deliberately stdlib-only.
 
+## Sparkle review, 2026-11-17
+
+Michell decided that Sparkle is the one updater for all Mac apps. The other
+apps now release through the shared workflow in michellzappa/housekit
+(`release-mac.yml`) and update through HouseKit's `SparkleUpdater`.
+Headroom is the **recorded exception**: it stays on `latest.json` and
+`update-app.sh`. The reasons above were checked again on that date:
+
+| Reason | Still true? |
+|---|---|
+| The host runs from inside the bundle under a KeepAlive LaunchAgent, so a bundle swap must bracket `bootout`/`bootstrap` | Yes. `HostController.swift` writes the agent with `KeepAlive`; the host is `Contents/Resources/host`. Sparkle's installer would swap the bundle under a running agent. |
+| No second private key: the team pin in `update-app.sh` makes the feed untrusted by design | Yes. Sparkle would add a per-app EdDSA key to keep safe. |
+| No SPM packages | No longer true: Headroom depends on HouseKit by URL. Moving that pin to HouseKit 0.2.0 or later makes Xcode resolve Sparkle's package too, but Headroom does not link `HouseKitSparkle`, so nothing ships. |
+
+Two of three still hold, and the first is the one that decides. Headroom's
+`release.yml` also does more than the shared one (the `gate` job that
+releases on a `host/VERSION` bump, TestFlight, the feed commit), so it
+keeps its own workflow too.
+
+`updates.centaur-labs.io` stays Headroom's GitHub Pages site. The other apps
+do not use it: their feeds are the `appcast.xml` on each app's latest GitHub
+Release (`housekit/docs/releasing.md` says why).
+
+To migrate later: implement `SPUUpdaterDelegate` so the install is handed to
+`update-app.sh` (Sparkle downloads and verifies, the script does the swap and
+the agent choreography), or move the host out of the bundle. Either is a
+decision for Michell.
+
 ## The shape
 
 **The app is a notifier and a launcher. The script does the work.**
