@@ -13,11 +13,11 @@ packages:
   # The house settings shell, standard General/About panes and changelog
   # view (michellzappa/housekit). Mac target only: HouseKit is macOS-only, so
   # the iPhone app keeps its own About and changelog in ios/HeadroomMobile.
-  # Pinned to a commit so CI, the mini and the laptop build the same code;
+  # Pinned to a release tag so CI, the mini and the laptop build the same code;
   # move the pin on purpose.
   HouseKit:
     url: https://github.com/michellzappa/housekit
-    revision: e894441e4194c8d65dde24119976b83e4453f313
+    exactVersion: 0.1.0
 settings:
   base:
     SWIFT_VERSION: "6.0"
