@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "version": "2.2.9",
-  "published": "2026-11-20T15:52:10Z",
-  "url": "https://github.com/michellzappa/headroom/releases/download/v2.2.9/Headroom-macOS.zip",
-  "sha256": "511756f7f96bca79297705aab9d0c6de02bfbaa9a91bbf41efc22a31586d0d20",
-  "size": 7286255,
+  "version": "2.3.0",
+  "published": "2026-11-20T20:31:25Z",
+  "url": "https://github.com/michellzappa/headroom/releases/download/v2.3.0/Headroom-macOS.zip",
+  "sha256": "a74a5f5e828575e62fd1402ec9bf788e6f5a527b4357c29e32c6cb3c507ee7ae",
+  "size": 7298328,
   "min_macos": "14.0",
-  "notes_md": "### Added\n\n- **Big picture on the desk display.** Tap a provider for a large percentage\n  dial and an explicit under/over pace reading. On the 1.8-inch rectangle,\n  reset time sits beside the dial at nearly the same size. Time rounds to\n  hours, with minutes during the last hour; exhausted windows take priority.\n  Tap again for charts, or hold / press PWR to return home.\n\n### Changed\n\n- **Settings uses the house settings window.** Headroom's Mac Settings now\n  runs on HouseKit's shared shell, the same window Sift uses. Every pane and\n  integration page is where it was. General shows Launch at login and\n  Updates first, then the time zone and the welcome window. Some labels take\n  the house words, for example \"This version\" for \"Current\". The iPhone app\n  does not change."
+  "notes_md": "### Added\n\n- **Google Antigravity quota source.** Headroom now tracks your Google\n  Antigravity weekly and 5-hour session limits directly from the local\n  Antigravity language server (desktop app, IDE, or CLI), with a `state.vscdb`\n  cloud fallback when the app is closed. Includes the Antigravity icon across\n  macOS, iOS, widgets, Watch, and the ESP32 desk display.\n\n### Changed\n\n- **Agents pane removed from Settings.** Removed the non-working Agents pane\n  from Mac Settings and hid the Answer coding agents toggle in iPhone\n  permissions, while keeping host API contracts intact.\n\n### Fixed\n\n- **Menu bar updates immediately after changing sources in Settings.** Toggling,\n  reordering, renaming, or recoloring sources in Settings now pushes the fresh\n  snapshot straight to the menu bar icon, popover, and widget instead of waiting\n  for the next background poll."
 }
