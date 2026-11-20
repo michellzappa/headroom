@@ -521,3 +521,11 @@ a meter.
 - Layout / IA (popover tabs vs iOS tab bar vs ESP32 pages)
 - Host prose (`headline`, `verdict`, attention `reasons`)
 - Accessibility strings that add context around a base term
+
+## Desk display Big picture
+
+**Big picture** is the single-provider large dial, toggled with a tap on a
+provider page. **Under pace**, **On pace**, and **Over pace** compare used quota
+with even spend for the named window; the small gap is a share of that window.
+At 100% used, **Empty** and **Resets in** replace the pace comparison.
+**Reset pending** means no countdown is known or its duration has elapsed.

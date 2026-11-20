@@ -114,6 +114,29 @@ still powers the device off. Long-press sync remains available through touch.
 | Bottom-right | Link glyph — Wi‑Fi arcs or USB cable |
 | Bottom-left | Power — plug on VBUS; battery fill + % when a cell is present; bolt while charging |
 
+### Big picture
+
+Tap a provider on the glance to open a large single-window dial: the accent
+arc is percentage used, and the white dot is even spend. The large number is
+**used**, with **Under pace**, **On pace**, or **Over pace** below it. The
+smaller comparison is the gap in percentage points of the window.
+
+The longer window is shown unless a window is exhausted. At 100% used, that
+window takes priority, the dial recedes, and **Resets in** shows its countdown.
+The countdown ticks in minutes between polls, using the host's rounded duration;
+a missing or elapsed duration says **Reset pending** until the provider confirms
+a new reading. Missing quota or pace never becomes a zero or an on-pace claim.
+
+Tap again to toggle between Big picture and the provider's charts. The board
+remembers this choice in NVS. Hold the provider screen, or short-press PWR /
+secondary, to return home. BOOT still cycles pages.
+
+Preview without flashing:
+
+```bash
+.venv-shots/bin/python scripts/render_esp32_preview.py --input docs/demo_usage.json --panel round-466 --big-picture 0 --raw --out /tmp/headroom-big-picture.png
+```
+
 ### Rings or Pace
 
 The upper half has the two readings the macOS menu-bar icon has, and the board

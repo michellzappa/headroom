@@ -421,6 +421,8 @@ struct PoolRow {
   float pct = -1;
   float pace = -1;
   String resets;
+  uint32_t resetSeconds = 0;
+  uint32_t receivedMs = 0;
 };
 
 struct ProviderQuota {
@@ -643,6 +645,8 @@ enum GlanceStyle : uint8_t {
   GLANCE_PACE = 1,
 };
 static GlanceStyle glanceStyle = GLANCE_RINGS;
+// Provider pages can trade their charts for one desk-distance reading.
+static bool bigPicture = true;
 
 static Preferences prefs;
 static const char *PREFS_NS = "headroom";
@@ -650,6 +654,7 @@ static const char *PREFS_NS = "headroom";
 // restore the wrong card after this dashboard reshuffle.
 static const char *PREF_HOME_MODE = "home_pane_v2";
 static const char *PREF_GLANCE_STYLE = "glance_style";
+static const char *PREF_BIG_PICTURE = "big_picture";
 static const char *PREF_EFFECT_ID = "effect_id";
 static uint32_t lastEffectId = 0;
 static bool pendingCelebration = false;
@@ -695,6 +700,7 @@ static void glanceStyleLoad() {
   if (!prefs.begin(PREFS_NS, true)) return;
   const uint8_t saved = prefs.getUChar(PREF_GLANCE_STYLE, GLANCE_RINGS);
   glanceStyle = saved <= GLANCE_PACE ? (GlanceStyle)saved : GLANCE_RINGS;
+  bigPicture = prefs.getBool(PREF_BIG_PICTURE, true);
   prefs.end();
 }
 
@@ -1393,6 +1399,25 @@ static void applyBurndownDoc(JsonObject b, Burndown &out) {
   out.ok = out.n > 0 || out.histN > 0;
 }
 
+// Compact host duration, e.g. "2d 3h" or "12m". Retain its minute
+// precision while counting down between polls; do not invent a reset time.
+static uint32_t resetDurationSeconds(const String &value) {
+  const char *p = value.c_str();
+  uint32_t seconds = 0;
+  while (*p) {
+    while (*p == ' ') ++p;
+    char *end = nullptr;
+    const long n = strtol(p, &end, 10);
+    if (end == p || n < 0) break;
+    const uint32_t unit = *end == 'd' ? 86400 : *end == 'h' ? 3600 :
+                          *end == 'm' ? 60 : *end == 's' ? 1 : 0;
+    if (!unit) break;
+    seconds += (uint32_t)n * unit;
+    p = end + 1;
+  }
+  return seconds;
+}
+
 static bool applyUsageDoc(JsonDocument &doc) {
   updatedZ = String((const char *)(doc["updated"] | ""));
 
@@ -1433,6 +1458,8 @@ static bool applyUsageDoc(JsonDocument &doc) {
           row.pct = pool["p"].isNull() ? -1.f : (float)(pool["p"] | -1.0);
           row.pace = pool["c"].isNull() ? -1.f : (float)(pool["c"] | -1.0);
           row.resets = boardAscii((const char *)(pool["r"] | ""));
+          row.resetSeconds = resetDurationSeconds(row.resets);
+          row.receivedMs = millis();
           if (row.pct < 0) continue;   // nothing to draw; reuse the row
           slot.q.n++;
         }
@@ -4442,6 +4469,90 @@ static const Burndown &burnFor(Page p) {
   return i < slotN ? slots[i].burn : kNoBurndown;
 }
 
+// One provider, one window: same longest-window pool and pace as the home
+// Pace glyph. A missing reading never becomes a zero or an "On pace" claim.
+static void drawBigPicturePage() {
+  gfx->clear(COL_BG);
+  const int16_t W = scrW(), H = scrH();
+  const uint8_t index = slotOf(page);
+  if (index >= slotN) { present(); return; }
+  const ProviderSlot &s = slots[index];
+  const PoolRow *pool = s.q.ok && s.q.n ? &s.q.pools[0] : nullptr;
+  // A blocked short window is the useful answer even with weekly quota left.
+  if (pool) {
+    for (uint8_t i = 0; i < s.q.n; ++i) {
+      if (s.q.pools[i].pct >= 100) { pool = &s.q.pools[i]; break; }
+    }
+  }
+#if defined(BOARD_ROUND_UI)
+  const int16_t cy = H / 2, radius = 142, titleY = 30;
+  const int16_t titleW = 260;
+#else
+  const int16_t cy = H / 2 - 2, radius = (H - 148) / 2, titleY = UI_TOP;
+  const int16_t titleW = W - UI_PAD * 2;
+#endif
+  drawCentered(truncFit(s.title, titleW, 3), titleY, 3, s.accent);
+  if (pool) drawCentered(truncFit(pool->title, titleW, 2), titleY + 30, 2, COL_DIM);
+  const bool empty = pool && pool->pct >= 100;
+  const uint16_t accent = empty ? dimToward(s.accent, COL_BG, 0.45f) : s.accent;
+  drawPaceRing(W / 2, cy, radius, 18, pool ? pool->pct : -1,
+               pool ? pool->pace : -1, accent);
+  char percent[20];
+  if (pool) snprintf(percent, sizeof percent, "%.0f%%", pool->pct);
+  else snprintf(percent, sizeof percent, "--");
+  drawCentered(percent, cy - 45, 8, pool ? COL_WHITE : COL_DIM);
+  if (empty) {
+    drawCentered("Resets in", cy + 24, 2, COL_DIM);
+    const uint32_t elapsed = (millis() - pool->receivedMs) / 1000;
+    const uint32_t left = pool->resetSeconds > elapsed ? pool->resetSeconds - elapsed : 0;
+    char countdown[32];
+    // The host sends rounded durations. Display minutes, never false seconds.
+    const uint32_t minutes = (left + 59) / 60;
+    if (minutes >= 1440) snprintf(countdown, sizeof countdown, "%lud %luh",
+                                 (unsigned long)(minutes / 1440), (unsigned long)(minutes % 1440 / 60));
+    else if (minutes >= 60) snprintf(countdown, sizeof countdown, "%luh %lum",
+                                    (unsigned long)(minutes / 60), (unsigned long)(minutes % 60));
+    else if (minutes) snprintf(countdown, sizeof countdown, "%lum", (unsigned long)minutes);
+    else snprintf(countdown, sizeof countdown, "Reset pending");
+    drawCentered(countdown, cy + 47,
+                 textWidth(countdown, 3) <= radius * 2 - 56 ? 3 : 2, COL_WHITE);
+  } else {
+    drawCentered(pool ? "used" : "No reading", cy + 24, 2, COL_DIM);
+    if (pool && pool->resets.length()) {
+      drawCentered(truncFit("Resets " + pool->resets, radius * 2 - 42, 2),
+                   cy + 48, 2, COL_DIM);
+    }
+  }
+  const int16_t statusY = cy + radius + 14;
+  char status[32], comparison[40];
+  comparison[0] = '\0';
+  if (!pool) snprintf(status, sizeof status, "No reading");
+  else if (empty) snprintf(status, sizeof status, "Empty");
+  else if (pool->pace < 0) snprintf(status, sizeof status, "Pace unknown");
+  else {
+    const float delta = pool->pct - pool->pace;
+    // Round once, so a displayed zero cannot claim to be over or under.
+    const int gap = (int)lroundf(fabsf(delta));
+    snprintf(status, sizeof status, "%s", gap == 0 ? "On pace" :
+             delta > 0 ? "Over pace" : "Under pace");
+    snprintf(comparison, sizeof comparison, "%d%% %s even spend", gap,
+             gap == 0 ? "from" : delta > 0 ? "over" : "under");
+  }
+  drawCentered(status, statusY, 3, COL_WHITE);
+  if (comparison[0]) drawCentered(comparison, statusY + 28, 1, COL_DIM);
+  drawCentered("Tap: details / hold: home", H - 18, 1, COL_DIM);
+#if defined(BOARD_ROUND_UI)
+  int16_t footerX = 0, footerW = 0;
+  roundBand(418, 436, 8, &footerX, &footerW);
+  drawPowerGlyph(footerX, 436);
+  drawLinkGlyph(footerX + footerW, 436);
+#else
+  drawPowerGlyph(UI_PAD, H - UI_PAD);
+  drawLinkGlyph(W - UI_PAD, H - UI_PAD);
+#endif
+  present();
+}
+
 static void drawQuotaPage() {
   gfx->clear(COL_BG);
   const int16_t W = scrW();
@@ -4830,6 +4941,7 @@ static void drawDashboard() {
   else if (page == PAGE_VERCEL) drawVercelPage();
   else if (page == PAGE_GIT) drawGitPage();
   else if (page == PAGE_LOCAL) drawLocalPage();
+  else if (bigPicture) drawBigPicturePage();
   else drawQuotaPage();
 }
 
@@ -4838,7 +4950,7 @@ static void drawDashboard() {
 // 2.16: CST9220 via SensorLib. 1.75 round: CST9217's native command/read/ack
 // protocol, copied from the working esp32-thinking-orbs target.
 //
-// Gestures: tap slot on Headroom → detail; tap on detail → home;
+// Gestures: tap slot → provider; tap provider → big picture/charts;
 // long-press → home; BOOT → next page (cycles through all, then home).
 #if defined(BOARD_TOUCH_CST92XX)
 #if defined(BOARD_WS_AMOLED_216)
@@ -5261,7 +5373,16 @@ static UiGesture consumeGesture() {
       }
     }
 
-    // Detail page: any press with or without XY goes home immediately.
+    // Provider taps toggle the reading; wait for release so holding still
+    // returns home. No XY is required, including on the round PMU board.
+    if (isSlotPage(page)) {
+      if ((now - touchDownMs) >= LONG_PRESS_MS) {
+        touchCommitted = true;
+        lastGestureMs = now;
+        return GESTURE_HOME;
+      }
+      return GESTURE_NONE;
+    }
     if (page != PAGE_GLANCE) {
       touchCommitted = true;
       lastGestureMs = now;
@@ -5308,6 +5429,7 @@ static UiGesture consumeGesture() {
   if (!touchDown) return GESTURE_NONE;
   // A ring slot pressed and let go without being held is the tap that opens
   // its detail page. Anything already committed has had its answer.
+  const bool providerTap = isSlotPage(page) && !touchIgnore && !touchCommitted;
   const bool slotTap = page == PAGE_GLANCE && touchHaveXY && !touchIgnore &&
                        !touchCommitted;
   touchDown = false;
@@ -5315,6 +5437,10 @@ static UiGesture consumeGesture() {
   touchCommitted = false;
   touchLongFired = false;
   touchHaveXY = false;
+  if (providerTap) {
+    lastGestureMs = now;
+    return GESTURE_TAP;
+  }
   if (slotTap) {
     GlanceHit hit;
     if (glanceHitAt(touchStartX, touchStartY, &hit) && hit.kind == HIT_PAGE) {
@@ -5621,6 +5747,13 @@ static void handleInput() {
           goToPage(hit.target, "tap");
         }
       }
+    } else if (isSlotPage(page)) {
+      bigPicture = !bigPicture;
+      if (prefs.begin(PREFS_NS, false)) {
+        prefs.putBool(PREF_BIG_PICTURE, bigPicture);
+        prefs.end();
+      }
+      drawDashboard();
     } else {
       goHome();
     }
@@ -5921,6 +6054,19 @@ void loop() {
       if (st == WL_CONNECTED) {
         if (!mdnsUp) mdnsUp = MDNS.begin(OTA_HOSTNAME);
         otaBegin();
+      }
+    }
+  }
+
+  // Keep an exhausted provider's reset countdown moving between host polls.
+  static uint32_t lastCountdownDraw = 0;
+  if (!touchDown && haveData && bigPicture && isSlotPage(page) &&
+      millis() - lastCountdownDraw >= 60000) {
+    lastCountdownDraw = millis();
+    const uint8_t i = slotOf(page);
+    if (i < slotN && slots[i].q.ok) {
+      for (uint8_t j = 0; j < slots[i].q.n; ++j) {
+        if (slots[i].q.pools[j].pct >= 100) { drawDashboard(); break; }
       }
     }
   }

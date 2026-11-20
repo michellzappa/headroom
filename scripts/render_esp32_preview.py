@@ -836,6 +836,69 @@ def seal_edges(img: Image.Image, bg) -> Image.Image:
     return img
 
 
+def render_big_picture(doc: dict, provider_index: int = 0) -> Image.Image:
+    """Mirror drawBigPicturePage: longest pool, or the first exhausted pool."""
+    device = device_view.build(doc)
+    providers = (device.get("providers") or [])[:3]
+    if not 0 <= provider_index < len(providers):
+        raise ValueError("Big picture provider index is not in this device payload")
+    provider = providers[provider_index]
+    pools = provider.get("pools") or []
+    pool = (next((p for p in pools if (p.get("p") or 0) >= 100), pools[0])
+            if provider.get("ok") and pools else None)
+    img = Image.new("RGB", (W, H), COL_BG)
+    draw = ImageDraw.Draw(img)
+    accent = parse_accent(provider.get("accent"))
+    cy = H // 2 if ROUND_PANEL else H // 2 - 2
+    radius = 142 if ROUND_PANEL else (H - 148) // 2
+    title_y = 30 if ROUND_PANEL else PAD + 10
+    title_w = 260 if ROUND_PANEL else W - PAD * 2
+    draw_centered(draw, clip_fit(draw, str(provider.get("title") or "-"), title_w, 3),
+                  title_y, 3, accent)
+    if pool:
+        draw_centered(draw, clip_fit(draw, str(pool.get("t") or ""), title_w, 2),
+                      title_y + 30, 2, COL_DIM)
+    empty = bool(pool and pool.get("p", -1) >= 100)
+    ring_accent = tuple(int(v * .45 + .5) for v in accent) if empty else accent
+    draw_pace_ring(draw, W // 2, cy, radius, 18,
+                   pool.get("p") if pool else None,
+                   pool.get("c") if pool else None, ring_accent)
+    percent = f'{math.floor(pool["p"] + .5)}%' if pool else "--"
+    draw_centered(draw, percent, cy - 45, 8, COL_WHITE if pool else COL_DIM)
+    if empty:
+        draw_centered(draw, "Resets in", cy + 24, 2, COL_DIM)
+        reset = str(pool.get("r") or "Reset pending")
+        reset_font = 3 if text_w(draw, reset, 3) <= radius * 2 - 56 else 2
+        draw_centered(draw, reset, cy + 47, reset_font, COL_WHITE)
+    else:
+        draw_centered(draw, "used" if pool else "No reading", cy + 24, 2, COL_DIM)
+        if pool and pool.get("r"):
+            draw_centered(draw, clip_fit(draw, "Resets " + pool["r"], radius * 2 - 42, 2),
+                          cy + 48, 2, COL_DIM)
+    status, comparison = "No reading", ""
+    if pool:
+        if empty:
+            status = "Empty"
+        elif pool.get("c", -1) < 0:
+            status = "Pace unknown"
+        else:
+            delta = pool["p"] - pool["c"]
+            gap = math.floor(abs(delta) + .5)
+            status = "On pace" if gap == 0 else "Over pace" if delta > 0 else "Under pace"
+            direction = "from" if gap == 0 else "over" if delta > 0 else "under"
+            comparison = f"{gap}% {direction} even spend"
+    status_y = cy + radius + 14
+    draw_centered(draw, status, status_y, 3, COL_WHITE)
+    if comparison:
+        draw_centered(draw, comparison, status_y + 28, 1, COL_DIM)
+    draw_centered(draw, "Tap: details / hold: home", H - 18, 1, COL_DIM)
+    footer_x, footer_w = round_band(418, 436, 8) if ROUND_PANEL else (PAD, W - PAD * 2)
+    footer_y = 436 if ROUND_PANEL else H - PAD
+    draw_power_glyph(draw, footer_x, footer_y, power="usb")
+    draw_link_glyph(draw, footer_x + footer_w, footer_y, link_via="wifi")
+    return seal_edges(img, COL_BG)
+
+
 def render_glance(
     doc: dict,
     link_via: str = "wifi",
@@ -1268,6 +1331,8 @@ def main():
         default="landscape",
         help="ESP32 display geometry to preview",
     )
+    parser.add_argument("--big-picture", type=int, choices=range(3),
+                        metavar="SLOT", help="Render one provider's large dial (0-2)")
     parser.add_argument("--raw", action="store_true", help="Skip device bezel")
     parser.add_argument("--scale", type=int, default=3)
     args = parser.parse_args()
@@ -1299,7 +1364,7 @@ def main():
         if not args.input:
             parser.error("--input is required for the glance state")
         doc = json.loads(Path(args.input).read_text())
-        panel = render_glance(
+        panel = render_big_picture(doc, args.big_picture) if args.big_picture is not None else render_glance(
             doc,
             link_via=args.link_via,
             link_error_minutes=args.link_error_minutes,
