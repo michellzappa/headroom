@@ -7,7 +7,15 @@ are not tracked here because they move on every commit.
 Add a section here before cutting a tag. `scripts/cut-release.sh` refuses to
 tag a version that has no entry.
 
-## Unreleased
+## 2.2.9 — 2026-11-20
+
+### Added
+
+- **Big picture on the desk display.** Tap a provider for a large percentage
+  dial and an explicit under/over pace reading. On the 1.8-inch rectangle,
+  reset time sits beside the dial at nearly the same size. Time rounds to
+  hours, with minutes during the last hour; exhausted windows take priority.
+  Tap again for charts, or hold / press PWR to return home.
 
 ### Changed
 
