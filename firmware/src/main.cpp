@@ -1418,6 +1418,20 @@ static uint32_t resetDurationSeconds(const String &value) {
   return seconds;
 }
 
+// Whole hours at desk distance; minute precision only in the final hour.
+static void formatResetCountdown(uint32_t seconds, char *out, size_t capacity) {
+  if (seconds >= 3600) {
+    const uint32_t hours = (seconds + 1800) / 3600;
+    if (hours >= 24) snprintf(out, capacity, "%lud %luh",
+                              (unsigned long)(hours / 24), (unsigned long)(hours % 24));
+    else snprintf(out, capacity, "%luh", (unsigned long)hours);
+  } else if (seconds > 0) {
+    snprintf(out, capacity, "%lum", (unsigned long)((seconds + 59) / 60));
+  } else {
+    snprintf(out, capacity, "Reset pending");
+  }
+}
+
 static bool applyUsageDoc(JsonDocument &doc) {
   updatedZ = String((const char *)(doc["updated"] | ""));
 
@@ -4520,14 +4534,7 @@ static void drawBigPicturePage() {
     const uint32_t elapsed = (millis() - pool->receivedMs) / 1000;
     const uint32_t left = pool->resetSeconds > elapsed ? pool->resetSeconds - elapsed : 0;
     char countdown[32];
-    // The host sends rounded durations. Display minutes, never false seconds.
-    const uint32_t minutes = (left + 59) / 60;
-    if (minutes >= 1440) snprintf(countdown, sizeof countdown, "%lud %luh",
-                                 (unsigned long)(minutes / 1440), (unsigned long)(minutes % 1440 / 60));
-    else if (minutes >= 60) snprintf(countdown, sizeof countdown, "%luh %lum",
-                                    (unsigned long)(minutes / 60), (unsigned long)(minutes % 60));
-    else if (minutes) snprintf(countdown, sizeof countdown, "%lum", (unsigned long)minutes);
-    else snprintf(countdown, sizeof countdown, "Reset pending");
+    formatResetCountdown(left, countdown, sizeof countdown);
     // Landscape has a full column beside the dial. Other panels keep the
     // countdown inside the circle and fit its narrower lower chord.
     const float innerRadius = radius - 18;

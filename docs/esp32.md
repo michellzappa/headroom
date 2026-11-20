@@ -123,7 +123,9 @@ smaller comparison is the gap in percentage points of the window. A large
 **Resets in** countdown shows days/hours left throughout the window, including
 before the quota is exhausted. On the 1.8″ landscape display, the dial and
 countdown sit side by side, with the time almost as large as the percentage.
-Square and round panels keep the countdown inside the dial.
+Square and round panels keep the countdown inside the dial. Time rounds to
+whole hours (with days when appropriate); minutes appear only during the last
+hour before reset.
 
 The longer window is shown unless a window is exhausted. At 100% used, that
 window takes priority, the dial recedes, and **Resets in** shows its countdown.

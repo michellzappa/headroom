@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
 from pathlib import Path
 import sys
 
@@ -836,6 +837,17 @@ def seal_edges(img: Image.Image, bg) -> Image.Image:
     return img
 
 
+def reset_countdown(duration: str) -> str:
+    """Mirror formatResetCountdown(): rounded hours, minutes below one hour."""
+    units = {"d": 86400, "h": 3600, "m": 60, "s": 1}
+    seconds = sum(int(value) * units[unit]
+                  for value, unit in re.findall(r"(\d+)\s*([dhms])", duration))
+    if seconds >= 3600:
+        hours = (seconds + 1800) // 3600
+        return f"{hours // 24}d {hours % 24}h" if hours >= 24 else f"{hours}h"
+    return f"{(seconds + 59) // 60}m" if seconds else "Reset pending"
+
+
 def render_big_picture(doc: dict, provider_index: int = 0) -> Image.Image:
     """Mirror drawBigPicturePage: longest pool, or the first exhausted pool."""
     device = device_view.build(doc)
@@ -876,7 +888,7 @@ def render_big_picture(doc: dict, provider_index: int = 0) -> Image.Image:
         at_center("used", dial_x, cy + (31 if side_by_side else 9), 1, COL_DIM)
         at_center("Resets in", time_x, cy + (-52 if side_by_side else 25),
                   2 if side_by_side else 1, COL_DIM)
-        reset = str(pool.get("r") or "Reset pending")
+        reset = reset_countdown(str(pool.get("r") or ""))
         inner_radius = radius - 18
         time_width = (time_right - time_left if side_by_side else
                       int(2 * math.sqrt(max(0, inner_radius ** 2 - 64 ** 2))) - 8)
