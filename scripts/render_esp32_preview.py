@@ -131,7 +131,7 @@ def dim(color, factor):
     )
 
 
-def draw_pace_ring(draw, cx, cy, r, thick, pct, pace_pct, accent):
+def draw_pace_ring(draw, cx, cy, r, thick, pct, pace_pct, accent, dot_color=COL_WHITE):
     """One ring band. Mirror of drawPaceRing() in firmware/src/main.cpp."""
     # A neutral track at 0% is indistinguishable from background, so two empty
     # rings merge into one dark blob. Tinting the track keeps each ring legible
@@ -153,7 +153,7 @@ def draw_pace_ring(draw, cx, cy, r, thick, pct, pace_pct, accent):
         dot = round(thick * 5 / 14)
         px = cx + mid * math.cos(a)
         py = cy + mid * math.sin(a)
-        draw.ellipse([px - dot, py - dot, px + dot, py + dot], fill=COL_WHITE)
+        draw.ellipse([px - dot, py - dot, px + dot, py + dot], fill=dot_color)
 
 
 def draw_quota_ring(draw, cx, cy, r, layers, accent, label):
@@ -862,9 +862,9 @@ def render_big_picture(doc: dict, provider_index: int = 0) -> Image.Image:
     ring_accent = tuple(int(v * .45 + .5) for v in accent) if empty else accent
     draw_pace_ring(draw, W // 2, cy, radius, 18,
                    pool.get("p") if pool else None,
-                   pool.get("c") if pool else None, ring_accent)
+                   pool.get("c") if pool else None, ring_accent, dot_color=COL_BG)
     percent = f'{math.floor(pool["p"] + .5)}%' if pool else "--"
-    draw_centered(draw, percent, cy - 45, 8, COL_WHITE if pool else COL_DIM)
+    draw_centered(draw, percent, cy - 35, 6, COL_WHITE if pool else COL_DIM)
     if empty:
         draw_centered(draw, "Resets in", cy + 24, 2, COL_DIM)
         reset = str(pool.get("r") or "Reset pending")

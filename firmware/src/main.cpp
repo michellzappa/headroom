@@ -3112,7 +3112,8 @@ static void fillRoundArc(int16_t cx, int16_t cy, int16_t r, int16_t thick,
 // One ring band: track + filled arc from 12 o'clock + pace dot.
 // The gap between where the arc stops and where the dot sits is the deficit.
 static void drawPaceRing(int16_t cx, int16_t cy, int16_t r, int16_t thick,
-                         float pct, float pacePct, uint16_t accent) {
+                         float pct, float pacePct, uint16_t accent,
+                         uint16_t dotColor = COL_WHITE) {
   const int16_t inner = (int16_t)(r - thick);
   // A neutral track is indistinguishable from background at this size, so two
   // near-empty rings merge into one dark blob. Tinting keeps each ring legible
@@ -3132,7 +3133,7 @@ static void drawPaceRing(int16_t cx, int16_t cy, int16_t r, int16_t thick,
   if (pacePct >= 0) {
     float pp = pacePct > 100 ? 100 : pacePct;
     float a = -90.0f + pp * 3.6f;
-    drawPaceDot(cx, cy, r, thick, a, COL_WHITE);
+    drawPaceDot(cx, cy, r, thick, a, dotColor);
   }
 }
 
@@ -4497,11 +4498,11 @@ static void drawBigPicturePage() {
   const bool empty = pool && pool->pct >= 100;
   const uint16_t accent = empty ? dimToward(s.accent, COL_BG, 0.45f) : s.accent;
   drawPaceRing(W / 2, cy, radius, 18, pool ? pool->pct : -1,
-               pool ? pool->pace : -1, accent);
+               pool ? pool->pace : -1, accent, COL_BG);
   char percent[20];
   if (pool) snprintf(percent, sizeof percent, "%.0f%%", pool->pct);
   else snprintf(percent, sizeof percent, "--");
-  drawCentered(percent, cy - 45, 8, pool ? COL_WHITE : COL_DIM);
+  drawCentered(percent, cy - 35, 6, pool ? COL_WHITE : COL_DIM);
   if (empty) {
     drawCentered("Resets in", cy + 24, 2, COL_DIM);
     const uint32_t elapsed = (millis() - pool->receivedMs) / 1000;

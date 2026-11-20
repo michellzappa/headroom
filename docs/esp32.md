@@ -117,7 +117,7 @@ still powers the device off. Long-press sync remains available through touch.
 ### Big picture
 
 Tap a provider on the glance to open a large single-window dial: the accent
-arc is percentage used, and the white dot is even spend. The large number is
+arc is percentage used, and the black dot is even spend. The large number is
 **used**, with **Under pace**, **On pace**, or **Over pace** below it. The
 smaller comparison is the gap in percentage points of the window.
 
