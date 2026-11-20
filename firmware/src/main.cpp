@@ -4488,11 +4488,12 @@ static void drawBigPicturePage() {
   const int16_t cy = H / 2, radius = 142, titleY = 30;
   const int16_t titleW = 260;
 #else
-  const int16_t cy = H / 2 - 2, radius = (H - 148) / 2, titleY = UI_TOP;
+  const int16_t cy = H / 2, radius = (H - 160) / 2, titleY = UI_TOP;
   const int16_t titleW = W - UI_PAD * 2;
 #endif
   drawCentered(truncFit(s.title, titleW, 3), titleY, 3, s.accent);
-  if (pool) drawCentered(truncFit(pool->title, titleW, 2), titleY + 30, 2, COL_DIM);
+  if (pool) drawCentered(truncFit(pool->title, titleW, 2),
+                          titleY + (H < 400 ? 24 : 30), 2, COL_DIM);
   const bool empty = pool && pool->pct >= 100;
   const uint16_t accent = empty ? dimToward(s.accent, COL_BG, 0.45f) : s.accent;
   drawPaceRing(W / 2, cy, radius, 18, pool ? pool->pct : -1,
@@ -4514,13 +4515,16 @@ static void drawBigPicturePage() {
                                     (unsigned long)(minutes / 60), (unsigned long)(minutes % 60));
     else if (minutes) snprintf(countdown, sizeof countdown, "%lum", (unsigned long)minutes);
     else snprintf(countdown, sizeof countdown, "Reset pending");
-    drawCentered(countdown, cy + 47,
-                 textWidth(countdown, 3) <= radius * 2 - 56 ? 3 : 2, COL_WHITE);
+    const uint8_t countdownSize = H < 400
+        ? (textWidth(countdown, 2) <= radius * 2 - 100 ? 2 : 1)
+        : (textWidth(countdown, 3) <= radius * 2 - 56 ? 3 : 2);
+    drawCentered(countdown, cy + 47, countdownSize, COL_WHITE);
   } else {
     drawCentered(pool ? "used" : "No reading", cy + 24, 2, COL_DIM);
     if (pool && pool->resets.length()) {
-      drawCentered(truncFit("Resets " + pool->resets, radius * 2 - 42, 2),
-                   cy + 48, 2, COL_DIM);
+      const uint8_t resetSize = H < 400 ? 1 : 2;
+      drawCentered(truncFit("Resets " + pool->resets, radius * 2 - 80, resetSize),
+                   cy + 48, resetSize, COL_DIM);
     }
   }
   const int16_t statusY = cy + radius + 14;

@@ -849,15 +849,15 @@ def render_big_picture(doc: dict, provider_index: int = 0) -> Image.Image:
     img = Image.new("RGB", (W, H), COL_BG)
     draw = ImageDraw.Draw(img)
     accent = parse_accent(provider.get("accent"))
-    cy = H // 2 if ROUND_PANEL else H // 2 - 2
-    radius = 142 if ROUND_PANEL else (H - 148) // 2
+    cy = H // 2 if ROUND_PANEL else H // 2
+    radius = 142 if ROUND_PANEL else (H - 160) // 2
     title_y = 30 if ROUND_PANEL else PAD + 10
     title_w = 260 if ROUND_PANEL else W - PAD * 2
     draw_centered(draw, clip_fit(draw, str(provider.get("title") or "-"), title_w, 3),
                   title_y, 3, accent)
     if pool:
         draw_centered(draw, clip_fit(draw, str(pool.get("t") or ""), title_w, 2),
-                      title_y + 30, 2, COL_DIM)
+                      title_y + (24 if H < 400 else 30), 2, COL_DIM)
     empty = bool(pool and pool.get("p", -1) >= 100)
     ring_accent = tuple(int(v * .45 + .5) for v in accent) if empty else accent
     draw_pace_ring(draw, W // 2, cy, radius, 18,
@@ -868,13 +868,15 @@ def render_big_picture(doc: dict, provider_index: int = 0) -> Image.Image:
     if empty:
         draw_centered(draw, "Resets in", cy + 24, 2, COL_DIM)
         reset = str(pool.get("r") or "Reset pending")
-        reset_font = 3 if text_w(draw, reset, 3) <= radius * 2 - 56 else 2
+        reset_font = ((2 if text_w(draw, reset, 2) <= radius * 2 - 100 else 1)
+                      if H < 400 else (3 if text_w(draw, reset, 3) <= radius * 2 - 56 else 2))
         draw_centered(draw, reset, cy + 47, reset_font, COL_WHITE)
     else:
         draw_centered(draw, "used" if pool else "No reading", cy + 24, 2, COL_DIM)
         if pool and pool.get("r"):
-            draw_centered(draw, clip_fit(draw, "Resets " + pool["r"], radius * 2 - 42, 2),
-                          cy + 48, 2, COL_DIM)
+            reset_font = 1 if H < 400 else 2
+            draw_centered(draw, clip_fit(draw, "Resets " + pool["r"], radius * 2 - 80, reset_font),
+                          cy + 48, reset_font, COL_DIM)
     status, comparison = "No reading", ""
     if pool:
         if empty:
