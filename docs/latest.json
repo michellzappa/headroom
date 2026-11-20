@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "version": "2.2.8",
-  "published": "2026-10-04T08:28:05Z",
-  "url": "https://github.com/michellzappa/headroom/releases/download/v2.2.8/Headroom-macOS.zip",
-  "sha256": "28eecfaee7e72182d9f9ce040c85746eceecd97769662d8a6d2315e86c082fe9",
-  "size": 7260759,
+  "version": "2.2.9",
+  "published": "2026-11-20T15:52:10Z",
+  "url": "https://github.com/michellzappa/headroom/releases/download/v2.2.9/Headroom-macOS.zip",
+  "sha256": "511756f7f96bca79297705aab9d0c6de02bfbaa9a91bbf41efc22a31586d0d20",
+  "size": 7286255,
   "min_macos": "14.0",
-  "notes_md": "### Fixed\n\n- **Prepaid balances no longer fill a quota slot.** With two coding quotas\n  on, the desk display, the menu bar icon and the widget showed OpenRouter or\n  AI Gateway in the third slot. Balances have no window to draw, so they now\n  stay under Activity, and two coding quotas show as two slots."
+  "notes_md": "### Added\n\n- **Big picture on the desk display.** Tap a provider for a large percentage\n  dial and an explicit under/over pace reading. On the 1.8-inch rectangle,\n  reset time sits beside the dial at nearly the same size. Time rounds to\n  hours, with minutes during the last hour; exhausted windows take priority.\n  Tap again for charts, or hold / press PWR to return home.\n\n### Changed\n\n- **Settings uses the house settings window.** Headroom's Mac Settings now\n  runs on HouseKit's shared shell, the same window Sift uses. Every pane and\n  integration page is where it was. General shows Launch at login and\n  Updates first, then the time zone and the welcome window. Some labels take\n  the house words, for example \"This version\" for \"Current\". The iPhone app\n  does not change."
 }
