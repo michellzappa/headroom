@@ -1,5 +1,14 @@
 import Foundation
 
+extension Notification.Name {
+    /// Posted by Settings after mutating sources, order, accents, or titles so
+    /// the menu bar icon, popover, and widget update without waiting for the
+    /// next background poll.
+    static let headroomSnapshotDidUpdate = Notification.Name(
+        "headroom.snapshotDidUpdate"
+    )
+}
+
 @MainActor
 final class UsageStore: ObservableObject {
     @Published private(set) var snapshot = UsageSnapshot.empty

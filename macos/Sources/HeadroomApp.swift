@@ -107,6 +107,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ) { _ in
             Task { @MainActor in study.show() }
         }
+
+        NotificationCenter.default.addObserver(
+            forName: .headroomSnapshotDidUpdate,
+            object: nil,
+            queue: .main
+        ) { [weak store] notification in
+            guard let snapshot = notification.object as? UsageSnapshot else {
+                return
+            }
+            Task { @MainActor in
+                store?.noteInteraction()
+                store?.applySnapshot(snapshot, healthy: true)
+                HeadroomWidgetCache.save(snapshot)
+            }
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {

@@ -289,6 +289,10 @@ extension SettingsView {
             sources = snapshot.sources ?? []
             claudeStatus = snapshot.claudeStatusIfEnabled
             menuBarPreviewSnapshot = snapshot
+            NotificationCenter.default.post(
+                name: .headroomSnapshotDidUpdate,
+                object: snapshot
+            )
             usageProviders = Dictionary(
                 (snapshot.providers ?? []).map { ($0.id, $0) },
                 uniquingKeysWith: { first, _ in first })
