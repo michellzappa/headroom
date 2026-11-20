@@ -476,7 +476,7 @@ def fetch_quota(force=False, account=None):
         except Exception:  # noqa: BLE001
             pass
         if "UNSUPPORTED_CLIENT" in body or "IneligibleTier" in body:
-            err = "Gemini consumer OAuth deprecated — try Antigravity later"
+            err = "Gemini consumer OAuth deprecated — enable Antigravity in Sources"
         else:
             err = f"Gemini HTTP {exc.code}"
         return cache_util.keep_stale(

@@ -16,6 +16,7 @@ enum ProviderIcon {
         case "cursor": "ProviderCursor"
         case "copilot": "ProviderCopilot"
         case "gemini": "ProviderGemini"
+        case "antigravity": "ProviderAntigravity"
         case "windsurf": "ProviderWindsurf"
         case "jetbrains": "ProviderJetBrains"
         case "zed": "ProviderZed"

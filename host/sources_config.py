@@ -37,6 +37,7 @@ import threading
 from typing import Callable, NamedTuple, Optional, Union
 
 import accounts
+import antigravity_usage
 import claude_status
 import codex_usage
 import copilot_usage
@@ -724,6 +725,11 @@ _GEMINI_POOLS = (
     PoolSpec("pro", "pro", "Pro", gemini_usage.DAY_WINDOW_S),
     PoolSpec("flash", "flash", "Flash", gemini_usage.DAY_WINDOW_S),
 )
+_ANTIGRAVITY_POOLS = (
+    PoolSpec("week", "week", "Weekly", antigravity_usage.WEEK_WINDOW_S),
+    PoolSpec("session", "session", "Session",
+             antigravity_usage.SESSION_WINDOW_S),
+)
 _WINDSURF_POOLS = (
     PoolSpec("week", "week", "Weekly", windsurf_usage.WEEK_WINDOW_S),
     PoolSpec("session", "session", "Daily", windsurf_usage.DAY_WINDOW_S),
@@ -751,6 +757,15 @@ _GROK_POOLS = (
     PoolSpec("credits", "credits", "Credits", grok_usage.WEEK_WINDOW_S,
              kind=KIND_OVERAGE, ring=False),
 )
+
+
+def _detail_antigravity(payload):
+    plan = payload.get("plan")
+    for key in ("week", "session"):
+        pct = (payload.get(key) or {}).get("pct")
+        if pct is not None:
+            return f"{plan} · {key} {pct:.0f}%" if plan else f"{key} {pct:.0f}%"
+    return plan or payload.get("error")
 
 
 def _detail_grok(payload):
@@ -871,6 +886,13 @@ BASE_SOURCES = (
            subscription_prices=_GEMINI_SUBSCRIPTION_PRICES,
            subscription_pricing_url="https://gemini.google.com/advanced",
            login_hint="run `gemini` and sign in"),
+    Source("antigravity", "Antigravity", "Antigravity desktop, IDE or CLI", 60,
+           antigravity_usage.fetch_quota, detail_fn=_detail_antigravity,
+           kind="quota", group=GROUP_AI, pools=_ANTIGRAVITY_POOLS,
+           headline=("week", "session"), accent="#6F6FD0",
+           subscription_prices=_GEMINI_SUBSCRIPTION_PRICES,
+           subscription_pricing_url="https://antigravity.google",
+           login_hint="open Antigravity and sign in"),
     Source("windsurf", "Windsurf", "Windsurf IDE plan cache", 60,
            windsurf_usage.fetch_quota,
            kind="quota", group=GROUP_AI, pools=_WINDSURF_POOLS,

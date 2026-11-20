@@ -26,13 +26,13 @@ class QuotaUtilTests(unittest.TestCase):
 
 
 class RegistryHasNewProviders(unittest.TestCase):
-    def test_eleven_quota_sources(self):
+    def test_twelve_quota_sources(self):
         ids = [s.id for s in sources_config.QUOTA_SOURCES]
         self.assertEqual(
             ids,
             ["claude", "codex", "cursor", "copilot", "gemini",
-             "windsurf", "jetbrains", "zed", "grok", "openrouter",
-             "ai-gateway"],
+             "antigravity", "windsurf", "jetbrains", "zed", "grok",
+             "openrouter", "ai-gateway"],
         )
         self.assertTrue(all(s.group == sources_config.GROUP_AI for s in
                             sources_config.QUOTA_SOURCES))

@@ -483,7 +483,7 @@ enum HeadroomTelemetry {
     static func normalizedSourceID(_ id: String) -> String? {
         let base = id.split(separator: ":", maxSplits: 1).first.map(String.init) ?? id
         let allowed = Set([
-            "claude", "codex", "cursor", "gemini", "zed", "copilot",
+            "claude", "codex", "cursor", "gemini", "antigravity", "zed", "copilot",
             "grok", "windsurf", "jetbrains", "openrouter", "ai-gateway",
             "vercel", "github", "git", "supabase", "plausible", "posthog",
             "sentry", "datadog", "axiom", "local",

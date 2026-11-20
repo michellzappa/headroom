@@ -14,6 +14,7 @@ import json
 import os
 import sqlite3
 
+import antigravity_usage
 import app_config
 import copilot_usage
 import gemini_usage
@@ -212,6 +213,7 @@ PROBES = {
     "cursor": cursor_signed_in,
     "copilot": copilot_usage.signed_in,
     "gemini": gemini_usage.signed_in,
+    "antigravity": antigravity_usage.signed_in,
     "windsurf": windsurf_usage.signed_in,
     "jetbrains": jetbrains_usage.signed_in,
     "zed": zed_usage.signed_in,

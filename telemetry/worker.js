@@ -1,7 +1,7 @@
 import { communityPage } from "./community_page.js";
 
 const ALLOWED_PROVIDERS = new Set([
-  "ai-gateway", "axiom", "claude", "codex", "copilot", "cursor", "datadog",
+  "ai-gateway", "antigravity", "axiom", "claude", "codex", "copilot", "cursor", "datadog",
   "gemini", "git", "github", "grok", "jetbrains", "local", "openrouter",
   "plausible", "posthog", "sentry", "supabase", "vercel", "windsurf", "zed",
 ]);

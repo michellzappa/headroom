@@ -13,6 +13,7 @@ final class ContractTests: XCTestCase {
             "cursor": "ProviderCursor",
             "copilot": "ProviderCopilot",
             "gemini": "ProviderGemini",
+            "antigravity": "ProviderAntigravity",
             "windsurf": "ProviderWindsurf",
             "jetbrains": "ProviderJetBrains",
             "zed": "ProviderZed",

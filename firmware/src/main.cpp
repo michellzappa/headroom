@@ -1930,6 +1930,7 @@ static const uint8_t *providerMark(const String &id) {
   if (providerBaseIs(id, "cursor")) return MARK_CURSOR;
   if (providerBaseIs(id, "copilot")) return MARK_COPILOT;
   if (providerBaseIs(id, "gemini")) return MARK_GEMINI;
+  if (providerBaseIs(id, "antigravity")) return MARK_ANTIGRAVITY;
   if (providerBaseIs(id, "windsurf")) return MARK_WINDSURF;
   if (providerBaseIs(id, "jetbrains")) return MARK_JETBRAINS;
   if (providerBaseIs(id, "zed")) return MARK_ZED;
