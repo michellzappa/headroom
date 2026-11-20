@@ -865,18 +865,18 @@ def render_big_picture(doc: dict, provider_index: int = 0) -> Image.Image:
                    pool.get("c") if pool else None, ring_accent, dot_color=COL_BG)
     percent = f'{math.floor(pool["p"] + .5)}%' if pool else "--"
     draw_centered(draw, percent, cy - 35, 6, COL_WHITE if pool else COL_DIM)
-    if empty:
-        draw_centered(draw, "Resets in", cy + 24, 2, COL_DIM)
+    if pool:
+        draw_centered(draw, "used", cy + 9, 1, COL_DIM)
+        draw_centered(draw, "Resets in", cy + 25, 1, COL_DIM)
         reset = str(pool.get("r") or "Reset pending")
-        reset_font = ((2 if text_w(draw, reset, 2) <= radius * 2 - 100 else 1)
-                      if H < 400 else (3 if text_w(draw, reset, 3) <= radius * 2 - 56 else 2))
-        draw_centered(draw, reset, cy + 47, reset_font, COL_WHITE)
+        inner_radius = radius - 18
+        time_width = int(2 * math.sqrt(max(0, inner_radius ** 2 - 64 ** 2))) - 8
+        reset_font = 3
+        while reset_font > 1 and text_w(draw, reset, reset_font) > time_width:
+            reset_font -= 1
+        draw_centered(draw, reset, cy + 40, reset_font, COL_WHITE)
     else:
-        draw_centered(draw, "used" if pool else "No reading", cy + 24, 2, COL_DIM)
-        if pool and pool.get("r"):
-            reset_font = 1 if H < 400 else 2
-            draw_centered(draw, clip_fit(draw, "Resets " + pool["r"], radius * 2 - 80, reset_font),
-                          cy + 48, reset_font, COL_DIM)
+        draw_centered(draw, "No reading", cy + 24, 2, COL_DIM)
     status, comparison = "No reading", ""
     if pool:
         if empty:

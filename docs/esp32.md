@@ -119,7 +119,9 @@ still powers the device off. Long-press sync remains available through touch.
 Tap a provider on the glance to open a large single-window dial: the accent
 arc is percentage used, and the black dot is even spend. The large number is
 **used**, with **Under pace**, **On pace**, or **Over pace** below it. The
-smaller comparison is the gap in percentage points of the window.
+smaller comparison is the gap in percentage points of the window. A large
+**Resets in** countdown inside the dial shows days/hours left throughout the
+window, including before the quota is exhausted.
 
 The longer window is shown unless a window is exhausted. At 100% used, that
 window takes priority, the dial recedes, and **Resets in** shows its countdown.

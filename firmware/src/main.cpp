@@ -4503,8 +4503,9 @@ static void drawBigPicturePage() {
   if (pool) snprintf(percent, sizeof percent, "%.0f%%", pool->pct);
   else snprintf(percent, sizeof percent, "--");
   drawCentered(percent, cy - 35, 6, pool ? COL_WHITE : COL_DIM);
-  if (empty) {
-    drawCentered("Resets in", cy + 24, 2, COL_DIM);
+  if (pool) {
+    drawCentered("used", cy + 9, 1, COL_DIM);
+    drawCentered("Resets in", cy + 25, 1, COL_DIM);
     const uint32_t elapsed = (millis() - pool->receivedMs) / 1000;
     const uint32_t left = pool->resetSeconds > elapsed ? pool->resetSeconds - elapsed : 0;
     char countdown[32];
@@ -4516,17 +4517,17 @@ static void drawBigPicturePage() {
                                     (unsigned long)(minutes / 60), (unsigned long)(minutes % 60));
     else if (minutes) snprintf(countdown, sizeof countdown, "%lum", (unsigned long)minutes);
     else snprintf(countdown, sizeof countdown, "Reset pending");
-    const uint8_t countdownSize = H < 400
-        ? (textWidth(countdown, 2) <= radius * 2 - 100 ? 2 : 1)
-        : (textWidth(countdown, 3) <= radius * 2 - 56 ? 3 : 2);
-    drawCentered(countdown, cy + 47, countdownSize, COL_WHITE);
-  } else {
-    drawCentered(pool ? "used" : "No reading", cy + 24, 2, COL_DIM);
-    if (pool && pool->resets.length()) {
-      const uint8_t resetSize = H < 400 ? 1 : 2;
-      drawCentered(truncFit("Resets " + pool->resets, radius * 2 - 80, resetSize),
-                   cy + 48, resetSize, COL_DIM);
+    // Fit the full text inside the circle's chord at the bottom of this line.
+    const float innerRadius = radius - 18;
+    const int16_t timeWidth = (int16_t)(2 * sqrtf(fmaxf(0,
+        innerRadius * innerRadius - 64 * 64))) - 8;
+    uint8_t countdownSize = 3;
+    while (countdownSize > 1 && textWidth(countdown, countdownSize) > timeWidth) {
+      --countdownSize;
     }
+    drawCentered(countdown, cy + 40, countdownSize, COL_WHITE);
+  } else {
+    drawCentered("No reading", cy + 24, 2, COL_DIM);
   }
   const int16_t statusY = cy + radius + 14;
   char status[32], comparison[40];
@@ -6063,7 +6064,7 @@ void loop() {
     }
   }
 
-  // Keep an exhausted provider's reset countdown moving between host polls.
+  // Keep the large reset countdown moving between host polls.
   static uint32_t lastCountdownDraw = 0;
   if (!touchDown && haveData && bigPicture && isSlotPage(page) &&
       millis() - lastCountdownDraw >= 60000) {
@@ -6071,7 +6072,7 @@ void loop() {
     const uint8_t i = slotOf(page);
     if (i < slotN && slots[i].q.ok) {
       for (uint8_t j = 0; j < slots[i].q.n; ++j) {
-        if (slots[i].q.pools[j].pct >= 100) { drawDashboard(); break; }
+        if (slots[i].q.pools[j].resetSeconds > 0) { drawDashboard(); break; }
       }
     }
   }
