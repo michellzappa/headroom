@@ -4497,15 +4497,26 @@ static void drawBigPicturePage() {
                           titleY + (H < 400 ? 24 : 30), 2, COL_DIM);
   const bool empty = pool && pool->pct >= 100;
   const uint16_t accent = empty ? dimToward(s.accent, COL_BG, 0.45f) : s.accent;
-  drawPaceRing(W / 2, cy, radius, 18, pool ? pool->pct : -1,
+  const bool sideBySide = W > H;
+  const int16_t dialX = sideBySide ? UI_PAD + radius : W / 2;
+  const int16_t timeLeft = dialX + radius + 16;
+  const int16_t timeRight = W - UI_PAD;
+  const int16_t timeX = sideBySide ? (timeLeft + timeRight) / 2 : W / 2;
+  auto drawAtCenter = [](const char *text, int16_t x, int16_t y,
+                         uint8_t size, uint16_t color) {
+    drawTextAt(text, x - textWidth(text, size) / 2, y, size, color);
+  };
+  drawPaceRing(dialX, cy, radius, 18, pool ? pool->pct : -1,
                pool ? pool->pace : -1, accent, COL_BG);
   char percent[20];
   if (pool) snprintf(percent, sizeof percent, "%.0f%%", pool->pct);
   else snprintf(percent, sizeof percent, "--");
-  drawCentered(percent, cy - 35, 6, pool ? COL_WHITE : COL_DIM);
+  drawAtCenter(percent, dialX, cy - (sideBySide ? 21 : 35),
+               6, pool ? COL_WHITE : COL_DIM);
   if (pool) {
-    drawCentered("used", cy + 9, 1, COL_DIM);
-    drawCentered("Resets in", cy + 25, 1, COL_DIM);
+    drawAtCenter("used", dialX, cy + (sideBySide ? 31 : 9), 1, COL_DIM);
+    drawAtCenter("Resets in", timeX, cy + (sideBySide ? -52 : 25),
+                 sideBySide ? 2 : 1, COL_DIM);
     const uint32_t elapsed = (millis() - pool->receivedMs) / 1000;
     const uint32_t left = pool->resetSeconds > elapsed ? pool->resetSeconds - elapsed : 0;
     char countdown[32];
@@ -4517,17 +4528,24 @@ static void drawBigPicturePage() {
                                     (unsigned long)(minutes / 60), (unsigned long)(minutes % 60));
     else if (minutes) snprintf(countdown, sizeof countdown, "%lum", (unsigned long)minutes);
     else snprintf(countdown, sizeof countdown, "Reset pending");
-    // Fit the full text inside the circle's chord at the bottom of this line.
+    // Landscape has a full column beside the dial. Other panels keep the
+    // countdown inside the circle and fit its narrower lower chord.
     const float innerRadius = radius - 18;
-    const int16_t timeWidth = (int16_t)(2 * sqrtf(fmaxf(0,
-        innerRadius * innerRadius - 64 * 64))) - 8;
-    uint8_t countdownSize = 3;
+    const int16_t timeWidth = sideBySide ? timeRight - timeLeft
+        : (int16_t)(2 * sqrtf(fmaxf(0,
+            innerRadius * innerRadius - 64 * 64))) - 8;
+    uint8_t countdownSize = sideBySide ? 5 : 3;
     while (countdownSize > 1 && textWidth(countdown, countdownSize) > timeWidth) {
       --countdownSize;
     }
-    drawCentered(countdown, cy + 40, countdownSize, COL_WHITE);
+    drawAtCenter(countdown, timeX, cy + (sideBySide ? -17 : 40),
+                 countdownSize, COL_WHITE);
   } else {
-    drawCentered("No reading", cy + 24, 2, COL_DIM);
+    drawAtCenter("No reading", dialX, cy + 31, 2, COL_DIM);
+    if (sideBySide) {
+      drawAtCenter("Resets in", timeX, cy - 52, 2, COL_DIM);
+      drawAtCenter("--", timeX, cy - 17, 5, COL_DIM);
+    }
   }
   const int16_t statusY = cy + radius + 14;
   char status[32], comparison[40];

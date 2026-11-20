@@ -860,23 +860,35 @@ def render_big_picture(doc: dict, provider_index: int = 0) -> Image.Image:
                       title_y + (24 if H < 400 else 30), 2, COL_DIM)
     empty = bool(pool and pool.get("p", -1) >= 100)
     ring_accent = tuple(int(v * .45 + .5) for v in accent) if empty else accent
-    draw_pace_ring(draw, W // 2, cy, radius, 18,
+    side_by_side = W > H
+    dial_x = PAD + radius if side_by_side else W // 2
+    time_left, time_right = dial_x + radius + 16, W - PAD
+    time_x = (time_left + time_right) // 2 if side_by_side else W // 2
+    def at_center(text, x, y, font, fill):
+        draw_text(draw, text, x - text_w(draw, text, font) // 2, y, font, fill)
+    draw_pace_ring(draw, dial_x, cy, radius, 18,
                    pool.get("p") if pool else None,
                    pool.get("c") if pool else None, ring_accent, dot_color=COL_BG)
     percent = f'{math.floor(pool["p"] + .5)}%' if pool else "--"
-    draw_centered(draw, percent, cy - 35, 6, COL_WHITE if pool else COL_DIM)
+    at_center(percent, dial_x, cy - (21 if side_by_side else 35), 6,
+              COL_WHITE if pool else COL_DIM)
     if pool:
-        draw_centered(draw, "used", cy + 9, 1, COL_DIM)
-        draw_centered(draw, "Resets in", cy + 25, 1, COL_DIM)
+        at_center("used", dial_x, cy + (31 if side_by_side else 9), 1, COL_DIM)
+        at_center("Resets in", time_x, cy + (-52 if side_by_side else 25),
+                  2 if side_by_side else 1, COL_DIM)
         reset = str(pool.get("r") or "Reset pending")
         inner_radius = radius - 18
-        time_width = int(2 * math.sqrt(max(0, inner_radius ** 2 - 64 ** 2))) - 8
-        reset_font = 3
+        time_width = (time_right - time_left if side_by_side else
+                      int(2 * math.sqrt(max(0, inner_radius ** 2 - 64 ** 2))) - 8)
+        reset_font = 5 if side_by_side else 3
         while reset_font > 1 and text_w(draw, reset, reset_font) > time_width:
             reset_font -= 1
-        draw_centered(draw, reset, cy + 40, reset_font, COL_WHITE)
+        at_center(reset, time_x, cy + (-17 if side_by_side else 40), reset_font, COL_WHITE)
     else:
-        draw_centered(draw, "No reading", cy + 24, 2, COL_DIM)
+        at_center("No reading", dial_x, cy + 31, 2, COL_DIM)
+        if side_by_side:
+            at_center("Resets in", time_x, cy - 52, 2, COL_DIM)
+            at_center("--", time_x, cy - 17, 5, COL_DIM)
     status, comparison = "No reading", ""
     if pool:
         if empty:

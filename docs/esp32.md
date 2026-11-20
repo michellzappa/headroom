@@ -120,8 +120,10 @@ Tap a provider on the glance to open a large single-window dial: the accent
 arc is percentage used, and the black dot is even spend. The large number is
 **used**, with **Under pace**, **On pace**, or **Over pace** below it. The
 smaller comparison is the gap in percentage points of the window. A large
-**Resets in** countdown inside the dial shows days/hours left throughout the
-window, including before the quota is exhausted.
+**Resets in** countdown shows days/hours left throughout the window, including
+before the quota is exhausted. On the 1.8″ landscape display, the dial and
+countdown sit side by side, with the time almost as large as the percentage.
+Square and round panels keep the countdown inside the dial.
 
 The longer window is shown unless a window is exhausted. At 100% used, that
 window takes priority, the dial recedes, and **Resets in** shows its countdown.
