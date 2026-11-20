@@ -2839,6 +2839,13 @@ enum MobilePermission: String, CaseIterable, Codable, Sendable {
     case servers
     case agents
 
+    /// Permissions surfaced in Mac and iPhone Settings. `agents` stays in the
+    /// enum and wire struct for host compatibility while the Agents mode is
+    /// removed from the app UI.
+    static let visibleCases: [MobilePermission] = [
+        .read, .refresh, .sources, .servers,
+    ]
+
     var title: String {
         switch self {
         case .read: "Read dashboard"

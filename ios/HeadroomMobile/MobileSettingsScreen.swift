@@ -108,7 +108,7 @@ struct MobileSettingsScreen: View {
             // Four read-only rows do not need a screen of their own. They
             // belong next to the connection they qualify.
             Section {
-                ForEach(MobilePermission.allCases, id: \.rawValue) { permission in
+                ForEach(MobilePermission.visibleCases, id: \.rawValue) { permission in
                     let allowed = store.mobilePermissions[permission]
                     // A trailing `Label` inside `LabeledContent` inflates the
                     // Form row on iOS; keep the status as a fixed-size HStack.

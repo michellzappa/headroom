@@ -50,7 +50,7 @@ enum SettingsDestination: Hashable, Sendable {
     /// "Sync" row: a person looking for phone permissions searches for the
     /// word iPhone, and onboarding's phone step points at `.iPhone`.
     static let macRoots: [SettingsDestination] = [
-        .general, .menuBarIcon, .host, .sources, .integrations, .codingAgents, .iPhone,
+        .general, .menuBarIcon, .host, .sources, .integrations, .iPhone,
         .otherMacs, .deskDisplay, .calendar, .telemetry, .about,
     ]
 

@@ -35,7 +35,7 @@ extension SettingsView {
                             .foregroundStyle(.secondary)
                     }
                 }
-                ForEach(MobilePermission.allCases, id: \.rawValue) { permission in
+                ForEach(MobilePermission.visibleCases, id: \.rawValue) { permission in
                     HStack {
                         Text(permission.title)
                         Spacer()

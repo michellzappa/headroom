@@ -128,9 +128,9 @@ surface-specific (see the end of this file), but the shape does not.
 | **Updates** | Whether a newer Headroom.app exists, and installing it. Always lists **This version** (this copy) and **Latest** (the update feed). HouseKit's `UpdatesSection` | macOS Settings |
 | **This version** | This Mac's installed Headroom.app version | macOS Settings → Updates |
 | **Latest** | Version the update feed last reported | macOS Settings → Updates |
-| **Providers** | AI coding-quota meters Headroom draws rings for. Order and focus live here. Claude Code / Codex connection settings live under Agents. OpenRouter and AI Gateway are prepaid balances under Integrations → Activity, not here | macOS Settings, iOS Settings, Welcome |
+| **Providers** | AI coding-quota meters Headroom draws rings for. Order and focus live here. OpenRouter and AI Gateway are prepaid balances under Integrations → Activity, not here | macOS Settings, iOS Settings, Welcome |
 | **What to watch** | Welcome rail title for the Providers step | macOS Welcome |
-| **Integrations** | Catalog of what you watch on Activity (and connect): Git, GitHub Actions, Vercel, OpenRouter, AI Gateway, Supabase, Plausible, PostHog, Sentry, Datadog, Axiom, local servers, Xcode builds. One reorderable list — enable, status, open leaf. Activity follows the same order for rows that paint a block (including OpenRouter / AI Gateway account use). Activity row count lives here; Local servers density on the Local leaf; projects and sites on each other Integration page. Claude Code and Codex live under **Agents**, not here | macOS Settings, iOS Settings |
+| **Integrations** | Catalog of what you watch on Activity (and connect): Git, GitHub Actions, Vercel, OpenRouter, AI Gateway, Supabase, Plausible, PostHog, Sentry, Datadog, Axiom, local servers, Xcode builds. One reorderable list — enable, status, open leaf. Activity follows the same order for rows that paint a block (including OpenRouter / AI Gateway account use). Activity row count lives here; Local servers density on the Local leaf; projects and sites on each other Integration page | macOS Settings, iOS Settings |
 | **Show in Headroom** | The dev-tool on/off on its Integrations leaf. Off stops polling and hides the rows; the key stays in the Keychain, which is what **Disconnect** clears | macOS Settings |
 | **Code and deploys** | Integrations leaves: **Git** (local commits on this Mac), **GitHub Actions** (CI via PAT), **Vercel** (CLI login) — three leaves because they use three different credentials | macOS Settings |
 | **Status** | Integration detail caption: connected, Keychain, hooks state, signed-in | macOS Settings |
@@ -402,6 +402,7 @@ undifferentiated pile of toggles:
 | `cursor` | Cursor | `ai` |
 | `copilot` | Copilot | `ai` |
 | `gemini` | Gemini | `ai` |
+| `antigravity` | Antigravity | `ai` |
 | `windsurf` | Windsurf | `ai` |
 | `jetbrains` | JetBrains AI | `ai` |
 | `zed` | Zed | `ai` |
