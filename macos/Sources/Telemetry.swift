@@ -599,9 +599,6 @@ final class TelemetryCoordinator {
         let client = HeadroomClient()
         let snapshot = isLocalHost ? try? await client.fetchUsage() : nil
         let health = isLocalHost ? try? await client.health() : nil
-        let agent = isLocalHost
-            ? try? await client.fetchAgentGatewayConfiguration()
-            : nil
         let multiMac = isLocalHost
             ? try? await client.fetchMultiMacConfiguration()
             : nil
@@ -652,7 +649,7 @@ final class TelemetryCoordinator {
             models: HeadroomTelemetry.modelShares(snapshot?.history),
             features: [
                 "phone_paired": HostController.mobileToken != nil,
-                "agent_gateway_enabled": agent?.enabled == true,
+                "agent_gateway_enabled": false,
                 "multi_mac_enabled": multiMac?.enabled == true,
             ]
         )

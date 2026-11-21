@@ -159,19 +159,6 @@ struct SettingsView: View {
     @State var mobileTokenMessage: String?
     @State var mobilePermissions = MobilePermissions.allEnabled
     @State var changingMobilePermission: MobilePermission?
-    @State var agentGatewayEnabled = false
-    @State var agentAlerts = true
-    @State var codexBinary = "codex"
-    @State var agentProviderStatus: AgentProviderStatus?
-    @State var agentGatewayMessage: String?
-    @State var agentTaskSurface: AgentTaskSurface?
-    @State var pickedTaskFolder: String?
-    @State var changingAgentGateway = false
-    @State var changingAgentAlerts = false
-    @State var claudeHooks: ClaudeHookConfiguration?
-    @State var claudeHooksMessage: String?
-    @State var changingClaudeHooks = false
-    @State var claudeQuestionMode = "notify"
     @State var multiMac = MultiMacConfiguration.unknown
     @State var multiMacMessage: String?
     @State var changingMultiMac = false
@@ -282,8 +269,6 @@ struct SettingsView: View {
             deskDisplayPane
         case .sources:
             sourcesPane
-        case .codingAgents:
-            codingAgentsPane
         case .iPhone:
             iPhonePane
         case .telemetry:
@@ -311,7 +296,6 @@ extension SettingsDestination {
         case .calendar: return "calendar"
         case .menuBarIcon: return "menu-bar-icon"
         case .sources: return "sources"
-        case .codingAgents: return "coding-agents"
         case .iPhone: return "iphone"
         case .telemetry: return "telemetry"
         case .integrations: return "integrations"

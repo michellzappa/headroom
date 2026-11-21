@@ -253,38 +253,6 @@ struct MobileHeadroomClient: Sendable {
             .permissions
     }
 
-    func fetchAgentAttentionEvents() async throws -> [AgentAttentionEvent] {
-        let url = try base()
-            .appending(path: "attention")
-            .appending(path: "events")
-        let data = try await send(url: url)
-        return try JSONDecoder()
-            .decode(AgentAttentionEventsResponse.self, from: data)
-            .events
-    }
-
-    func respond(
-        to event: AgentAttentionEvent,
-        action: AgentAttentionAction,
-        idempotencyKey: String
-    ) async throws -> AgentAttentionEvent {
-        let url = try base()
-            .appending(path: "attention")
-            .appending(path: "events")
-            .appending(path: event.id)
-            .appending(path: "respond")
-        let body = try JSONEncoder().encode(AgentAttentionResponseRequest(
-            revision: event.revision,
-            action: action.id,
-            idempotencyKey: idempotencyKey,
-            text: nil
-        ))
-        let data = try await send(url: url, method: "POST", body: body)
-        return try JSONDecoder()
-            .decode(AgentAttentionResponse.self, from: data)
-            .event
-    }
-
     func setSources(_ enabled: [String: Bool]) async throws -> [String: Bool] {
         let url = try base()
             .appending(path: "sources")

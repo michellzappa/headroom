@@ -2,18 +2,8 @@ import Foundation
 import UserNotifications
 
 enum MobileNotifications {
-    static let agentNotificationTapped = Notification.Name(
-        "headroom.agent-notification-tapped"
-    )
-
     static func installDelegate() {
         UNUserNotificationCenter.current().delegate = NotificationDelegate.shared
-    }
-
-    static func agentEventID(
-        from userInfo: [AnyHashable: Any]
-    ) -> String? {
-        userInfo["agent_event_id"] as? String
     }
 
     static func requestAuthorization() async {
@@ -83,37 +73,9 @@ enum MobileNotifications {
         }
     }
 
-    static func notifyIfNeeded(_ events: [AgentAttentionEvent]) async {
-        guard UserDefaults.standard.bool(forKey: "notificationsEnabled") else {
-            return
-        }
-        for event in events where event.state == "pending" {
-            let key = "lastNotifiedAgentEvent-\(event.id)"
-            guard !UserDefaults.standard.bool(forKey: key) else { continue }
-            let content = UNMutableNotificationContent()
-            content.title = event.notificationTitle
-            content.body = event.summary
-            content.sound = .default
-            var userInfo: [AnyHashable: Any] = ["agent_event_id": event.id]
-            if let machineID = event.machineID {
-                userInfo["machine_id"] = machineID
-            }
-            content.userInfo = userInfo
-            let request = UNNotificationRequest(
-                identifier: "headroom-agent-\(event.id)",
-                content: content,
-                trigger: nil
-            )
-            if (try? await UNUserNotificationCenter.current().add(request)) != nil {
-                UserDefaults.standard.set(true, forKey: key)
-            }
-        }
-    }
-
-    // The singleton has no mutable state; callbacks are forwarded to
-    // NotificationCenter on the main queue. NSObject protocol conformances
-    // are not annotated Sendable, so state this invariant explicitly for
-    // Swift 6's global-actor checking.
+    // The singleton has no mutable state. NSObject protocol conformances are
+    // not annotated Sendable, so state this invariant explicitly for Swift 6's
+    // global-actor checking.
     private final class NotificationDelegate: NSObject,
         UNUserNotificationCenterDelegate, @unchecked Sendable {
         static let shared = NotificationDelegate()
@@ -124,27 +86,7 @@ enum MobileNotifications {
             withCompletionHandler completionHandler:
                 @escaping (UNNotificationPresentationOptions) -> Void
         ) {
-            // Keep the doorbell visible when the app is already open. The
-            // Attention tab is still the place where a response is made.
             completionHandler([.banner, .sound])
-        }
-
-        func userNotificationCenter(
-            _ center: UNUserNotificationCenter,
-            didReceive response: UNNotificationResponse,
-            withCompletionHandler completionHandler: @escaping () -> Void
-        ) {
-            let userInfo = response.notification.request.content.userInfo
-            if let eventID = MobileNotifications.agentEventID(from: userInfo) {
-                DispatchQueue.main.async {
-                    NotificationCenter.default.post(
-                        name: MobileNotifications.agentNotificationTapped,
-                        object: nil,
-                        userInfo: ["agent_event_id": eventID]
-                    )
-                }
-            }
-            completionHandler()
         }
     }
 }

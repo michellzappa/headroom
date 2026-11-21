@@ -19,7 +19,6 @@ struct RootView: View {
     @State private var showsConnection = false
     @State private var showsSettings = false
     @State private var selectedTab: MobileTab = .overview
-    @State private var focusedAgentEventID: String?
 
     var body: some View {
         Group {
@@ -35,7 +34,6 @@ struct RootView: View {
                     NavigationStack {
                         AttentionScreen(
                             store: store,
-                            focusedEventID: $focusedAgentEventID,
                             showsSettings: $showsSettings
                         )
                     }
@@ -70,30 +68,6 @@ struct RootView: View {
                 }
             }
         }
-        .onReceive(
-            NotificationCenter.default.publisher(
-                for: MobileNotifications.agentNotificationTapped
-            )
-        ) { notification in
-            guard let eventID = notification.userInfo?["agent_event_id"]
-                as? String else { return }
-            Task {
-                // Refresh before choosing the destination. A notification
-                // can outlive the event if the Mac already answered it.
-                await store.refresh()
-                if let event = store.agentAttentionEvents.first(
-                    where: { $0.id == eventID }
-                ) {
-                    selectedTab = .attention
-                    focusedAgentEventID = eventID
-                } else {
-                    // The request was answered or expired; Attention is the
-                    // honest destination for the resulting all-clear state.
-                    selectedTab = .attention
-                    focusedAgentEventID = nil
-                }
-            }
-        }
         .task(id: exportDirectory) {
             guard let exportDirectory else { return }
             await runScreenshotExport(to: exportDirectory)
@@ -104,10 +78,7 @@ struct RootView: View {
     /// deliberately not added in: several of them are a reading of the same
     /// failed rows, so counting both reports one broken build twice.
     private var waitingCount: Int {
-        // Passive agent rows are visible in Attention but do not make the
-        // tab badge claim that a response is waiting.
-        store.agentAttentionEvents.filter(\.isActionable).count
-            + store.attentionFailures.count
+        store.attentionFailures.count
     }
 
     /// Signal each tab after Charts settle so `simctl io screenshot` can grab it.

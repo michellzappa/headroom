@@ -40,13 +40,6 @@ enum MobileBackgroundRefresh {
                     endpoint: MobileConnection.endpoint,
                     token: MobileTokenStore.read() ?? ""
                 )
-                // Agent attention is its own availability path. A quota
-                // source can fail while a permission is still waiting, so a
-                // stale /usage response must not suppress that notification.
-                if let events = try? await client.fetchAgentAttentionEvents() {
-                    MobileAgentAttentionArchive.save(events)
-                    await MobileNotifications.notifyIfNeeded(events)
-                }
                 let snapshot = try await client.fetchAndArchiveUsage()
                 let widgetSnapshot = HeadroomWidgetCache.save(snapshot)
                 await MainActor.run { WatchBridge.shared.push(widgetSnapshot) }

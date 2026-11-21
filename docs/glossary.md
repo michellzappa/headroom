@@ -48,7 +48,7 @@ not a quota surface, and it earns the exception by staying apart:
 
 **Voice: second person, present tense, no first person.** Headroom says *you*
 and names things; it never says *we*, *our*, or *I*, and it never apologises.
-Actions are imperative (**Refresh all**, **Add a test row**), states are
+Actions are imperative (**Refresh all**, **Dismiss all**), states are
 fragments (**Not updating**, **On pace**). Welcome is allowed to be warmer than
 Settings — that is a register, and it is deliberate — but it stays in the same
 person. `check-glossary-copy.sh` fails the build on `Text("We `.
@@ -108,7 +108,7 @@ surface-specific (see the end of this file), but the shape does not.
 | **Summary** | Aggregate usage view inside Usage, before provider detail | macOS, iOS |
 | **Quotas** | Coding quota detail, reached from Usage → Summary (no longer its own iOS tab) | iOS |
 | **Coding quotas** | Section title above the rings | macOS, iOS |
-| **Attention** | The queue: agent questions, rollup reasons, failed rows | macOS mode, iOS tab |
+| **Attention** | The queue: rollup reasons and failed rows | macOS mode, iOS tab |
 | **Activity** | Merged deploys / commits / Actions feed, over the service panels | macOS mode, iOS tab, ESP32 detail pages |
 | **Recent** | Chronological mixed activity feed (commits, Actions, deploys, resets); provider identity is on each row | iOS, macOS |
 | **GitHub Actions** | GitHub workflow activity | iOS, macOS |
@@ -133,12 +133,10 @@ surface-specific (see the end of this file), but the shape does not.
 | **Integrations** | Catalog of what you watch on Activity (and connect): Git, GitHub Actions, Vercel, OpenRouter, AI Gateway, Supabase, Plausible, PostHog, Sentry, Datadog, Axiom, local servers, Xcode builds. One reorderable list — enable, status, open leaf. Activity follows the same order for rows that paint a block (including OpenRouter / AI Gateway account use). Activity row count lives here; Local servers density on the Local leaf; projects and sites on each other Integration page | macOS Settings, iOS Settings |
 | **Show in Headroom** | The dev-tool on/off on its Integrations leaf. Off stops polling and hides the rows; the key stays in the Keychain, which is what **Disconnect** clears | macOS Settings |
 | **Code and deploys** | Integrations leaves: **Git** (local commits on this Mac), **GitHub Actions** (CI via PAT), **Vercel** (CLI login) — three leaves because they use three different credentials | macOS Settings |
-| **Status** | Integration detail caption: connected, Keychain, hooks state, signed-in | macOS Settings |
+| **Status** | Integration detail caption: connected, Keychain, signed-in | macOS Settings |
 | **Connect** / **Replace** / **Disconnect** | Paste, overwrite, or clear a Keychain credential | macOS Settings |
 | **Keychain** | Detail Status when a token is stored on this Mac. The SecureField shows `••••••••••••` so the row does not look empty | macOS Settings |
 | **Not connected** | Hub / detail when nothing is pasted yet | macOS Settings |
-| **Hooks installed** / **Hooks off** | Agents caption for Claude Code hooks | macOS Settings |
-| **Gateway on** / **Gateway off** | Agents caption for Codex | macOS Settings |
 | **Dev root** | Folder scanned for local git repos, one level deep. Stays on this Mac | macOS Settings |
 | **Commit authors** | Names or emails whose commits count as yours; blank counts everyone | macOS Settings |
 | **Teams** | Vercel team filter; blank reads every team the login can see | macOS Settings |
@@ -155,26 +153,6 @@ surface-specific (see the end of this file), but the shape does not.
 | **Source on GitHub** | Link to the public repository from About | macOS, iOS |
 | **GitHub stars** | Live star count under the source link on About | macOS, iOS |
 | **Attention** | Warning / status card on the Mac, and the iOS tab it became (scoring policy: `docs/attention.md`) | macOS, iOS |
-| **Answer coding agents** | Mac-granted iPhone permission to answer an agent approval request | macOS, iOS |
-| **Using Codex at** | Path to the Codex executable Headroom discovered and is supervising | macOS |
-| **Agents** | Claude Code hooks and the Codex attention gateway — install, test, and connection status. Not part of the Integrations catalog | macOS Settings |
-| **Agent alerts** | Whether passive agent notices appear; questions, choices, and approvals remain visible when it is off | macOS Settings |
-| **Your agents, wherever you are** | Headroom's companion promise: see and safely answer agent requests from iPhone while the computer keeps its full context | macOS, iOS |
-| **Claude questions** | Whether Claude questions appear on both Mac and iPhone, can wait for an iPhone answer, or stay Mac-only | macOS |
-| **Claude Code hooks** | Managed Claude lifecycle and permission integration | macOS |
-| **Install hooks** / **Reinstall hooks** / **Remove hooks** | Manage only Headroom-owned entries in Claude settings | macOS |
-| **Add a test row** | Add a harmless Claude test row to the common feed | macOS |
-| **Request** | The agent's own request, field by field, above the answer buttons | iOS |
-| **Why** | The provider's stated reasons for asking | iOS |
-| **Show request** / **Hide request** | Expand the bulk fields (file contents, replacement bodies) | iOS |
-| **Shortened to fit** | This value is a prefix; the host clipped it | iOS |
-| **Options** | The choices an agent is offering, each with why you would pick it | iOS |
-| **Ask on Mac** | Decline to answer a question from the phone; it appears on the Mac | iOS |
-| **Allow once** / **Always allow this exact request** / **Deny** | Answers to a permission request. The middle one saves a rule | iOS |
-| **Saves the rule** | The exact rule an always-allow answer will write | iOS |
-| **Start task** | Give an agent a folder and a prompt | macOS, iOS |
-| **Reply to the agent…** | Free-text answer to a request | iOS |
-| **Answer in the terminal** | This question is showing in both places; answer it where it was asked | iOS |
 | **Other Macs** | iCloud settings sync between Macs (under Sync) | macOS Settings |
 | **Desk display** | The ESP32 board's panel: **Brightness** (25/50/75/100%), **Dim on a schedule** (**From** / **Until** hours, host fades over 30 minutes), **Celebrate quota resets**, **Boot animation**, and which **Pages** BOOT cycles (one to one with sources; **Off under Integrations** when the source is off). Shows the board's **Firmware**, **Connection** and **Last seen** with a liveness dot judged against its measured poll cadence. Host-owned; the board applies it on its next poll. See [esp32.md](esp32.md) | macOS Settings |
 | **Telemetry** | Local payload preview plus thresholded Community Pulse (weekly growth, new vs returning, builds, CPU, macOS, countries, services, models, features), shown only while anonymous diagnostics is enabled. The newest week is marked as still filling and never differenced against a finished one | macOS Settings |
@@ -318,8 +296,8 @@ blank axis.
 | **Not updating** | The host is replaying a source's last good numbers; the age travels with it (**Not updating · 2 hours ago**) |
 | **Paused** | The host is deliberately not refreshing — usually a provider rate limit (`stale_cause: rate_limited`). Carries the wait when known (**Paused · retries in 5m**). Secondary, not orange |
 | **Needs sign-in** | That source's credential is missing or was rejected — `auth_required` on `providers[]` / `sources[]`. Ages the same way. Attention names the fix (`claude /login`, `codex login`, sign in to Cursor, …) |
-| **Dismiss** | Swipe one row out of the iPhone Attention queue — a passive coding-agent notice, a rollup reason, or a failed feed row |
-| **Dismiss all** | Hide every row in an Attention section and ack the rollup so the menu-bar pip goes out too. iPhone: per section (passive agent notices, or **Needs attention**). Mac: the one Attention control (no per-row swipe) |
+| **Dismiss** | Swipe one row out of the iPhone Attention queue — a rollup reason or a failed feed row |
+| **Dismiss all** | Hide every row in the Attention section and ack the rollup so the menu-bar pip goes out too. Mac: the one Attention control (no per-row swipe) |
 | **Refresh all** | Force-sync every source |
 | **Active** | Mac Settings → Providers: the services you track, rich reorderable rows with live usage. A switched-off row stays here as **Off** — paused, configured, not polled |
 | **Library** | Mac Settings → Providers: the **AI providers** you don't track, as compact chips |

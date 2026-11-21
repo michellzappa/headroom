@@ -388,15 +388,6 @@ enum HeadroomCopy {
     static let settingsKeySavedPrompt = "••••••••••••"
     static let signedIn = "Signed in"
     static let notSignedIn = "Not signed in"
-    static let hooksInstalled = "Hooks installed"
-    static let hooksOff = "Hooks off"
-    static let hooksInstalledShort = "Installed"
-    static let hooksNotInstalled = "Not installed"
-    static let hooksUpdateAvailable = "Update available"
-    static let hooksModifiedExternally = "Modified externally"
-    static let hooksConfigurationError = "Configuration error"
-    static let gatewayOn = "Gateway on"
-    static let gatewayOff = "Gateway off"
     static let folderMissing = "Folder missing"
     /// Host predates the field — not a warning, just a non-answer.
     static let statusUnknown = "Unknown"
@@ -422,75 +413,13 @@ enum HeadroomCopy {
     static let whatToTrackHint =
         "From local sign-in. Change either list later in Settings."
     static let dismiss = "Dismiss"
-    /// Bulk clear on either Attention section: passive agent notices, or the
-    /// warnings the rollup and the feed put in the queue. Mac Attention uses
-    /// the same label and action (no per-row swipe there).
+    /// Bulk clear on Attention: the warnings the rollup and the feed put in the
+    /// queue. Mac Attention uses the same label and action (no per-row swipe).
     static let dismissAll = "Dismiss all"
     /// Legacy name for `dismissAll` — Mac Attention used to say Clear and only
     /// ack the rollup; both surfaces now dismiss the queue and ack together.
     static let clearAttention = dismissAll
     static let refreshAll = "Refresh all"
-    static let answerCodingAgents = "Answer coding agents"
-    static let codingAgents = "Agents"
-    static let agentAlerts = "Agent alerts"
-    static let agentAlertsHelp =
-        "Show passive agent notices such as “Ready for your next instruction”. Questions, choices, and approvals always remain visible."
-    static let agentCompanionTitle = "Your agents, wherever you are"
-    static let agentQuestionMode = "Claude questions"
-    static let agentQuestionNotify = "Show on Mac + iPhone"
-    static let agentQuestionAnswer = "Let iPhone answer"
-    static let agentQuestionOff = "Mac only"
-    static let agentQuestionModeHelp =
-        "Let iPhone answer briefly pauses a question while Headroom waits for your choice."
-    static let claudeCode = "Claude Code"
-    static let claudeCodeHooks = "Claude Code hooks"
-    static let installHooks = "Install hooks"
-    static let reinstallHooks = "Reinstall hooks"
-    static let removeHooks = "Remove hooks"
-    /// Adds one harmless Claude row to the common feed. Named for what it
-    /// does: "attention" is the card's name and the API's table, not a thing
-    /// you can have one of and send.
-    static let sendTestAttention = "Add a test row"
-    static func usingCodex(at path: String) -> String {
-        "Using Codex at \(path)"
-    }
-
-    /// The agent's own request, shown before you answer it. An approval you
-    /// cannot read is not an approval, so these labels sit above the actual
-    /// fields rather than a paraphrase of them.
-    static let agentRequest = "Request"
-    static let agentWhyAsking = "Why"
-    static let showFullRequest = "Show request"
-    static let hideFullRequest = "Hide request"
-    /// Said plainly: the value on screen is a prefix, not the whole thing.
-    static let agentValueShortened = "Shortened to fit"
-    /// Shown beside an always-allow answer. A durable grant made from a phone
-    /// should say exactly what it will write before you tap it.
-    static let agentWouldSaveRule = "Saves the rule"
-    /// A question shows in both places and is answered where it was asked.
-    static let answerInTheTerminal = "Answer in the terminal"
-
-    /// Giving an agent work, rather than answering work it already started.
-    static let startTask = "Start task"
-    static let startTaskAgent = "Agent"
-    static let startTaskFolder = "Folder"
-    static let startTaskPromptPlaceholder = "What should it do?"
-    static let chooseFolder = "Choose folder…"
-    /// A phone cannot browse the Mac's disk, so it waits for the Mac to use
-    /// one first. Says that, rather than showing an empty picker.
-    static let noFoldersYet = "Start one on the Mac first to pick a folder here"
-    static let noAgentCanTakeWork = "No agent is connected to take work"
-
-    /// Said after a start succeeds. Both providers answer `ok` and then work
-    /// quietly, so without this the surface looked like it had done nothing.
-    static func agentIsWorking(_ agent: String, in folder: String) -> String {
-        "\(agent) is working in \(folder)"
-    }
-    /// The Mac has no feed of its own, so it says where the answers arrive.
-    static let watchOnPhone = "Requests appear on your iPhone"
-    static func agentFieldsOmitted(_ count: Int) -> String {
-        count == 1 ? "1 more field not shown" : "\(count) more fields not shown"
-    }
 
     /// Shown when the phone is drawing its last saved payload because the Mac
     /// is not answering. The numbers are real, they are just not current, and

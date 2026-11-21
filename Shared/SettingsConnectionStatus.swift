@@ -87,40 +87,4 @@ struct SettingsConnectionStatus: Equatable, Sendable {
     static var folderMissing: SettingsConnectionStatus {
         SettingsConnectionStatus(HeadroomCopy.folderMissing, tone: .attention)
     }
-
-    /// Claude hooks detail states. Hub uses the coarser installed/off pair.
-    static func claudeHooks(state: String?) -> SettingsConnectionStatus {
-        switch state {
-        case "installed":
-            SettingsConnectionStatus(
-                HeadroomCopy.hooksInstalledShort,
-                tone: .good,
-                symbol: "checkmark.circle.fill"
-            )
-        case "outdated":
-            SettingsConnectionStatus(
-                HeadroomCopy.hooksUpdateAvailable,
-                tone: .attention,
-                symbol: "exclamationmark.triangle.fill"
-            )
-        case "modified_externally":
-            SettingsConnectionStatus(
-                HeadroomCopy.hooksModifiedExternally,
-                tone: .attention,
-                symbol: "exclamationmark.triangle.fill"
-            )
-        case "error":
-            SettingsConnectionStatus(
-                HeadroomCopy.hooksConfigurationError,
-                tone: .attention,
-                symbol: "exclamationmark.triangle.fill"
-            )
-        default:
-            SettingsConnectionStatus(
-                HeadroomCopy.hooksNotInstalled,
-                tone: .attention,
-                symbol: "circle"
-            )
-        }
-    }
 }

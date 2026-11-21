@@ -5,8 +5,7 @@ extension SettingsView {
     /// One catalog of watched things — order, enable, status, open leaf.
     ///
     /// Flat list (not group sections): the pin is the layout, and Activity
-    /// follows the same order for ids that paint blocks. Claude Code / Codex
-    /// are under Coding agents, not here.
+    /// follows the same order for ids that paint blocks.
     var integrationsHub: some View {
         Form {
             activityRowLimitSection
@@ -118,31 +117,7 @@ extension SettingsView {
         }
     }
 
-    /// One hub row. Shared with the Coding agents pane, which links to the two
-    /// agent leaves rather than keeping a second copy of their settings.
-    ///
-    /// `LabeledContent` + `Label` keeps Form's icon column aligned across
-    /// symbols of different widths — a bare `Label`/`Spacer`/`Text` stack
-    /// opts that out and leaves titles drifting row to row.
-    func integrationRow(_ kind: SettingsIntegration) -> some View {
-        SettingsLeafLink(integrationLeaf(kind)) {
-            LabeledContent {
-                integrationStatus(kind).label()
-            } label: {
-                Label {
-                    Text(kind.title)
-                } icon: {
-                    ProviderMark(
-                        providerID: kind.rawValue,
-                        size: 16,
-                        fallbackSystemImage: kind.symbol
-                    )
-                }
-            }
-        }
-    }
-
-    /// "Connected" is the wrong word for the two that need no credential, so
+    /// "Connected" is the wrong word for the ones that need no credential, so
     /// they say what is actually true of them instead.
     ///
     /// Token-backed rows (Supabase / Plausible / GitHub) used to say Connected
@@ -150,18 +125,6 @@ extension SettingsView {
     /// the live `sources[]` detail is what actually answered.
     func integrationStatus(_ kind: SettingsIntegration) -> SettingsConnectionStatus {
         switch kind {
-        case .claudeCode:
-            let ok = claudeHooks?.installed == true
-            return SettingsConnectionStatus(
-                ok ? HeadroomCopy.hooksInstalled : HeadroomCopy.hooksOff,
-                tone: ok ? .ok : .attention
-            )
-        case .codex:
-            return SettingsConnectionStatus(
-                agentGatewayEnabled
-                    ? HeadroomCopy.gatewayOn : HeadroomCopy.gatewayOff,
-                tone: agentGatewayEnabled ? .ok : .attention
-            )
         case .git:
             guard gitEditable else { return .unknown }
             guard gitConfig.devRootExists else { return .folderMissing }
@@ -261,8 +224,6 @@ extension SettingsView {
                 activityRowLimitSection
             }
             switch kind {
-            case .claudeCode: claudeCodeSections
-            case .codex: codexSections
             case .git: gitSections
             case .github: githubSections
             case .vercel: vercelSections

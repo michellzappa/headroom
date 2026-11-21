@@ -355,71 +355,6 @@ struct HeadroomClient: Sendable {
             .permissions
     }
 
-    func fetchAgentTaskSurface() async throws -> AgentTaskSurface {
-        let url = try base()
-            .appendingPathComponent("agents")
-            .appendingPathComponent("tasks")
-        return try JSONDecoder().decode(
-            AgentTaskSurface.self, from: try await send(request(url, timeout: 5)))
-    }
-
-    @discardableResult
-    func startAgentTask(
-        provider: String, cwd: String, prompt: String
-    ) async throws -> AgentStartTaskResponse {
-        let url = try base()
-            .appendingPathComponent("agents")
-            .appendingPathComponent("tasks")
-        var post = request(url, timeout: 30)
-        post.httpMethod = "POST"
-        post.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        post.httpBody = try JSONEncoder().encode(AgentStartTaskRequest(
-            provider: provider, cwd: cwd, prompt: prompt))
-        return try JSONDecoder().decode(
-            AgentStartTaskResponse.self, from: try await send(post))
-    }
-
-    func fetchAgentGatewayConfiguration() async throws
-        -> AgentGatewayConfiguration {
-        let url = try base()
-            .appendingPathComponent("agents")
-            .appendingPathComponent("config")
-        let data = try await send(request(url, timeout: 5))
-        return try JSONDecoder().decode(
-            AgentGatewayConfiguration.self, from: data)
-    }
-
-    func setAgentGatewayConfiguration(
-        enabled: Bool,
-        codexBinary: String
-    ) async throws -> AgentGatewayConfiguration {
-        let url = try base()
-            .appendingPathComponent("agents")
-            .appendingPathComponent("config")
-        let body = try JSONSerialization.data(withJSONObject: [
-            "enabled": enabled,
-            "codex_binary": codexBinary,
-        ])
-        let data = try await send(request(
-            url, method: "POST", body: body, timeout: 8))
-        return try JSONDecoder().decode(
-            AgentGatewayConfiguration.self, from: data)
-    }
-
-    func setAgentAlerts(_ enabled: Bool) async throws
-        -> AgentGatewayConfiguration {
-        let url = try base()
-            .appendingPathComponent("agents")
-            .appendingPathComponent("config")
-        let body = try JSONSerialization.data(withJSONObject: [
-            "alerts": enabled,
-        ])
-        let data = try await send(request(
-            url, method: "POST", body: body, timeout: 5))
-        return try JSONDecoder().decode(
-            AgentGatewayConfiguration.self, from: data)
-    }
-
     func fetchMultiMacConfiguration() async throws -> MultiMacConfiguration {
         let url = try base()
             .appendingPathComponent("machines")
@@ -554,37 +489,6 @@ struct HeadroomClient: Sendable {
         let body = try JSONSerialization.data(withJSONObject: payload)
         return try await send(request(
             url, method: "POST", body: body, timeout: 8))
-    }
-
-    func fetchClaudeHookConfiguration() async throws
-        -> ClaudeHookConfiguration {
-        let url = try base()
-            .appendingPathComponent("agents")
-            .appendingPathComponent("claude")
-            .appendingPathComponent("config")
-        let data = try await send(request(url, timeout: 5))
-        return try JSONDecoder().decode(
-            ClaudeHookConfiguration.self, from: data)
-    }
-
-    func changeClaudeHooks(
-        _ action: String,
-        questionMode: String? = nil
-    ) async throws
-        -> ClaudeHookConfiguration {
-        let url = try base()
-            .appendingPathComponent("agents")
-            .appendingPathComponent("claude")
-            .appendingPathComponent("config")
-        var payload: [String: Any] = ["action": action]
-        if let questionMode {
-            payload["question_mode"] = questionMode
-        }
-        let body = try JSONSerialization.data(withJSONObject: payload)
-        let data = try await send(request(
-            url, method: "POST", body: body, timeout: 8))
-        return try JSONDecoder().decode(
-            ClaudeHookConfiguration.self, from: data)
     }
 
     func fetchGitHubWatch() async throws -> GitHubWatch {
@@ -1235,20 +1139,6 @@ struct AxiomConfiguration: Decodable, Sendable {
     }
 }
 
-struct AgentGatewayConfiguration: Decodable, Sendable {
-    var ok: Bool
-    var enabled: Bool
-    var codexBinary: String
-    /// Optional for compatibility with hosts from before Agent alerts.
-    var alerts: Bool?
-    var provider: AgentProviderStatus
-
-    enum CodingKeys: String, CodingKey {
-        case ok, enabled, provider
-        case codexBinary = "codex_binary"
-    }
-}
-
 struct MultiMacConfiguration: Decodable, Sendable {
     var ok: Bool
     var enabled: Bool
@@ -1296,39 +1186,6 @@ struct MachineRound: Sendable {
     var recordJSON: String
     var adopted: [String]
     var peerCount: Int
-}
-
-struct AgentProviderStatus: Decodable, Sendable {
-    var provider: String
-    var available: Bool
-    var connection: String
-    var error: String?
-    var version: String?
-    var resolvedBinary: String?
-
-    enum CodingKeys: String, CodingKey {
-        case provider, available, connection, error, version
-        case resolvedBinary = "resolved_binary"
-    }
-}
-
-struct ClaudeHookConfiguration: Decodable, Sendable {
-    var ok: Bool
-    var provider: String
-    var settingsPath: String?
-    var state: String
-    var installed: Bool
-    var installedEvents: [String]?
-    var version: Int?
-    var error: String?
-    var questionMode: String?
-
-    enum CodingKeys: String, CodingKey {
-        case ok, provider, state, installed, version, error
-        case questionMode = "question_mode"
-        case settingsPath = "settings_path"
-        case installedEvents = "installed_events"
-    }
 }
 
 // HealthReport / SourceHealth moved to Shared/HealthModels.swift so the

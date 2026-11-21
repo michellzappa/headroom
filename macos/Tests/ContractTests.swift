@@ -347,8 +347,6 @@ final class ContractTests: XCTestCase {
         XCTAssertEqual(HeadroomCopy.inKeychain, "Keychain")
         XCTAssertEqual(HeadroomCopy.settingsKeySavedPrompt, "••••••••••••")
         XCTAssertEqual(HeadroomCopy.macUnavailable, "Mac unavailable")
-        XCTAssertEqual(HeadroomCopy.hooksInstalled, "Hooks installed")
-        XCTAssertEqual(HeadroomCopy.gatewayOn, "Gateway on")
         XCTAssertEqual(HeadroomCopy.settingsStatus, "Status")
         XCTAssertEqual(HeadroomCopy.on, "On")
         XCTAssertEqual(HeadroomCopy.off, "Off")

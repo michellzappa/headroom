@@ -1,5 +1,4 @@
 import Foundation
-import LocalAuthentication
 
 @MainActor
 final class MobileUsageStore: ObservableObject {
@@ -8,8 +7,6 @@ final class MobileUsageStore: ObservableObject {
     @Published private(set) var stoppingServerID: String?
     @Published private(set) var changingSourceID: String?
     @Published private(set) var mobilePermissions = MobilePermissions.allDisabled
-    @Published private(set) var agentAttentionEvents: [AgentAttentionEvent] = []
-    @Published private(set) var respondingAgentEventID: String?
     @Published private(set) var errorMessage: String?
     /// When the Mac handed us the snapshot on screen — live this session, or
     /// read back from the archive on a cold launch.
@@ -26,19 +23,11 @@ final class MobileUsageStore: ObservableObject {
     /// an app that only fetches when it comes to the front keeps drawing the
     /// pre-restart document until someone pulls to refresh.
     private var liveLoop: Task<Void, Never>?
-    private var agentLiveLoop: Task<Void, Never>?
     private var cadence = RefreshCadence()
 
     private static let liveInterval: TimeInterval = 60
-    /// Agent questions are time-sensitive; keep this separate from the full
-    /// usage poll so answering from the phone does not make every quota source
-    /// run once per few seconds.
-    private static let agentLiveInterval: TimeInterval = 5
 
     init() {
-        if let events = MobileAgentAttentionArchive.load() {
-            agentAttentionEvents = events
-        }
         guard let entry = MobileSnapshotArchive.load() else { return }
         snapshot = entry.snapshot
         capturedAt = entry.capturedAt
@@ -112,44 +101,11 @@ final class MobileUsageStore: ObservableObject {
                 await self.refresh()
             }
         }
-        agentLiveLoop = Task { [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(
-                    for: .seconds(Self.agentLiveInterval))
-                guard !Task.isCancelled else { return }
-                await self?.refreshAgentAttention()
-            }
-        }
     }
 
     func stopLiveUpdates() {
         liveLoop?.cancel()
         liveLoop = nil
-        agentLiveLoop?.cancel()
-        agentLiveLoop = nil
-    }
-
-    /// Fast foreground-only path for a question or approval. This is kept
-    /// independent of `/usage`: a broken quota provider must not delay a
-    /// response to an agent, and the full snapshot does not need five-second
-    /// polling.
-    private func refreshAgentAttention() async {
-        guard isConfigured, mobilePermissions.agents else { return }
-        let client = MobileHeadroomClient(
-            endpoint: MobileConnection.endpoint,
-            token: MobileTokenStore.read() ?? ""
-        )
-        guard let events = try? await client.fetchAgentAttentionEvents()
-        else { return }
-        applyAgentAttentionEvents(events)
-        await MobileNotifications.notifyIfNeeded(events)
-    }
-
-    /// Keep memory and the on-disk archive in lockstep so a cold launch does
-    /// not resurrect a row the person already answered this session.
-    private func applyAgentAttentionEvents(_ events: [AgentAttentionEvent]) {
-        agentAttentionEvents = events
-        MobileAgentAttentionArchive.save(events)
     }
 
     private func nextInterval() -> TimeInterval {
@@ -175,11 +131,6 @@ final class MobileUsageStore: ObservableObject {
         do {
             if let permissions = try? await client.fetchMobilePermissions() {
                 mobilePermissions = permissions
-            }
-            if mobilePermissions.read,
-               let events = try? await client.fetchAgentAttentionEvents() {
-                applyAgentAttentionEvents(events)
-                await MobileNotifications.notifyIfNeeded(events)
             }
             if forceServerSync || recovering {
                 if mobilePermissions.refresh {
@@ -214,57 +165,6 @@ final class MobileUsageStore: ObservableObject {
         await refresh()
     }
 
-    func answer(
-        _ event: AgentAttentionEvent,
-        with action: AgentAttentionAction
-    ) async {
-        guard mobilePermissions.agents,
-              !isStale,
-              respondingAgentEventID == nil else { return }
-        respondingAgentEventID = event.id
-        defer { respondingAgentEventID = nil }
-        do {
-            if action.requiresBiometric == true {
-                let context = LAContext()
-                try await context.evaluatePolicy(
-                    .deviceOwnerAuthentication,
-                    localizedReason: "\(action.label): \(event.summary)"
-                )
-            }
-            let client = MobileHeadroomClient(
-                endpoint: MobileConnection.endpoint,
-                token: MobileTokenStore.read() ?? ""
-            )
-            let updated = try await client.respond(
-                to: event,
-                action: action,
-                idempotencyKey: UUID().uuidString
-            )
-            applyAgentAttentionEvents(
-                agentAttentionEvents.filter { $0.id != updated.id })
-            errorMessage = nil
-        } catch {
-            errorMessage = error.localizedDescription
-            if let events = try? await MobileHeadroomClient(
-                endpoint: MobileConnection.endpoint,
-                token: MobileTokenStore.read() ?? ""
-            ).fetchAgentAttentionEvents() {
-                applyAgentAttentionEvents(events)
-            }
-        }
-    }
-
-    /// Clears only passive agent notices. Requests with a real answer remain
-    /// untouched, even when the user chooses the bulk action.
-    func dismissAllAgentNotices() async {
-        let notices = agentAttentionEvents.filter(\.isDismissOnly)
-        for event in notices {
-            guard let dismiss = event.actions.first(where: { $0.id == "dismiss" })
-            else { continue }
-            await answer(event, with: dismiss)
-        }
-    }
-
     /// Fixture path for README / marketing screenshots (no network).
     func applySnapshot(_ value: UsageSnapshot) {
         snapshot = value
@@ -279,9 +179,7 @@ final class MobileUsageStore: ObservableObject {
     /// we just stopped talking to, so it goes with it.
     func forgetArchive() {
         MobileSnapshotArchive.clear()
-        MobileAgentAttentionArchive.clear()
         snapshot = .empty
-        agentAttentionEvents = []
         capturedAt = nil
         isShowingArchive = false
     }

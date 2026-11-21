@@ -2,12 +2,11 @@ import Foundation
 
 /// Settings navigation graph shared by macOS and iOS.
 ///
-/// Root order mirrors user intent (General → providers → watches → agents →
+/// Root order mirrors user intent (General → providers → watches →
 /// devices → telemetry → About). Nested leaves sit under Integrations
 /// (every watchable thing, see `SettingsIntegration`).
 ///
 /// Integrations is one catalog of what you watch on Activity (and connect).
-/// Claude Code and Codex connection leaves live under Agents.
 ///
 /// Onboarding (`WelcomePane`) maps onto the same ideas where it can:
 /// - Providers ↔ Welcome “What to watch” (same symbol)
@@ -23,7 +22,6 @@ enum SettingsDestination: Hashable, Sendable {
     /// The menu bar glyph: Remaining or Pace, Invert, and the tile.
     case menuBarIcon
     case sources
-    case codingAgents
     case iPhone
     case telemetry
     case integrations
@@ -70,7 +68,6 @@ enum SettingsDestination: Hashable, Sendable {
         case .calendar: return HeadroomCopy.calendarTitle
         case .menuBarIcon: return HeadroomCopy.menuBarIcon
         case .sources: return HeadroomCopy.settingsSources
-        case .codingAgents: return HeadroomCopy.codingAgents
         case .iPhone: return HeadroomCopy.settingsiPhone
         case .telemetry: return HeadroomCopy.settingsTelemetry
         case .integrations: return HeadroomCopy.settingsIntegrations
@@ -90,7 +87,6 @@ enum SettingsDestination: Hashable, Sendable {
         case .calendar: return "calendar"
         case .menuBarIcon: return "menubar.rectangle"
         case .sources: return "checklist"
-        case .codingAgents: return "cpu"
         case .iPhone: return "iphone"
         case .telemetry: return "chart.xyaxis.line"
         case .integrations: return "link"
@@ -111,7 +107,7 @@ enum SettingsDestination: Hashable, Sendable {
     /// typing a key, and keys are never entered on the phone.
     var isMacOnly: Bool {
         switch self {
-        case .general, .host, .calendar, .menuBarIcon, .codingAgents, .telemetry, .otherMacs,
+        case .general, .host, .calendar, .menuBarIcon, .telemetry, .otherMacs,
              .deskDisplay, .integration:
             return true
         case .integrations, .sources, .iPhone, .about, .connection,
@@ -131,8 +127,6 @@ enum SettingsDestination: Hashable, Sendable {
 /// Raw values match `sources_config` ids where a source exists, so a status
 /// lookup against `/usage` needs no second mapping table.
 enum SettingsIntegration: String, Hashable, CaseIterable, Sendable {
-    case claudeCode = "claude"
-    case codex
     case git
     case github
     case vercel
@@ -147,18 +141,13 @@ enum SettingsIntegration: String, Hashable, CaseIterable, Sendable {
     /// Local servers + Xcode builds (shared `local` source).
     case local
 
-    /// Hub grouping. Agents can run code, the rest only report — worth a
-    /// visible line between them in a list someone scans for "what did I
-    /// give this thing access to".
     enum Group: String, CaseIterable, Sendable {
-        case agents
         case code
         case balances
         case services
 
         var title: String {
             switch self {
-            case .agents: return HeadroomCopy.codingAgents
             case .code: return HeadroomCopy.integrationsCode
             case .balances: return HeadroomCopy.integrationsBalances
             case .services: return HeadroomCopy.integrationsServices
@@ -168,7 +157,6 @@ enum SettingsIntegration: String, Hashable, CaseIterable, Sendable {
 
     var group: Group {
         switch self {
-        case .claudeCode, .codex: return .agents
         case .git, .github, .vercel: return .code
         case .openrouter, .aiGateway: return .balances
         case .supabase, .plausible, .posthog, .sentry, .datadog, .axiom, .local:
@@ -182,8 +170,6 @@ enum SettingsIntegration: String, Hashable, CaseIterable, Sendable {
 
     var title: String {
         switch self {
-        case .claudeCode: return HeadroomCopy.claudeCode
-        case .codex: return "Codex"
         case .git: return "Git"
         case .github: return HeadroomCopy.githubActions
         case .vercel: return "Vercel"
@@ -201,8 +187,6 @@ enum SettingsIntegration: String, Hashable, CaseIterable, Sendable {
 
     var symbol: String {
         switch self {
-        case .claudeCode: return "sparkles"
-        case .codex: return "cpu"
         case .git: return "arrow.triangle.branch"
         case .github: return "chevron.left.forwardslash.chevron.right"
         case .vercel: return "triangle"
@@ -218,26 +202,14 @@ enum SettingsIntegration: String, Hashable, CaseIterable, Sendable {
         }
     }
 
-    /// True when the leaf can start or steer a local executable. Drives the
-    /// hub's caption, and is the reason `docs/trust.md` treats these routes as
-    /// Class 4 rather than ordinary config.
-    var runsCode: Bool {
-        switch self {
-        case .claudeCode, .codex: return true
-        case .git, .github, .vercel, .openrouter, .aiGateway,
-             .supabase, .plausible, .posthog, .sentry, .datadog, .axiom, .local:
-            return false
-        }
-    }
-
     /// Leaves that share the Mac Activity feed row-count stepper. Same
     /// `@AppStorage` as the Integrations hub — open any of these and the
-    /// limit is still there. Balances and agents have no Activity rows.
+    /// limit is still there. Balances have no Activity rows.
     var sharesActivityRowLimit: Bool {
         switch self {
         case .git, .github, .vercel, .supabase, .sentry, .datadog, .axiom:
             return true
-        case .claudeCode, .codex, .openrouter, .aiGateway, .plausible,
+        case .openrouter, .aiGateway, .plausible,
              .posthog, .local:
             return false
         }
