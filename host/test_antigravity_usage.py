@@ -38,18 +38,20 @@ class ProcessAndPortParsingTests(unittest.TestCase):
             "  101 /Applications/Windsurf.app/Contents/Resources/app/extensions/windsurf/bin/language_server_macos_arm --app_data_dir windsurf --csrf_token ws-tok --extension_server_port 51111",
             "  202 /Applications/Antigravity.app/Contents/Resources/app/extensions/antigravity/bin/language_server_macos_arm --app_data_dir antigravity --csrf_token agy-tok-1 --https_server_port 61234 --extension_server_port 61235",
             "  250 /Applications/Antigravity.app/Contents/Resources/bin/language_server --standalone --override_ide_name antigravity --subclient_type hub --https_server_port 0 --csrf_token agy-tok-hub --app_data_dir antigravity",
+            "  260 /Users/mz/.local/share/agy/bin/language_server_macos_arm --override_ide_name agy --app_data_dir agy --csrf_token agy-tok-cli",
             "  303 /Users/mz/Library/Application Support/Antigravity/bin/language_server_macos --csrf_token=agy-tok-2 --https_server_port=0",
             "  404 /usr/bin/python3 headroom_server.py",
         ])
         servers = antigravity_usage._parse_ps_output(ps_out)
-        self.assertEqual([s["pid"] for s in servers], [202, 250, 303])
+        self.assertEqual([s["pid"] for s in servers], [202, 250, 260, 303])
         self.assertEqual(servers[0]["csrf_token"], "agy-tok-1")
         self.assertEqual(servers[0]["https_port"], 61234)
         self.assertEqual(servers[0]["ext_port"], 61235)
         self.assertEqual(servers[1]["csrf_token"], "agy-tok-hub")
         self.assertIsNone(servers[1]["https_port"])
-        self.assertEqual(servers[2]["csrf_token"], "agy-tok-2")
-        self.assertIsNone(servers[2]["https_port"])
+        self.assertEqual(servers[2]["csrf_token"], "agy-tok-cli")
+        self.assertEqual(servers[3]["csrf_token"], "agy-tok-2")
+        self.assertIsNone(servers[3]["https_port"])
 
     def test_parses_lsof_loopback_ports(self):
         lsof_out = "\n".join([
@@ -469,7 +471,7 @@ class DetectionAndFetchTests(unittest.TestCase):
         self.assertTrue(out["stale"])
         self.assertFalse(out["auth_required"])
         self.assertEqual(out["error"], "Antigravity is not running")
-        self.assertEqual(out["fix"], "Open Antigravity, then refresh Headroom.")
+        self.assertEqual(out["fix"], "Open Antigravity or run agy, then refresh Headroom.")
 
     def test_registry_and_providers_payload_wire_antigravity(self):
         self.assertIn("antigravity", detect_sources.PROBES)

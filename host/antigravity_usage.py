@@ -87,6 +87,12 @@ APP_PATHS = (
     "/Applications/Antigravity.app",
     os.path.expanduser("~/Applications/Antigravity.app"),
 )
+CLI_BINS = (
+    os.path.expanduser("~/.local/bin/agy"),
+    "/opt/homebrew/bin/agy",
+    "/usr/local/bin/agy",
+    "agy",
+)
 
 PS_BINS = ("/bin/ps", "/usr/bin/ps", "ps")
 LSOF_BINS = ("/usr/sbin/lsof", "/usr/bin/lsof", "lsof")
@@ -144,6 +150,10 @@ def _int_port(raw):
     return val if 1 <= val <= 65535 else None
 
 
+def _is_antigravity_name(val):
+    return "antigravity" in val or val == "agy" or val.startswith("agy-")
+
+
 def _is_antigravity_server(cmd):
     """True if `cmd` is an Antigravity language server (not Windsurf/etc.)."""
     if not cmd or not _LS_BIN_RE.search(cmd):
@@ -151,10 +161,10 @@ def _is_antigravity_server(cmd):
     tokens = _split_cmd(cmd)
     app_dir = (_flag_value(tokens, "app_data_dir") or "").lower()
     if app_dir:
-        return "antigravity" in app_dir
+        return _is_antigravity_name(app_dir)
     ide_name = (_flag_value(tokens, "override_ide_name") or "").lower()
     if ide_name:
-        return "antigravity" in ide_name
+        return _is_antigravity_name(ide_name)
     lower = cmd.lower()
     if "windsurf" in lower:
         return False
@@ -591,6 +601,8 @@ def _local_install_present():
         return True
     if any(os.path.isfile(p) for p in STATE_DB_PATHS):
         return True
+    if _find_bin(CLI_BINS):
+        return True
     return False
 
 
@@ -987,7 +999,7 @@ def fetch_quota(force=False):
                 "Antigravity is not running",
                 _EMPTY, disk_name=DISK,
                 auth_required=False,
-                fix="Open Antigravity, then refresh Headroom.")
+                fix="Open Antigravity or run agy, then refresh Headroom.")
 
         return cache_util.keep_stale(
             _cache, now,

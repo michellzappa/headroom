@@ -43,9 +43,10 @@ tag a version that has no entry.
 
 - **Google Antigravity quota source.** Headroom now tracks your Google
   Antigravity weekly and 5-hour session limits directly from the local
-  Antigravity language server (desktop app, IDE, or CLI), with a `state.vscdb`
-  cloud fallback when the app is closed. Includes the Antigravity icon across
-  macOS, iOS, widgets, Watch, and the ESP32 desk display.
+  Antigravity language server (desktop app, IDE, or `agy` CLI), with a
+  `state.vscdb` cloud fallback when the app is closed. Includes the Antigravity
+  icon across macOS, iOS, widgets, Watch, and the ESP32 desk display. Thanks to
+  [@bboyyan](https://github.com/bboyyan) for requesting this (#40).
 
 ### Changed
 
