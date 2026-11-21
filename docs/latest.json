@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "version": "2.3.0",
-  "published": "2026-11-20T20:31:25Z",
-  "url": "https://github.com/michellzappa/headroom/releases/download/v2.3.0/Headroom-macOS.zip",
-  "sha256": "a74a5f5e828575e62fd1402ec9bf788e6f5a527b4357c29e32c6cb3c507ee7ae",
-  "size": 7298328,
+  "version": "2.3.1",
+  "published": "2026-11-21T12:14:37Z",
+  "url": "https://github.com/michellzappa/headroom/releases/download/v2.3.1/Headroom-macOS.zip",
+  "sha256": "10e0cc8567aab7f3acda66c2ab992ff4f94196c94afce608653e0097e39cb2d0",
+  "size": 7074473,
   "min_macos": "14.0",
-  "notes_md": "### Added\n\n- **Google Antigravity quota source.** Headroom now tracks your Google\n  Antigravity weekly and 5-hour session limits directly from the local\n  Antigravity language server (desktop app, IDE, or CLI), with a `state.vscdb`\n  cloud fallback when the app is closed. Includes the Antigravity icon across\n  macOS, iOS, widgets, Watch, and the ESP32 desk display.\n\n### Changed\n\n- **Agents pane removed from Settings.** Removed the non-working Agents pane\n  from Mac Settings and hid the Answer coding agents toggle in iPhone\n  permissions, while keeping host API contracts intact.\n\n### Fixed\n\n- **Menu bar updates immediately after changing sources in Settings.** Toggling,\n  reordering, renaming, or recoloring sources in Settings now pushes the fresh\n  snapshot straight to the menu bar icon, popover, and widget instead of waiting\n  for the next background poll."
+  "notes_md": "### Removed\n\n- **Remaining Agents UI and dead code across iOS and macOS.** Removed the\n  coding-agents section, polling loop, archive, and notification routing from\n  the iPhone Attention tab, along with dead macOS/Shared Agents views, models,\n  client methods, and glossary entries. Host routes and `MobilePermissions`\n  wire fields remain intact for backward compatibility.\n\n### Fixed\n\n- **Local signed macOS builds preserve Multi-Mac CloudKit.** `scripts/build-app.sh --release --sign`\n  now auto-detects the matching Developer ID signing identity and Production\n  CloudKit provisioning profile (`~/.headroom/Headroom.provisionprofile` or\n  installed Xcode profiles) when environment variables are unset."
 }
