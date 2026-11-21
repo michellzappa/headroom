@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "version": "2.3.1",
-  "published": "2026-11-21T12:14:37Z",
-  "url": "https://github.com/michellzappa/headroom/releases/download/v2.3.1/Headroom-macOS.zip",
-  "sha256": "10e0cc8567aab7f3acda66c2ab992ff4f94196c94afce608653e0097e39cb2d0",
-  "size": 7074473,
+  "version": "2.3.2",
+  "published": "2026-11-21T14:15:35Z",
+  "url": "https://github.com/michellzappa/headroom/releases/download/v2.3.2/Headroom-macOS.zip",
+  "sha256": "9d037b5b33feddad98ba164f6f9457f560452e5684c25fb96dde97ed88c2f235",
+  "size": 7075880,
   "min_macos": "14.0",
-  "notes_md": "### Removed\n\n- **Remaining Agents UI and dead code across iOS and macOS.** Removed the\n  coding-agents section, polling loop, archive, and notification routing from\n  the iPhone Attention tab, along with dead macOS/Shared Agents views, models,\n  client methods, and glossary entries. Host routes and `MobilePermissions`\n  wire fields remain intact for backward compatibility.\n\n### Fixed\n\n- **Local signed macOS builds preserve Multi-Mac CloudKit.** `scripts/build-app.sh --release --sign`\n  now auto-detects the matching Developer ID signing identity and Production\n  CloudKit provisioning profile (`~/.headroom/Headroom.provisionprofile` or\n  installed Xcode profiles) when environment variables are unset."
+  "notes_md": "### Fixed\n\n- **Google Antigravity 2.34+ quota polling.** Antigravity 2.34 stopped passing\n  `--csrf_token` on the `language_server` command line and moved its loopback\n  ports and CSRF token into `~/.gemini/antigravity/daemon/*.json`. Headroom now\n  reads live daemon discovery files, merges them with running `language_server`\n  processes by PID, and surfaces HTTP 401 auth errors cleanly.\n- **ESP32 big picture dial stays at full accent at 100% used.** Exhausted\n  windows on the desk display big picture page now keep the provider's full\n  accent color instead of dimming the ring."
 }
