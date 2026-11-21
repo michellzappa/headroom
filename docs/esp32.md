@@ -128,7 +128,8 @@ whole hours (with days when appropriate); minutes appear only during the last
 hour before reset.
 
 The longer window is shown unless a window is exhausted. At 100% used, that
-window takes priority, the dial recedes, and **Resets in** shows its countdown.
+window takes priority with a full accent dial, and **Resets in** shows its
+countdown.
 The countdown ticks in minutes between polls, using the host's rounded duration;
 a missing or elapsed duration says **Reset pending** until the provider confirms
 a new reading. Missing quota or pace never becomes a zero or an on-pace claim.

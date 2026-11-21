@@ -871,7 +871,6 @@ def render_big_picture(doc: dict, provider_index: int = 0) -> Image.Image:
         draw_centered(draw, clip_fit(draw, str(pool.get("t") or ""), title_w, 2),
                       title_y + (24 if H < 400 else 30), 2, COL_DIM)
     empty = bool(pool and pool.get("p", -1) >= 100)
-    ring_accent = tuple(int(v * .45 + .5) for v in accent) if empty else accent
     side_by_side = W > H
     dial_x = PAD + radius if side_by_side else W // 2
     time_left, time_right = dial_x + radius + 16, W - PAD
@@ -880,7 +879,7 @@ def render_big_picture(doc: dict, provider_index: int = 0) -> Image.Image:
         draw_text(draw, text, x - text_w(draw, text, font) // 2, y, font, fill)
     draw_pace_ring(draw, dial_x, cy, radius, 18,
                    pool.get("p") if pool else None,
-                   pool.get("c") if pool else None, ring_accent, dot_color=COL_BG)
+                   pool.get("c") if pool else None, accent, dot_color=COL_BG)
     percent = f'{math.floor(pool["p"] + .5)}%' if pool else "--"
     at_center(percent, dial_x, cy - (21 if side_by_side else 35), 6,
               COL_WHITE if pool else COL_DIM)

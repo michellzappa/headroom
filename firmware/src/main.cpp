@@ -4511,7 +4511,6 @@ static void drawBigPicturePage() {
   if (pool) drawCentered(truncFit(pool->title, titleW, 2),
                           titleY + (H < 400 ? 24 : 30), 2, COL_DIM);
   const bool empty = pool && pool->pct >= 100;
-  const uint16_t accent = empty ? dimToward(s.accent, COL_BG, 0.45f) : s.accent;
   const bool sideBySide = W > H;
   const int16_t dialX = sideBySide ? UI_PAD + radius : W / 2;
   const int16_t timeLeft = dialX + radius + 16;
@@ -4522,7 +4521,7 @@ static void drawBigPicturePage() {
     drawTextAt(text, x - textWidth(text, size) / 2, y, size, color);
   };
   drawPaceRing(dialX, cy, radius, 18, pool ? pool->pct : -1,
-               pool ? pool->pace : -1, accent, COL_BG);
+               pool ? pool->pace : -1, s.accent, COL_BG);
   char percent[20];
   if (pool) snprintf(percent, sizeof percent, "%.0f%%", pool->pct);
   else snprintf(percent, sizeof percent, "--");
