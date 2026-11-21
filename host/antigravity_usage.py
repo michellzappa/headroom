@@ -1,11 +1,16 @@
 """Google Antigravity quota via the local language server (with cloud fallback).
 
 Antigravity (desktop app, IDE, and `agy` CLI) runs a local Connect-RPC
-language server (`language_server_macos*`) bound to loopback. Polling it
+language server (`language_server*`) bound to loopback. Polling it
 requires no external API keys and never triggers a Keychain prompt:
   1. `RetrieveUserQuotaSummary` — rolling 5-hour and weekly quota buckets.
   2. `GetUserStatus` — account plan tier + fallback per-model quotaInfo.
   3. `GetCommandModelConfigs` — secondary fallback for model quotaInfo.
+
+Discovery checks both `~/.gemini/antigravity*/daemon/*.json` (where
+Antigravity 2.34+ writes the server's loopback ports and CSRF token in a
+user-only `0600` file instead of exposing `--csrf_token` in argv) and
+running `language_server` processes from `ps` (older builds / IDE).
 
 When Antigravity is closed, falls back to reading a cached access token from
 `state.vscdb` (`antigravityAuthStatus`) against `cloudcode-pa.googleapis.com`
@@ -185,7 +190,79 @@ def _parse_ps_output(text):
     return servers
 
 
-def _find_servers():
+def _int_pid(raw):
+    try:
+        val = int(str(raw).strip())
+    except (TypeError, ValueError):
+        return None
+    return val if val > 0 else None
+
+
+def _pid_alive(pid):
+    if not isinstance(pid, int) or pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+        return True
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+
+
+def _parse_daemon_file(path, alive_check=None):
+    """Parse one `~/.gemini/antigravity/daemon/*.json` discovery file."""
+    try:
+        with open(path, encoding="utf-8") as handle:
+            blob = json.load(handle)
+    except (OSError, json.JSONDecodeError, ValueError):
+        return None
+    if not isinstance(blob, dict):
+        return None
+    pid = _int_pid(blob.get("pid"))
+    if not pid:
+        return None
+    check = _pid_alive if alive_check is None else alive_check
+    if not check(pid):
+        return None
+    csrf = str(blob.get("csrfToken") or blob.get("csrf_token") or "").strip()
+    https_port = _int_port(blob.get("httpsPort") or blob.get("https_port"))
+    http_port = _int_port(blob.get("httpPort") or blob.get("http_port"))
+    if not (csrf or https_port or http_port):
+        return None
+    return {
+        "pid": pid,
+        "csrf_token": csrf,
+        "https_port": https_port,
+        "http_port": http_port,
+        "ext_port": None,
+    }
+
+
+def _read_daemon_servers(home_dirs=None, alive_check=None):
+    """Read live Antigravity server metadata from `daemon/*.json` files."""
+    servers = []
+    for home in (HOME_DIRS if home_dirs is None else home_dirs):
+        daemon_dir = os.path.join(home, "daemon")
+        if not os.path.isdir(daemon_dir):
+            continue
+        try:
+            entries = sorted(os.listdir(daemon_dir))
+        except OSError:
+            continue
+        for name in entries:
+            if not name.endswith(".json"):
+                continue
+            path = os.path.join(daemon_dir, name)
+            if not os.path.isfile(path):
+                continue
+            parsed = _parse_daemon_file(path, alive_check=alive_check)
+            if parsed:
+                servers.append(parsed)
+    return servers
+
+
+def _find_ps_servers():
     ps_bin = _find_bin(PS_BINS)
     if not ps_bin:
         return []
@@ -200,6 +277,50 @@ def _find_servers():
     except (OSError, subprocess.SubprocessError):
         return []
     return _parse_ps_output(proc.stdout)
+
+
+def _merge_servers(daemon_servers, ps_servers):
+    """Merge daemon discovery files and `ps` rows by PID."""
+    by_pid = {}
+    for row in (ps_servers or ()):
+        by_pid[row["pid"]] = {
+            "pid": row["pid"],
+            "csrf_token": row.get("csrf_token") or "",
+            "https_port": row.get("https_port"),
+            "http_port": row.get("http_port"),
+            "ext_port": row.get("ext_port"),
+        }
+    for row in (daemon_servers or ()):
+        pid = row["pid"]
+        cur = by_pid.get(pid)
+        if cur is None:
+            by_pid[pid] = {
+                "pid": pid,
+                "csrf_token": row.get("csrf_token") or "",
+                "https_port": row.get("https_port"),
+                "http_port": row.get("http_port"),
+                "ext_port": row.get("ext_port"),
+            }
+        else:
+            if row.get("csrf_token"):
+                cur["csrf_token"] = row["csrf_token"]
+            if row.get("https_port"):
+                cur["https_port"] = row["https_port"]
+            if row.get("http_port"):
+                cur["http_port"] = row["http_port"]
+            if row.get("ext_port") and not cur.get("ext_port"):
+                cur["ext_port"] = row["ext_port"]
+    merged = list(by_pid.values())
+    merged.sort(key=lambda s: (
+        0 if s["csrf_token"] else 1,
+        0 if (s.get("https_port") or s.get("http_port")) else 1,
+        s["pid"],
+    ))
+    return merged
+
+
+def _find_servers():
+    return _merge_servers(_read_daemon_servers(), _find_ps_servers())
 
 
 def _parse_lsof_ports(text):
@@ -242,11 +363,15 @@ def _candidate_endpoints(server, ports=None):
             out.append((scheme, port))
 
     https_port = server.get("https_port")
+    http_port = server.get("http_port")
     ext_port = server.get("ext_port")
     if https_port:
         add("https", https_port)
     for port in (ports or ()):
         add("https", port)
+    if http_port:
+        add("http", http_port)
+        add("https", http_port)
     for port in (ports or ()):
         add("http", port)
     if ext_port:
@@ -309,13 +434,32 @@ def _looks_like_connect_error(code, data):
     return False
 
 
+def _probe_endpoints(endpoints, csrf, req_body):
+    """Probe `(scheme, port)` pairs until one answers Connect-RPC."""
+    auth_err = None
+    for scheme, port in endpoints:
+        code, data = _rpc_post(
+            scheme, port, "RetrieveUserQuotaSummary", csrf, req_body)
+        if code == 200 and data is not None:
+            return (scheme, port), data, None, auth_err
+        if _looks_like_connect_error(code, data):
+            return (scheme, port), None, None, auth_err
+        if code == 401 and isinstance(data, dict) and data.get("message"):
+            auth_err = auth_err or str(data["message"])
+            continue
+        # Probe GetUserStatus on the same endpoint before moving to the next
+        # port, in case RetrieveUserQuotaSummary returned a bare 404.
+        code2, data2 = _rpc_post(
+            scheme, port, "GetUserStatus", csrf, req_body)
+        if code2 == 200 and data2 is not None:
+            return (scheme, port), None, data2, auth_err
+        if code2 == 401 and isinstance(data2, dict) and data2.get("message"):
+            auth_err = auth_err or str(data2["message"])
+    return None, None, None, auth_err
+
+
 def _query_server(server, ports=None):
     """Query one local language server; returns dict of responses or None."""
-    if ports is None:
-        ports = _listening_ports(server["pid"])
-    endpoints = _candidate_endpoints(server, ports)
-    if not endpoints:
-        return None
     csrf = server.get("csrf_token") or ""
     req_body = {"metadata": METADATA}
 
@@ -323,27 +467,38 @@ def _query_server(server, ports=None):
     summary_blob = None
     status_blob = None
     configs_blob = None
+    auth_err = None
+    tried = set()
 
-    for scheme, port in endpoints:
-        code, data = _rpc_post(
-            scheme, port, "RetrieveUserQuotaSummary", csrf, req_body)
-        if code == 200 and data is not None:
-            working = (scheme, port)
-            summary_blob = data
-            break
-        if _looks_like_connect_error(code, data):
-            working = (scheme, port)
-            break
-        # Probe GetUserStatus on the same endpoint before moving to the next
-        # port, in case RetrieveUserQuotaSummary returned a bare 404.
-        code2, data2 = _rpc_post(
-            scheme, port, "GetUserStatus", csrf, req_body)
-        if code2 == 200 and data2 is not None:
-            working = (scheme, port)
-            status_blob = data2
-            break
+    if ports is not None:
+        endpoints = _candidate_endpoints(server, ports)
+        if not endpoints:
+            return None
+        working, summary_blob, status_blob, auth_err = _probe_endpoints(
+            endpoints, csrf, req_body)
+    else:
+        if server.get("https_port") or server.get("http_port"):
+            known = _candidate_endpoints(server, ())
+            tried.update(known)
+            working, summary_blob, status_blob, auth_err = _probe_endpoints(
+                known, csrf, req_body)
+        if working is None:
+            discovered = _listening_ports(server["pid"])
+            remaining = [
+                ep for ep in _candidate_endpoints(server, discovered)
+                if ep not in tried
+            ]
+            if remaining:
+                working, summary_blob, status_blob, err2 = _probe_endpoints(
+                    remaining, csrf, req_body)
+                auth_err = auth_err or err2
 
     if working is None:
+        if auth_err:
+            return {
+                "ok": False,
+                "error": f"Antigravity language server rejected request ({auth_err})",
+            }
         return None
 
     scheme, port = working

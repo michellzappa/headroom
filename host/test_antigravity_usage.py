@@ -83,6 +83,67 @@ class ProcessAndPortParsingTests(unittest.TestCase):
             ],
         )
 
+    def test_reads_daemon_discovery_json_and_skips_dead_pids(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            daemon_dir = Path(tmp) / "daemon"
+            daemon_dir.mkdir()
+            (daemon_dir / "hub_49561.json").write_text(json.dumps({
+                "pid": 87892,
+                "httpsPort": 49560,
+                "httpPort": 49561,
+                "lsVersion": "2.34.0",
+                "csrfToken": "tok-live",
+            }))
+            (daemon_dir / "hub_11111.json").write_text(json.dumps({
+                "pid": 99999,
+                "httpsPort": 11110,
+                "httpPort": 11111,
+                "csrfToken": "tok-stale",
+            }))
+            (daemon_dir / "broken.json").write_text("{not json")
+
+            servers = antigravity_usage._read_daemon_servers(
+                home_dirs=(tmp,),
+                alive_check=lambda pid: pid == 87892,
+            )
+            self.assertEqual(len(servers), 1)
+            self.assertEqual(servers[0]["pid"], 87892)
+            self.assertEqual(servers[0]["csrf_token"], "tok-live")
+            self.assertEqual(servers[0]["https_port"], 49560)
+            self.assertEqual(servers[0]["http_port"], 49561)
+
+    def test_merges_daemon_csrf_and_ports_into_ps_server_without_cli_csrf(self):
+        # Antigravity 2.34+ omits --csrf_token from argv and writes it to daemon/*.json.
+        ps_out = (
+            "87892 /Applications/Antigravity.app/Contents/Resources/bin/language_server "
+            "--standalone --override_ide_name antigravity --subclient_type hub "
+            "--override_ide_version 2.34.0 --https_server_port 0 --app_data_dir antigravity "
+            "--read_host_bridge_token_from_stdin"
+        )
+        ps_servers = antigravity_usage._parse_ps_output(ps_out)
+        self.assertEqual(ps_servers[0]["csrf_token"], "")
+        self.assertIsNone(ps_servers[0]["https_port"])
+
+        daemon_servers = [{
+            "pid": 87892,
+            "csrf_token": "tok-from-daemon",
+            "https_port": 49560,
+            "http_port": 49561,
+            "ext_port": None,
+        }]
+        merged = antigravity_usage._merge_servers(daemon_servers, ps_servers)
+        self.assertEqual(len(merged), 1)
+        self.assertEqual(merged[0]["pid"], 87892)
+        self.assertEqual(merged[0]["csrf_token"], "tok-from-daemon")
+        self.assertEqual(merged[0]["https_port"], 49560)
+        self.assertEqual(merged[0]["http_port"], 49561)
+
+        endpoints = antigravity_usage._candidate_endpoints(merged[0], ())
+        self.assertEqual(
+            endpoints,
+            [("https", 49560), ("http", 49561), ("https", 49561)],
+        )
+
 
 class QuotaMappingTests(unittest.TestCase):
     NOW = 1800000000.0  # 2027-01-15T08:00:00Z
@@ -338,6 +399,58 @@ class DetectionAndFetchTests(unittest.TestCase):
         self.assertEqual(out["plan"], "Google AI Pro")
         self.assertEqual(out["week"]["pct"], 35.0)
         self.assertEqual(out["session"]["pct"], 10.0)
+
+    def test_query_server_skips_lsof_when_daemon_https_port_works(self):
+        server = {
+            "pid": 87892,
+            "csrf_token": "tok-daemon",
+            "https_port": 49560,
+            "http_port": 49561,
+            "ext_port": None,
+        }
+
+        def fake_rpc(scheme, port, method, csrf, body=None, timeout=4):
+            self.assertEqual((scheme, port, csrf), ("https", 49560, "tok-daemon"))
+            if method == "RetrieveUserQuotaSummary":
+                return 200, {
+                    "groups": [{
+                        "buckets": [
+                            {"window": "WEEKLY", "remainingFraction": 0.80},
+                        ]
+                    }]
+                }
+            return 200, {}
+
+        with patch.object(
+                antigravity_usage, "_listening_ports",
+                side_effect=AssertionError("lsof should not be called")):
+            with patch.object(
+                    antigravity_usage, "_rpc_post", side_effect=fake_rpc):
+                out = antigravity_usage._query_server(server)
+        self.assertTrue(out["ok"])
+        self.assertEqual(out["week"]["pct"], 20.0)
+
+    def test_query_server_reports_401_missing_csrf_error(self):
+        server = {
+            "pid": 87892,
+            "csrf_token": "",
+            "https_port": 49560,
+            "http_port": None,
+            "ext_port": None,
+        }
+
+        def fake_rpc(scheme, port, method, csrf, body=None, timeout=4):
+            return 401, {
+                "code": "unauthenticated",
+                "message": "unauthenticated: missing CSRF token",
+            }
+
+        with patch.object(antigravity_usage, "_listening_ports", return_value=[]):
+            with patch.object(
+                    antigravity_usage, "_rpc_post", side_effect=fake_rpc):
+                out = antigravity_usage._query_server(server)
+        self.assertFalse(out["ok"])
+        self.assertIn("missing CSRF token", out["error"])
 
     def test_fetch_preserves_stale_with_fix_when_app_closed(self):
         prior = {
