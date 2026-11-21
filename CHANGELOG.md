@@ -7,6 +7,19 @@ are not tracked here because they move on every commit.
 Add a section here before cutting a tag. `scripts/cut-release.sh` refuses to
 tag a version that has no entry.
 
+## 2.3.2 — 2026-11-21
+
+### Fixed
+
+- **Google Antigravity 2.34+ quota polling.** Antigravity 2.34 stopped passing
+  `--csrf_token` on the `language_server` command line and moved its loopback
+  ports and CSRF token into `~/.gemini/antigravity/daemon/*.json`. Headroom now
+  reads live daemon discovery files, merges them with running `language_server`
+  processes by PID, and surfaces HTTP 401 auth errors cleanly.
+- **ESP32 big picture dial stays at full accent at 100% used.** Exhausted
+  windows on the desk display big picture page now keep the provider's full
+  accent color instead of dimming the ring.
+
 ## 2.3.1 — 2026-11-21
 
 ### Removed
