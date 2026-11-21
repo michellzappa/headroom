@@ -7,6 +7,23 @@ are not tracked here because they move on every commit.
 Add a section here before cutting a tag. `scripts/cut-release.sh` refuses to
 tag a version that has no entry.
 
+## 2.3.1 — 2026-11-21
+
+### Removed
+
+- **Remaining Agents UI and dead code across iOS and macOS.** Removed the
+  coding-agents section, polling loop, archive, and notification routing from
+  the iPhone Attention tab, along with dead macOS/Shared Agents views, models,
+  client methods, and glossary entries. Host routes and `MobilePermissions`
+  wire fields remain intact for backward compatibility.
+
+### Fixed
+
+- **Local signed macOS builds preserve Multi-Mac CloudKit.** `scripts/build-app.sh --release --sign`
+  now auto-detects the matching Developer ID signing identity and Production
+  CloudKit provisioning profile (`~/.headroom/Headroom.provisionprofile` or
+  installed Xcode profiles) when environment variables are unset.
+
 ## 2.3.0 — 2026-11-20
 
 ### Added
