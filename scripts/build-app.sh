@@ -146,6 +146,60 @@ expanded_entitlements() {
   printf '%s' "$out"
 }
 
+# Check whether a provisioning profile authorizes Developer ID CloudKit for
+# this app bundle and signing team. Development profiles carry an array for
+# icloud-container-environment and omit ProvisionsAllDevices, so checking both
+# keeps us from embedding a development profile into a Developer ID build.
+profile_matches_developer_id() {
+  local cand="$1"
+  local team="$2"
+  local bundle_id="$3"
+  [[ -f "$cand" ]] || return 1
+  local decoded
+  decoded="$(mktemp -t headroom-profile-check)"
+  if ! security cms -D -i "$cand" > "$decoded" 2>/dev/null; then
+    rm -f "$decoded"
+    return 1
+  fi
+  local all_devices app_id prof_team icloud_env
+  all_devices="$(/usr/libexec/PlistBuddy -c "Print :ProvisionsAllDevices" "$decoded" 2>/dev/null || true)"
+  app_id="$(/usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.application-identifier" "$decoded" 2>/dev/null || true)"
+  prof_team="$(/usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.team-identifier" "$decoded" 2>/dev/null || true)"
+  icloud_env="$(/usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.icloud-container-environment" "$decoded" 2>/dev/null || true)"
+  rm -f "$decoded"
+  [[ "$all_devices" == "true" \
+     && "$app_id" == "${team}.${bundle_id}" \
+     && "$prof_team" == "$team" \
+     && "$icloud_env" == "Production" ]]
+}
+
+# Locate a matching Developer ID CloudKit profile on this Mac when
+# HEADROOM_PROVISION_PROFILE is not explicitly set.
+find_icloud_profile() {
+  local team="$1"
+  local bundle_id="$2"
+  local cand
+  if profile_matches_developer_id "$HOME/.headroom/Headroom.provisionprofile" "$team" "$bundle_id"; then
+    printf '%s' "$HOME/.headroom/Headroom.provisionprofile"
+    return 0
+  fi
+  local dir
+  for dir in \
+    "$HOME/Library/MobileDevice/Provisioning Profiles" \
+    "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+  do
+    [[ -d "$dir" ]] || continue
+    for cand in "$dir"/*.provisionprofile; do
+      [[ -f "$cand" ]] || continue
+      if profile_matches_developer_id "$cand" "$team" "$bundle_id"; then
+        printf '%s' "$cand"
+        return 0
+      fi
+    done
+  done
+  return 1
+}
+
 # Multi-Mac's CloudKit entitlements, but only when a profile authorizes them.
 #
 # `com.apple.developer.*` is the restricted family. codesign does not check
@@ -157,7 +211,15 @@ expanded_entitlements() {
 # one that shipped before this feature existed.
 embed_icloud_profile() {
   local app_ents="$1"
+  local team="$2"
   local profile="${HEADROOM_PROVISION_PROFILE:-}"
+  if [[ -z "$profile" ]]; then
+    local bundle_id
+    bundle_id="$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP/Contents/Info.plist" 2>/dev/null || true)"
+    if [[ -n "$bundle_id" ]]; then
+      profile="$(find_icloud_profile "$team" "$bundle_id" || true)"
+    fi
+  fi
   if [[ -z "$profile" ]]; then
     echo "note: no HEADROOM_PROVISION_PROFILE — multi-Mac CloudKit is off in this build" >&2
     return 0
@@ -249,6 +311,16 @@ sign_adhoc() {
 
 sign_developer_id() {
   local identity="${HEADROOM_SIGN_IDENTITY:-}"
+  if [[ -z "$identity" && -n "${HEADROOM_TEAM_ID:-}" ]]; then
+    local matches
+    matches="$(security find-identity -v -p codesigning 2>/dev/null \
+      | sed -n "s/.*\"\(Developer ID Application: .* (${HEADROOM_TEAM_ID})\)\".*/\1/p" \
+      | sort -u)"
+    if [[ -n "$matches" && "$(printf '%s\n' "$matches" | wc -l | tr -d ' ')" -eq 1 ]]; then
+      identity="$matches"
+      echo "note: using $identity" >&2
+    fi
+  fi
   if [[ -z "$identity" ]]; then
     echo "error: HEADROOM_SIGN_IDENTITY required for --sign / --notarize" >&2
     echo "  e.g. export HEADROOM_SIGN_IDENTITY='Developer ID Application: Name (TEAMID)'" >&2
@@ -264,7 +336,7 @@ sign_developer_id() {
   app_ents="$(expanded_entitlements "$ENTITLEMENTS" "$team")"
   # Before any codesign call: the profile lands inside the bundle, so it has to
   # be there when the bundle is sealed.
-  embed_icloud_profile "$app_ents"
+  embed_icloud_profile "$app_ents" "$team"
 
   if [[ -d "$WIDGET" ]]; then
     codesign --force --options runtime --timestamp \
