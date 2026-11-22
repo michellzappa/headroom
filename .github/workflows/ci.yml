@@ -13,7 +13,9 @@ concurrency:
 jobs:
   host:
     name: Host (Python ${{ matrix.python }})
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest moved to 26.04, which has no Python 3.9 build in
+    # the setup-python toolcache, and 3.9 is the floor below.
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
