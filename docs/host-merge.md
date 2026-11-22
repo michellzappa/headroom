@@ -78,7 +78,7 @@ in-process move. Two risky changes stay apart.
 
 ## Verified constraints
 
-Checked on 2026-08-07, because the plan depends on both.
+Checked on 2026-08-07, because the plan depends on it.
 
 **The app is not sandboxed.** [Headroom.entitlements](../macos/Headroom.entitlements)
 carries `com.apple.security.application-groups` and nothing else, and states
@@ -88,12 +88,6 @@ host and becomes wrong at Phase 5.
 
 Any future move into the App Sandbox ends this design. Treat sandboxing and
 this plan as mutually exclusive.
-
-**Installed Claude Code hooks call HTTP, not Python.**
-[claude_hooks.py:53](../host/claude_hooks.py#L53) writes `"type": "http"` with
-a `http://127.0.0.1:<port>/agents/hooks/claude/<event>` URL. Hooks already
-written into `~/.claude/settings.json` keep working after the port, provided
-the port stays 8737. Only the installer is Python, and it moves with the rest.
 
 ## Decisions to settle before Phase 1
 
@@ -152,7 +146,7 @@ Keychain items.
 *Gate:* a clean install and an upgrade over an existing LaunchAgent install both
 serve `/usage`, and the board polls without a reflash.
 
-**Phase 5. Remove Python.** Delete `host/`. Rewrite the hook installer in Swift.
+**Phase 5. Remove Python.** Delete `host/`.
 Update [AGENTS.md](../AGENTS.md), [host.md](host.md), [setup.md](setup.md), and
 [troubleshooting.md](troubleshooting.md). Correct the comment in
 `Headroom.entitlements`. Delete the Python row from the support floor in

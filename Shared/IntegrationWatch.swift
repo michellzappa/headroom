@@ -4,8 +4,8 @@ import Foundation
 ///
 /// Host `integrations_order` pins these. Activity lays out only ids where
 /// `paintsActivity` is true. Prepaid balances (OpenRouter, AI Gateway) paint
-/// an account-use block there — not Usage rings. Claude Code and Codex live
-/// under Coding agents, not this list.
+/// an account-use block there — not Usage rings. Claude Code and Codex are
+/// quota sources, not this list.
 enum IntegrationWatch: String, CaseIterable, Identifiable, Sendable {
     case git
     case github

@@ -649,7 +649,6 @@ final class TelemetryCoordinator {
             models: HeadroomTelemetry.modelShares(snapshot?.history),
             features: [
                 "phone_paired": HostController.mobileToken != nil,
-                "agent_gateway_enabled": false,
                 "multi_mac_enabled": multiMac?.enabled == true,
             ]
         )

@@ -22,40 +22,19 @@ Three surfaces, in descending order of how much they are allowed to ask of you:
 | Menu bar | the pip and the meters, plus detail on click | pip only |
 | Phone / Watch | the same answer when you are not at the desk | yes, if it is attention-level |
 
-## What Headroom is becoming, and the line under it
+## The line under it
 
-Versions 1.2.4 through 1.2.7 turned the phone into a remote control for a
-coding agent: read the request, approve it, deny it with a reason, answer a
-question, stop a runaway turn. That is a real second product living inside the
-first, and it changes what the app is responsible for.
+Headroom is a quota app. Being explicit about the line, so it is a decision
+rather than a drift:
 
-Being explicit about the line, so it is a decision rather than a drift:
-
-- **Headroom answers agent requests. It does not originate work.** Approving,
-  denying, replying and interrupting are all responses to something the agent
-  asked. Starting a turn, editing a prompt, or launching a session from the
-  phone is a different product — a mobile client for a coding agent — and
-  Headroom is not it.
+- **Headroom reports. It does not drive other tools.** It reads quota, usage
+  and ship status. Approving, answering or starting work in a coding agent is a
+  different product, and Headroom is not it.
 - **Every remote capability has a local equivalent that came first.** If the
   Mac cannot do it, the phone does not get it.
-- **The board never gains agent controls.** It has no authentication, no way to
-  show a full command, and a touch target the size of a thumb. It reports that
-  something is waiting. See [docs/contract.md](contract.md) on the board being
-  a render target.
-- **A secret never leaves the Mac.** A Codex question marked `isSecret` is
-  never offered remotely and never enters the ledger. This is an invariant, not
-  a behaviour: any new adapter inherits it.
-
-The product promise is simple: **your agents, wherever you are**. Headroom
-keeps the computer-side request visible, mirrors it in Attention on iPhone,
-and lets you answer the small set of safe, structured questions that can keep
-work moving when you are away from the desk. Passive agent activity stays
-dismissible; a request that can block work stays visible until you decide.
-
-The reason to hold this line is that the two products want opposite things. The
-glance wants to say less. A remote control wants to say everything, because an
-approval you cannot fully read is not an approval
-([docs/agent-attention.md](agent-attention.md)).
+- **The board never gains controls.** It has no authentication and a touch
+  target the size of a thumb. It reports. See [docs/contract.md](contract.md)
+  on the board being a render target.
 
 ## What earns a Setting
 
@@ -93,9 +72,8 @@ actually spent your quota.
 | Quota resets | **400 days** | `~/.headroom/quota_resets.jsonl` (Codex also merges [codex-resets.com](https://codex-resets.com)) |
 | Daily burn | **30 days** | `~/.headroom/daily_burn.json` |
 | Claude history | **400 days** | `~/.headroom/claude_history.json` |
-| Agent ledger | **30 days from settlement** | `~/.headroom/attention.sqlite3` |
 
-Three decisions follow from calling it an asset:
+Two decisions follow from calling it an asset:
 
 - **Losing it is a bug, not a cleanup.** Anything that rewrites these files
   gets the same care as the config merge. `quota_samples` is already
@@ -103,16 +81,9 @@ Three decisions follow from calling it an asset:
 - **It should survive a new Mac.** There is no export today and no import.
   Getting a new laptop currently costs you every chart. That is the gap most
   worth closing of anything in this file.
-- **The ledger is the exception, and gets the opposite treatment.** It holds
-  commands, file paths and code excerpts from every permission request, so it
-  is the one store where *keeping* data is the risk. Settled events are pruned
-  30 days after they settle; anything still pending survives regardless of age,
-  because something is blocked on it. The clock runs from settlement, not
-  creation — a request raised in March and answered today is a record of what
-  you approved today.
 
 The four numbers above are also four different formats in one directory. Time
-series want to be in the SQLite that already exists; config stays JSON. That
+series want to be in one SQLite file; config stays JSON. That
 consolidation is what makes "export your history" a feature rather than a
 project.
 
@@ -158,7 +129,7 @@ refresh.
 
 **The exit condition is already visible.** Guaranteed push while the phone is
 suspended needs APNs, and APNs needs HTTP/2, which the standard library does
-not speak. [docs/agent-attention.md](agent-attention.md) names this. So the
+not speak. So the
 decision to make ahead of time, rather than under pressure:
 
 - Polling stays the default and keeps working with zero dependencies.
@@ -266,7 +237,7 @@ written down here. The rules below are what later work inherits.
    98.4% of input is cache reads. A total is a measure of cache reuse. Any
    dollar figure says it is an estimate ([metering.md](metering.md)).
 7. **Friends get numbers about usage and nothing else.** No attention events,
-   no ledger, no paths, no repository names, no agent controls.
+   no paths, no repository names.
 
 ### The open question: counting people on the server
 

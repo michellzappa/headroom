@@ -11,7 +11,6 @@
 | Extra account missing | Settings → Providers → Library → **Add account** — [setup.md](setup.md#extra-accounts) |
 | Gemini flips to “Not updating” after ~1h | OAuth client not found (custom npm prefix / bundled CLI). Install `gemini-cli` where the host looks, or set `gemini_oauth_client_id` / `_secret` in `config.json` — [host.md](host.md) |
 | iPhone won’t pair | Confirm **mobile token** (not host token); Local Network allowed — [ios-companion.md](ios-companion.md) |
-| Agent requests never reach the phone | Settings → Agents (hooks / gateway on); iPhone grant **Answer coding agents** — [agent-attention.md](agent-attention.md) |
 | ESP32 says **NO HOST** | [esp32.md](esp32.md) — the panel names the failing half; `pio device monitor` prints the same |
 | Gatekeeper blocks `.app` | Prefer a [notarized Release](https://github.com/michellzappa/headroom/releases); otherwise right-click → Open. Signing: [releasing.md](releasing.md) |
 | Restart host | `launchctl kickstart -k gui/$(id -u)/com.centaur-labs.headroom` |

@@ -113,8 +113,7 @@ neither is writing the plist back.
 actually uses. It was repointed at agent scratchpad paths five times in one
 day, and every time the host died — because the scratchpad had been cleaned up,
 or the build in it was mid-edit. A dead host is not cosmetic: the board stops
-getting data, the phone stops getting rows, and every Claude session sharing
-this Mac loses its Headroom integration at once.
+getting data and the phone stops getting rows.
 
 **Verify against your own copy, not the shared service.** The host takes a
 port, so nothing has to touch the plist:
@@ -519,8 +518,7 @@ its constants. Changing one means changing all of them.
 
 Attention rollup scoring is the same kind of contract: `docs/attention.md`.
 Weights and ages stay hardcoded product policy — do not add an Attention
-Settings pane. Gateway prefs live under Coding agents; see
-`docs/agent-attention.md`.
+Settings pane.
 
 ## Contracts, access, and standing decisions
 
@@ -537,15 +535,14 @@ so both can be a year behind the host. That file also inventories every
 constant mirrored across Python, Swift and C++, and which of them are actually
 enforced (three) versus held together by a comment (four).
 
-**[docs/trust.md](docs/trust.md) — adding a route.** Four classes: Mac-local
-(anything naming credentials or config), ambient read, scoped control, and
-agent control. Pick the class first, then write the handler. A route that can
+**[docs/trust.md](docs/trust.md) — adding a route.** Three classes: Mac-local
+(anything naming credentials or config), ambient read, and scoped control.
+Pick the class first, then write the handler. A route that can
 cause code to run does not ship under the same gate as one that changes a
 display preference. `SECURITY.md` is the user-facing half; if the two
 disagree, fix `SECURITY.md` first.
 
-**[docs/product.md](docs/product.md) — what to build.** What Headroom is, the
-line under the agent gateway (it answers requests, it does not originate work),
+**[docs/product.md](docs/product.md) — what to build.** What Headroom is,
 what earns a Setting versus staying hardcoded, retention as a user asset, the
 stdlib-only exit condition, and the one genuinely undecided question: whether a
 burndown chart is what a Mac watched or what happened to a pool. Decide that

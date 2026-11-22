@@ -10,7 +10,7 @@ struct SettingsConnectionStatus: Equatable, Sendable {
     /// How loudly the caption reads.
     enum Tone: Equatable, Sendable {
         /// Healthy / expected. Secondary grey on the hub; green only when a
-        /// detail pane also carries a glyph (Claude hooks installed).
+        /// detail pane also carries a glyph.
         case ok
         /// Explicit success with a symbol — detail panes only.
         case good

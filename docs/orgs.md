@@ -14,7 +14,7 @@ cohort — different consent, different payload), [trust.md](trust.md).
 
 **Multiplayer quota pacing.** An org is a roster of seats playing the same
 kind of window Headroom already draws for one person. Members see each
-other's *coarse* window state — not prompts, paths, repos, or agent ledgers.
+other's *coarse* window state — not prompts, paths, or repos.
 
 The single-player game, restated:
 
@@ -30,7 +30,7 @@ The org view is that game with other humans on the course.
 ## What this is not
 
 - Not a feed of what people are coding.
-- Not shared control of anyone's Mac, agents, or Attention.
+- Not shared control of anyone's Mac or Attention.
 - Not a replacement for provider admin consoles.
 - Not an identity provider for the local host. Loopback, tokens, and
   Class 1–4 routes in [trust.md](trust.md) stay as they are.
@@ -134,7 +134,7 @@ Org rollup (derived server-side or client-side from the same rows):
 - model-family mix across the org
 
 **Not in the roster:** repos, commits, local servers, Attention reasons,
-agent events, exact dollars, emails, machine hostnames, raw model ids.
+exact dollars, emails, machine hostnames, raw model ids.
 
 Interaction model is glance + switcher, same posture as the popover. No chat,
 no comments, no @mention inside Headroom.
@@ -197,7 +197,7 @@ Server allowlists provider ids, pool keys, and model families the same way
 telemetry does. Unknown keys drop; oversized bodies 413; auth failure 401.
 
 **Never accepted:** prompts, paths, repo names, commit subjects, Attention
-fingerprints, agent ledger fields, account emails, host tokens, exact USD.
+fingerprints, account emails, host tokens, exact USD.
 
 Stale rows: if no publish within S, roster shows `stale` then eventually
 hides from the "live" strip (membership remains).
@@ -367,8 +367,8 @@ the solo app — otherwise the roster is a table of percentages with no craft.
 
 - SSO / Google / GitHub login
 - SCIM, directory sync, audit log export
-- Publishing Attention or agent approvals to the org
-- Controlling a teammate's agent or servers
+- Publishing Attention to the org
+- Controlling a teammate's servers
 - Public org pages (that is the separate "publish glance URL" idea)
 - Merging provider billing admins into Headroom
 - Board/Watch org roster

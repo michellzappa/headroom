@@ -5,7 +5,7 @@ account-scoped, so two Macs polling the same login read the same percentages
 off the provider. What does not travel is everything *around* those numbers:
 which sources you enabled, the order you pinned them in, the colours you gave
 them, and the fact that the other Mac is sitting there with three servers up
-and an agent waiting on you.
+and a build that failed.
 
 ## Why a folder and not CloudKit
 
@@ -37,7 +37,7 @@ round that adopts nothing writes nothing.
 Credentials, of any kind, ever — `shared_prefs` reaches config.json through a
 whitelist in app_config, so the host token cannot be written here even by
 accident. Also not synced: anything describing one machine's disk or moment —
-`dev_root`, `codex_binary`, local servers, git commits, the Claude token log,
+`dev_root`, local servers, git commits, the Claude token log,
 attention events. Those are *reported* per machine and shown with an owner,
 never merged. A merged list of local servers would be a fiction.
 
@@ -481,7 +481,7 @@ def _peer_view(peer, now):
         "stale": age > STALE_S,
     }
     for key in ("host_version", "providers", "servers", "attention_open",
-                "attention_top", "agent", "board"):
+                "attention_top", "board"):
         if peer.get(key) is not None:
             out[key] = peer[key]
     return out

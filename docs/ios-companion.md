@@ -34,17 +34,14 @@ Mac on its own — the phone forwards what it fetched. See
   iPhone pairing. A `.local` hostname, LAN IP, or Tailscale MagicDNS name
   remains available as a fallback.
 - Token stored in the iOS Keychain.
-- Three tabs: **Usage** (quotas, burndown, daily burn), **Attention** (queue
-  and agent answers), **Activity** (Recent feed plus service panels).
+- Three tabs: **Usage** (quotas, burndown, daily burn), **Attention** (queue), **Activity** (Recent feed plus service panels).
 - Activity: deploys, commits, Actions, resets; Supabase / Plausible / PostHog
   panels; local servers and Xcode builds — deep links where the source has one.
 - Source toggles in Settings: **Providers** and **Integrations** (same catalog
   as Mac — Vercel, Git, Actions, Supabase, Plausible, PostHog, Sentry, Datadog,
   Axiom, local servers, builds). Face ID before stopping a local server.
   Credentials stay in the Mac Keychain.
-- Attention summary, bounded agent responses when granted, and local
-  notifications. The phone can answer an existing request, but it cannot
-  start or steer an agent task.
+- Attention summary and local notifications.
 - Home Screen widgets backed by an App Group cache: rings on the small size,
   the combined burndown on the medium one. The Mac runs the same extension in
   Notification Center — one source file, `widget/HeadroomWidget.swift`, built
@@ -76,9 +73,8 @@ Mac on its own — the phone forwards what it fetched. See
 
 Every mobile operation requires the **mobile token**, a private/Tailscale client
 address, the `X-Headroom-Client: ios` header, and its matching Mac-owned
-permission: `read`, `refresh`, `sources`, `servers`, or `agents`. Change the
-grants under Mac Settings → iPhone pairing. The `agents` grant answers existing
-attention events only; task creation and steering remain Mac-local. Provider
+permission: `read`, `refresh`, `sources`, or `servers`. Change the
+grants under Mac Settings → iPhone pairing. Provider
 credentials and permission changes remain Mac-only.
 
 ## Build

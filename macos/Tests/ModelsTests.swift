@@ -651,16 +651,6 @@ final class ModelsTests: XCTestCase {
         XCTAssertEqual(reset, [[100, 72], [150, 72], [150, 48], [200, 48]])
     }
 
-    func testOlderMobilePermissionsDefaultAgentControlOff() throws {
-        let data = Data("""
-        {"read":true,"refresh":true,"sources":true,"servers":true}
-        """.utf8)
-        let permissions = try JSONDecoder().decode(
-            MobilePermissions.self, from: data)
-        XCTAssertTrue(permissions.read)
-        XCTAssertFalse(permissions.agents)
-    }
-
     func testAccountMarkTitlePrefersTheUserLabel() throws {
         let labeled = try JSONDecoder().decode(
             QuotaProviderInfo.self,

@@ -9,7 +9,7 @@ first launch’s Welcome sheet starts it automatically and installs a login item
   small size and the combined burndown on the medium one
 - Welcome / setup sheet when the host is down or on first open, asking about
   **Providers** and **Integrations** separately
-- Settings: General, Providers, Integrations, Agents, Sync, Telemetry; host /
+- Settings: General, Providers, Integrations, Sync, Telemetry; host /
   mobile tokens and integration keys on their leaves
 
 Product install overview: [../README.md](../README.md). First-run sources and

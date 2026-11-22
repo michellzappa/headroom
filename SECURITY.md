@@ -52,7 +52,7 @@ network too. So:
 
 Tokens are 32 bytes from `secrets.token_urlsafe`, written 0600, compared with
 `hmac.compare_digest`. The mobile token is separate so the phone's permission
-scopes (`read` / `refresh` / `sources` / `servers` / `agents`) cannot be
+scopes (`read` / `refresh` / `sources` / `servers`) cannot be
 sidestepped with the host token. `POST /local/stop` re-checks the live listener
 table and the process owner before it signals anything.
 
@@ -61,19 +61,6 @@ Which routes accept which caller, and the rule new routes are classified by, is
 
 ## Known limits
 
-- **Answering a coding agent is the strongest capability, on the weakest
-  transport.** With the `agents` scope granted, a caller holding the mobile
-  token from a private-range address can approve a command that then runs on
-  your Mac. Face ID is enforced by the phone, so a client that skips it is not
-  detected, and without TLS the token and the approval cross the segment in
-  cleartext. Grant `agents` only if you are on your own network or Tailscale.
-  Options for closing this are in [docs/trust.md](docs/trust.md).
-- **Agent request history is kept for 30 days.**
-  `~/.headroom/attention.sqlite3` records the fields of every permission
-  request — commands, paths, code excerpts. Owner-only, never synced, never
-  uploaded, and answered requests are pruned 30 days after you answer them.
-  Anything still pending is kept regardless of age. Delete the file with the
-  host stopped to clear it now.
 - **Loopback is trusted without a token**, which assumes you are the only user
   of the Mac. A second logged-in account can read `/usage` and post to the
   Mac-local routes.

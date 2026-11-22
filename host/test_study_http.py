@@ -14,7 +14,7 @@ from unittest import mock
 
 import headroom_server
 import study_service
-from test_agent_http import AgentHTTPTests
+import test_http_harness as http_harness
 from test_study_card import sample_records
 from test_usage_study import TZ, write
 
@@ -34,7 +34,8 @@ POST_ROUTES = (
 
 
 class StudyHTTPTests(unittest.TestCase):
-    request = AgentHTTPTests.request     # the socketpair harness, not its tests
+    def request(self, *args, **kw):
+        return http_harness.request(*args, **kw)
 
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
@@ -83,7 +84,7 @@ class StudyHTTPTests(unittest.TestCase):
         headers = {"X-Headroom-Client": "ios"}
         with mock.patch("headroom_server.app_config.mobile_permissions",
                         return_value=["read", "refresh", "sources",
-                                      "servers", "agents"]):
+                                      "servers"]):
             for path in GET_ROUTES:
                 self.assertEqual(
                     self.get(path, peer=LAN, headers=headers)[0], 403, path)

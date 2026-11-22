@@ -118,22 +118,3 @@ extension QuotaProviderInfo {
         HeadroomPalette.providerTint(id: id, accent: accent)
     }
 }
-
-extension Array where Element == QuotaProviderInfo {
-    /// The accent the user picked for a provider, for surfaces that know the
-    /// tool but not the account.
-    ///
-    /// A coding-agent hook names Claude or Codex and never says which account
-    /// answered it, so an exact `claude:work` match is preferred and a base
-    /// match is the fallback. Without this the row paints the built-in brand
-    /// triple — which is wrong the moment anyone changes an accent in
-    /// Settings, and says nothing about *which* provider's colour it is.
-    func accentTint(forProvider providerID: String) -> Color {
-        func base(_ value: String) -> String {
-            String(value.split(separator: ":", maxSplits: 1).first ?? "")
-        }
-        let match = first { $0.id == providerID }
-            ?? first { base($0.id) == base(providerID) }
-        return match?.tint ?? HeadroomPalette.providerTint(id: providerID)
-    }
-}
