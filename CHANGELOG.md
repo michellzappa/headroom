@@ -7,6 +7,29 @@ are not tracked here because they move on every commit.
 Add a section here before cutting a tag. `scripts/cut-release.sh` refuses to
 tag a version that has no entry.
 
+## 2.3.3 — 2026-11-22
+
+### Removed
+
+- **Coding-agent integrations.** Headroom is a quota app now. The host no
+  longer installs or answers Claude Code hooks, no longer runs a Codex App
+  Server, and no longer serves the `/agents/*` routes or the attention event
+  feed (`/attention/events`). The iPhone's "Answer coding agents" permission,
+  the agent count on the Macs list and the agent-only settings
+  (`agent_question_mode`, `agent_gateway_enabled`, `codex_binary`,
+  `agent_alerts`) are gone too. Quota, usage, burn and spend for every
+  provider work as before, and so do the usage study and the Attention
+  rollup for CI, builds and alerts. If you installed Headroom's Claude Code
+  hooks, delete the entries whose URL contains `managed_by=headroom` from
+  `~/.claude/settings.json`. Until you do, each hook gets a 404 and Claude
+  continues normally.
+
+### Fixed
+
+- **Antigravity CLI installs.** Headroom now finds the `agy` CLI at
+  `~/.local/bin/agy` and the language servers it starts. The offline hint
+  mentions `agy`.
+
 ## 2.3.2 — 2026-11-21
 
 ### Fixed
