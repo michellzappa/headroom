@@ -1,12 +1,11 @@
 # Attention
 
-Attention is two products that share a word. Do not add a Settings pane for
-either one's scoring knobs.
+Attention is the rollup: the glance pip and the Attention card. Do not add a
+Settings pane for its scoring knobs.
 
 | Layer | What | Where it lives |
 |-------|------|----------------|
 | **Rollup** | Glance pip + Attention card (`ok` / `warn` / `critical`) | `_build_attention` in `host/headroom_server.py` (queued for `host/attention.py` in [`backlog.md`](backlog.md)) |
-| **Gateway** | Coding-agent approval / idle events | Ledger + adapters — [`agent-attention.md`](agent-attention.md) |
 
 ## Rollup scoring is product policy
 
@@ -46,22 +45,19 @@ is what turns the menu-bar pip off everywhere on this host.
 
 | Knob | Surface |
 |------|---------|
-| Codex attention gateway on/off + binary | Mac Settings → Agents |
-| Claude hooks install / test | Mac Settings → Agents |
-| Answer coding agents | Mac Settings → iPhone (`agents` permission, default off) |
 | Attention notifications | iOS Settings → iPhone (`@AppStorage`) |
 | Disable a source | Sources — stops that source's stale/derived reasons |
 
 No Settings destination named Attention. No user-editable weights, ages, or
-severity thresholds. Ack fingerprint and the event ledger stay off
+severity thresholds. The ack fingerprint stays off
 `SHARED_CONFIG_KEYS` / CloudKit.
 
 ## Future escape hatch only
 
 If a specific kind becomes chronic noise in real use (stuck amber forever), add
 **mute-by-kind**: a local boolean map in `config.json`, same locality as
-`agent_gateway_enabled`, gated inside the scorer. Place the toggle next to the
-source that feeds it (Agents or Integrations) — still not a scoring UI.
+`attention_ack_fingerprint`, gated inside the scorer. Place the toggle next to
+the Integration that feeds it. It is still not a scoring UI.
 
 Do not invent threshold pickers, weight sliders, or a synced attention-prefs
 blob. Revisit only when mute-by-kind is clearly needed.
@@ -69,10 +65,8 @@ blob. Revisit only when mute-by-kind is clearly needed.
 ## Phone offline
 
 Rollup reasons and activity failures ride inside the phone's archived `/usage`
-payload (`MobileSnapshotArchive`). Coding-agent events are a separate poll, so
-they have their own on-device cache (`MobileAgentAttentionArchive`). Both draw
-as **Recent history** when the Mac is unreachable; answering still needs a live
-host.
+payload (`MobileSnapshotArchive`). They draw as **Recent history** when the Mac
+is unreachable.
 
 ## Structural extract
 

@@ -16,7 +16,8 @@ At most one aggregate batch per calendar week:
   family (`arm64` / `x86_64`);
 - normalized provider ids that are enabled, used, or healthy;
 - rounded model-family shares from the local usage summary;
-- three coarse feature flags: phone pairing, agent gateway, and multi-Mac;
+- two coarse feature flags: phone pairing and multi-Mac (the intake still
+  accepts the old `agent_gateway_enabled` flag from older app versions);
 - a **week-scoped dedupe key** (`HMAC-SHA256(install_secret, ISO week)` as
   64 hex chars) so the intake can ignore duplicate reports from the same Mac
   in the same week;

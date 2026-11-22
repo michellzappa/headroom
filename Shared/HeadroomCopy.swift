@@ -50,7 +50,7 @@ enum HeadroomCopy {
     static let settingsSync = "Sync"
     static let settingsTelemetry = "Telemetry"
     static let settingsIntegrations = "Integrations"
-    /// The two halves of Integrations that are not agents. Code is where work
+    /// The two halves of Integrations. Code is where work
     /// lands; services are what you point a key at.
     static let integrationsCode = "Code and deploys"
     static let integrationsServices = "Services"

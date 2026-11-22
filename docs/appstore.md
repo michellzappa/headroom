@@ -54,8 +54,7 @@ toggles, and stopping local servers.
 Features:
 - Coding quota rings for Claude, Codex, and Cursor — remaining %, pace, resets
 - Burndown and daily burn across providers
-- Attention queue with optional notifications — including answering agent
-  requests when the Mac grants it
+- Attention queue with optional notifications
 - Activity: deploys, commits, Actions, plus Supabase / Plausible / PostHog and
   local servers on the same tab
 - Home Screen widgets backed by an on-device cache
@@ -90,7 +89,7 @@ last 24h stay visible even on a busy team.
 
 Activity row limit (3–24) sits on every Activity source leaf.
 
-README and setup match Usage · Attention · Activity (Providers, Agents,
+README and setup match Usage · Attention · Activity (Providers,
 Telemetry).
 ```
 

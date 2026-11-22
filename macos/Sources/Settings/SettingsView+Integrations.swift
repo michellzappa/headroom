@@ -34,7 +34,7 @@ extension SettingsView {
                 .font(.caption)
                 .help("Drag to reorder")
             // Mark + title + chevron open the leaf; drag handle and toggle
-            // stay their own targets (same split as Coding agents rows).
+            // stay their own targets.
             if let kind {
                 SettingsLeafLink(integrationLeaf(kind)) {
                     catalogIdentity(watch, title: title)

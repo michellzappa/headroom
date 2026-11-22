@@ -334,7 +334,7 @@ say years.
 
 Ship money where the client updates in days, learn what the numbers should say,
 and only then spend a firmware revision on it. Same shape as the standing rule
-that the board never gains agent controls: the board is a render target, and it
+that the board never gains controls: the board is a render target, and it
 should render a settled idea.
 
 ### 9. Balances resolve product.md's open question.

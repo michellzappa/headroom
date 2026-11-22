@@ -46,13 +46,12 @@ func fetchUsage() async throws -> UsageSnapshot {
 
 One decoder, one `try`, whole document. `UsageSnapshot`'s own fields are all
 optional, so a *top-level* key going missing degrades gracefully. The nested
-structs are where it bites: `HeadroomModels.swift` has **39 non-optional
-decoded fields**, and exactly one hand-written `init(from:)` in the file. Nine
-of the 39 sit on the `/usage` path — `ActivityItem.id`, `DailyBurnDay.date`,
+structs are where it bites: `HeadroomModels.swift` has non-optional decoded
+fields, and exactly one hand-written `init(from:)` in the file. Nine of them
+sit on the `/usage` path — `ActivityItem.id`, `DailyBurnDay.date`,
 `GitHubRun.id`, `PlausibleSite.domain`, `PostHogProject.id`, `QuotaProviderInfo.id`,
 `SupabaseLint.name`, `SupabaseProject.ref`, `SupabaseService.name`,
-`SyncSource.id` — and the other 30 are on the agent-event path, which decodes
-separately and fails separately.
+`SyncSource.id`.
 
 Every one of the nine is an identity field, which is what makes this feel safe
 and is exactly why it is not: identity fields are the ones a refactor renames.

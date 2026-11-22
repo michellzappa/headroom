@@ -109,20 +109,11 @@ next person can find it.
   emitting a firmware header, a Swift file and a Python module. `boot_max.h`
   and the `HostVersion` golden vector are the two precedents already in the
   repo.
-- **Harden remote agent answers.** Approving a command that runs on the Mac
-  still rides a plaintext bearer token with Face ID enforced only by the
-  client. `/attention/events/{id}/respond` is the remaining mobile agent
-  control route; `_is_private()` already separates Tailscale CGNAT from
-  RFC1918, so option 1 in [trust.md](trust.md) remains one predicate.
-- **A clear-history control.** The ledger prunes at 30 days
-  (`agent_events.RETENTION_S`), which was the urgent half. The remaining half
-  is a button — deleting a SQLite file with the host stopped is not a thing to
-  ask of anyone, and it is the natural home for a "forget this session" too.
 - **Export and import history.** A new Mac still costs you every chart, and the
-  charts are spread across five files with three formats:
-  `~/.headroom/claude_history.json`, `daily_burn.json`, `quota_samples.jsonl`,
-  `quota_resets.jsonl` and `attention.sqlite3`. Consolidating them into the
-  SQLite that already exists is what turns this from a project into a feature.
+  charts are spread across four files with two formats:
+  `~/.headroom/claude_history.json`, `daily_burn.json`, `quota_samples.jsonl`
+  and `quota_resets.jsonl`. Consolidating them into one SQLite file is what
+  turns this from a project into a feature.
   See [product.md](product.md#history-is-a-user-asset).
 
 *Done since the last review:* the non-optional Swift field audit. `/usage` now

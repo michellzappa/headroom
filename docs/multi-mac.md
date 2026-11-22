@@ -27,7 +27,7 @@ colours you gave them, and the non-secret half of `config.json` — git authors,
 Vercel teams, GitHub org filters, Plausible sites, PostHog projects.
 
 **Never merged, but reported.** Local servers, git commits, the Claude token
-log, agent attention events, whether the ESP32 is on this desk. These are
+log, whether the ESP32 is on this desk. These are
 genuinely different per machine and a merged list of them would describe a
 computer that does not exist. Each Mac publishes a summary of its own and the
 others show it with an owner and an age.
@@ -288,7 +288,7 @@ same code at Dropbox or Syncthing. A secret in the record is a secret in a
 plaintext file in a third party's folder.
 
 Also never synced: anything describing one machine's disk or moment —
-`dev_root`, `codex_binary`, extra-account credential roots, the mobile pairing
+`dev_root`, extra-account credential roots, the mobile pairing
 token, local servers, git commits, the Claude token log, attention events.
 
 ## Usage counts travel, and are added up
@@ -305,7 +305,7 @@ person instead of one machine without anyone moving a file.
   which the phone and the board read; `_peer_view` copies a whitelist, so a
   peer's shard never reaches `/usage` either.
 - A shard is tens of KB for a year of sessions, so `/machines/sync` takes
-  bodies up to 2 MB rather than the 128 KB hook ceiling.
+  bodies up to 2 MB rather than the 128 KB bulk ceiling.
 - The counts are exact. They go only where the record goes: the CloudKit
   private database, or the folder the person chose.
 
@@ -389,8 +389,8 @@ Two endpoints, both loopback-only:
 | `POST /machines/sync` | peer records in, this Mac's record out |
 
 `/machines/sync` bodies clear the handler's usual 4 KB POST cap — one machine
-record is already a few KB of prefs and stamps — so it shares the 128 KB
-ceiling with the hook payloads.
+record is already a few KB of prefs and stamps — so it gets the 128 KB
+bulk ceiling.
 
 `machines[]` is always in `/usage` with at least this Mac's own row, so a
 single-Mac install has the same shape as a synced one and no client needs a
@@ -404,9 +404,8 @@ burndown chart. The merge is easy — thinned curves, local samples win, remote
 fills gaps, max-pct within a bucket since usage only rises inside a window —
 but it is a separate change from settings.
 
-**Cross-machine control.** Answering an agent or stopping a server on the other
-Mac. The attention ledger is already compare-and-swap guarded for it, but the
-transport here is a folder that syncs on its own schedule, which is the wrong
+**Cross-machine control.** Stopping a server on the other
+Mac. The transport here is a folder that syncs on its own schedule, which is the wrong
 shape for something you expect to happen now.
 
 **The phone.** iPhone and Watch pair to one Mac, and that Mac now knows about

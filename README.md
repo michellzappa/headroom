@@ -52,8 +52,6 @@ a single JSON feed. No Headroom cloud account — tokens stay on the machine.
   (and a menu-bar tick per provider in focus).
 - **Ship status ambient** — failed Actions, deploys, and monitors as an
   Attention pip and queue, not another tab.
-- **Agents away from the desk** — approve, deny, or reply to Claude / Codex
-  requests from Attention on iPhone (Headroom answers; it does not start work).
 - **Local-first** — credentials and CLIs you already have; optional board can
   fall back to USB when hotel Wi‑Fi blocks mDNS.
 
@@ -122,7 +120,6 @@ curl -s localhost:8737/health | python3 -m json.tool
 | [docs/product.md](docs/product.md) | Standing product decisions |
 | [docs/metering.md](docs/metering.md) | Meter kinds |
 | [docs/attention.md](docs/attention.md) | Attention rollup policy |
-| [docs/agent-attention.md](docs/agent-attention.md) | Coding-agent gateway |
 | [docs/multi-mac.md](docs/multi-mac.md) | CloudKit settings sync |
 | [docs/telemetry.md](docs/telemetry.md) | Anonymous product diagnostics |
 | [docs/updater.md](docs/updater.md) | In-app update feed |

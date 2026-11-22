@@ -31,8 +31,7 @@ Onboarding and Settings keep them apart — different questions, different setup
   Settings** (Keychain — never sent to the phone or written into `/usage`).
   **Git** and **GitHub Actions** are separate on purpose: Git reads local
   commits on disk (no token, including unpushed); Actions needs a GitHub PAT
-  and only sees what GitHub knows. Claude Code / Codex connection settings
-  live under **Agents**, not here.
+  and only sees what GitHub knows.
 
 | Integration | Where |
 |---|---|

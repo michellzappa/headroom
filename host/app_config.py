@@ -43,14 +43,6 @@ DEFAULTS = {
     # Authenticated iOS clients may use only these capabilities, and only from
     # a private/Tailscale address. Credential management remains Mac-local.
     "mobile_permissions": ["read", "refresh", "sources", "servers"],
-    # The agent gateway is opt-in while its protocol and remote-control
-    # surfaces are being introduced. Merely installing/updating Headroom must
-    # never launch a coding agent behind the user's back.
-    "agent_gateway_enabled": False,
-    "codex_binary": "codex",
-    # Passive agent notices are useful when coordinating several sessions, but
-    # questions and approvals remain visible when this is off.
-    "agent_alerts": True,
     # Escape hatch for a Gemini CLI install the host cannot find, or a future
     # layout it cannot read. The equivalent env vars are documented but do not
     # survive: the app rewrites the LaunchAgent plist on every host install.
@@ -87,7 +79,7 @@ DEFAULTS = {
 # Config keys that are the same person's answer on every Mac, so they follow
 # them from one to the next. Everything absent from this tuple stays local,
 # and two of those absences are load-bearing: `auth_token` is a credential,
-# and `dev_root` / `codex_binary` are paths that describe one machine's disk.
+# and `dev_root` is a path that describes one machine's disk.
 SHARED_CONFIG_KEYS = (
     # One person has one notion of "today", and burndown history merges
     # across Macs (docs/metering.md decision 9) — two machines disagreeing
@@ -809,7 +801,7 @@ def set_axiom_org_id(value):
     return org
 
 
-MOBILE_PERMISSION_ORDER = ("read", "refresh", "sources", "servers", "agents")
+MOBILE_PERMISSION_ORDER = ("read", "refresh", "sources", "servers")
 
 
 def mobile_permissions():
@@ -831,112 +823,11 @@ def set_mobile_permissions(values):
     return frozenset(ordered)
 
 
-MAX_TASK_FOLDERS = 8
-
-
-def task_folders():
-    """Folders you have started agent work in, most recent first.
-
-    The Mac can open a folder picker; a phone cannot browse the Mac's disk, so
-    it picks from what the Mac has already used.
-    """
-    value = get("agent_task_folders")
-    if not isinstance(value, list):
-        return []
-    return [entry for entry in value
-            if isinstance(entry, str) and entry][:MAX_TASK_FOLDERS]
-
-
-def remember_task_folder(folder):
-    """Move a folder to the front of the list, without duplicating it."""
-    if not isinstance(folder, str) or not folder.strip():
-        return task_folders()
-    folder = folder.strip()
-    remaining = [entry for entry in task_folders() if entry != folder]
-    ordered = [folder] + remaining
-    ordered = ordered[:MAX_TASK_FOLDERS]
-    _persist(agent_task_folders=ordered)
-    return ordered
-
-
-QUESTION_MODES = ("off", "notify", "answer")
-
-
-def agent_question_mode():
-    """What Headroom does when Claude asks you something.
-
-    `notify` — the default — posts the question and gets out of the way, so it
-    appears in the terminal *and* on your phone. You answer where you already
-    are. `answer` holds the call so the phone can answer it, which is the only
-    way to answer remotely and also the reason the question cannot be answered
-    at the Mac while it is held. `off` installs no hook at all.
-    """
-    value = get("agent_question_mode")
-    if value in QUESTION_MODES:
-        return value
-    # The old boolean, read once so an existing opt-in is not silently lost.
-    if get("agent_remote_questions") is True:
-        return "answer"
-    return "notify"
-
-
-def set_agent_question_mode(mode):
-    if mode not in QUESTION_MODES:
-        raise ValueError(f"mode must be one of {', '.join(QUESTION_MODES)}")
-    _persist(agent_question_mode=mode)
-    return mode
-
-
-def agent_gateway_enabled():
-    """Whether Headroom may launch its supervised coding-agent adapter."""
-    return get("agent_gateway_enabled") is True
-
-
-def codex_binary():
-    """Executable used for the Codex App Server child process."""
-    value = str(get("codex_binary") or DEFAULTS["codex_binary"]).strip()
-    return os.path.expanduser(value or DEFAULTS["codex_binary"])
-
-
-def agent_alerts():
-    """Whether passive coding-agent notices appear in the attention feed."""
-    return get("agent_alerts") is True
-
-
-def set_agent_alerts(enabled):
-    if not isinstance(enabled, bool):
-        raise ValueError("alerts must be true or false")
-    _persist(agent_alerts=enabled)
-    return agent_alerts()
-
-
 def gemini_oauth_client():
     """Return (client_id, client_secret) overrides, empty strings if unset."""
     cid = str(get("gemini_oauth_client_id") or "").strip()
     secret = str(get("gemini_oauth_client_secret") or "").strip()
     return cid, secret
-
-
-def set_agent_gateway(enabled=None, codex_binary_value=None):
-    """Persist the Mac-owned Codex gateway settings."""
-    updates = {}
-    if enabled is not None:
-        if not isinstance(enabled, bool):
-            raise ValueError("enabled must be true or false")
-        updates["agent_gateway_enabled"] = enabled
-    if codex_binary_value is not None:
-        if not isinstance(codex_binary_value, str):
-            raise ValueError("codex_binary must be a string")
-        binary = codex_binary_value.strip()
-        if not binary or len(binary) > 4096 or "\x00" in binary:
-            raise ValueError("invalid codex_binary")
-        updates["codex_binary"] = binary
-    if updates:
-        _persist(**updates)
-    return {
-        "enabled": agent_gateway_enabled(),
-        "codex_binary": codex_binary(),
-    }
 
 
 def icloud_sync_enabled():

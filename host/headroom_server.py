@@ -45,11 +45,8 @@ from glob import glob
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import accounts
-import agent_events
-import agent_gateway
 import app_config
 import activity_history
-import claude_hooks
 import auth
 import burndown
 import cache_util
@@ -1096,15 +1093,6 @@ def _machine_beacon(doc):
     if attention.get("level") not in (None, "ok"):
         beacon["attention_open"] = len(attention.get("reasons") or [])
         beacon["attention_top"] = attention.get("summary")
-    # An agent waiting for an answer is the one thing here that is genuinely
-    # urgent and genuinely invisible from the other Mac.
-    try:
-        open_events = (agent_gateway.get().events(state="open") or {})
-        waiting = len(open_events.get("events") or [])
-    except Exception:
-        waiting = 0
-    if waiting:
-        beacon["agent"] = waiting
     if _device_payload(time.time()):
         # Only one Mac has the board on its desk, and that is worth saying:
         # it is the machine whose numbers the panel is showing.
@@ -1935,7 +1923,6 @@ def _health_payload():
         # reports in. A board that never populates this is either offline or
         # predates build stamping.
         "device": _device_payload(time.time()),
-        "agents": agent_gateway.get().capabilities(),
         "sources": {
             sid: {
                 "ok": by_id.get(sid, {}).get("ok"),
@@ -1987,7 +1974,7 @@ class Handler(BaseHTTPRequestHandler):
         answer flips to 127.0.0.1 — classic rebinding, and this host is a
         fixed port advertised over mDNS — reaches us on a loopback socket
         like any local process, and would inherit the whole Mac-local class:
-        starting an agent task, reading `/config/git`, restarting the host.
+        reading `/config/git`, changing accounts, restarting the host.
         What it cannot do is change the name in `Host`, because that is the
         name it had to resolve to get here. So the header has to agree.
         """
@@ -2074,12 +2061,8 @@ class Handler(BaseHTTPRequestHandler):
                         "/config/sentry", "/config/datadog", "/config/axiom",
                         "/config/timezone", "/config/display",
                         "/config/calendar", "/calendar.ics", "/calendar.json",
-                        "/agents/capabilities", "/agents/config",
-                        "/agents/claude/config", "/agents/codex/task",
-                        "/agents/tasks",
                         "/machines/config",
-                        "/study", "/study/shard",
-                        "/attention/events"):
+                        "/study", "/study/shard"):
             self.send_error(404)
             return
         if not self._allowed():
@@ -2158,28 +2141,6 @@ class Handler(BaseHTTPRequestHandler):
                 return
             self._send_json(200, _accounts_payload())
             return
-        if path == "/agents/tasks":
-            # Starting work runs a local executable and accepts arbitrary
-            # prompt text. It is a Mac-local convenience, not a mobile agent
-            # client capability; the phone only answers existing attention
-            # events below.
-            if not self._is_loopback():
-                self._send_json(403, {"ok": False, "error": "localhost only"})
-                return
-            self._send_json(200, agent_gateway.get().task_surface())
-            return
-        if path == "/agents/codex/task":
-            if not self._is_loopback():
-                self._send_json(403, {"ok": False, "error": "localhost only"})
-                return
-            self._send_json(200, agent_gateway.get().codex_task())
-            return
-        if path == "/agents/config":
-            if not self._is_loopback():
-                self._send_json(403, {"ok": False, "error": "localhost only"})
-                return
-            self._send_json(200, agent_gateway.get().configuration())
-            return
         if path == "/machines/config":
             # Names a folder on this Mac's disk and decides whether this Mac
             # publishes anything. Mac-local, like the credentials settings.
@@ -2202,29 +2163,6 @@ class Handler(BaseHTTPRequestHandler):
             except study_service.StudyError as error:
                 self._send_json(409, {"ok": False, "error": str(error)})
             return
-        if path == "/agents/claude/config":
-            if not self._is_loopback():
-                self._send_json(403, {"ok": False, "error": "localhost only"})
-                return
-            try:
-                result = claude_hooks.inspect(port=self.server.server_port)
-            except (OSError, ValueError, json.JSONDecodeError) as error:
-                self._send_json(
-                    200, {
-                        "ok": False,
-                        "provider": "claude-code",
-                        "state": "error",
-                        "installed": False,
-                        "question_mode": app_config.agent_question_mode(),
-                        "error": str(error),
-                    })
-                return
-            self._send_json(200, {
-                "ok": True,
-                **result,
-                "question_mode": app_config.agent_question_mode(),
-            })
-            return
         if path == "/mobile/permissions":
             granted = app_config.mobile_permissions()
             self._send_json(200, {
@@ -2234,28 +2172,6 @@ class Handler(BaseHTTPRequestHandler):
                     for permission in app_config.MOBILE_PERMISSION_ORDER
                 },
             })
-            return
-        if path in ("/agents/capabilities", "/attention/events"):
-            if (not self._is_loopback()
-                    and not self._mobile_permission_allowed("read")):
-                self._send_json(
-                    403, {"ok": False, "error": "mobile dashboard access disabled"})
-                return
-            if path == "/agents/capabilities":
-                self._send_json(200, agent_gateway.get().capabilities())
-                return
-            query = urllib.parse.parse_qs(split.query)
-            try:
-                state = query.get("state", ["open"])[0]
-                limit = int(query.get("limit", ["50"])[0])
-                after_raw = query.get("after_ms", [None])[0]
-                after_ms = int(after_raw) if after_raw is not None else None
-                result = agent_gateway.get().events(
-                    state=state, limit=limit, after_ms=after_ms)
-            except (ValueError, agent_events.InvalidEvent) as error:
-                self._send_json(400, {"ok": False, "error": str(error)})
-                return
-            self._send_json(200, result)
             return
         if path in ("", "/usage") and self._is_mobile_client():
             if not self._mobile_permission_allowed("read"):
@@ -2309,16 +2225,6 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(403, {"ok": False, "error": "cross-site request"})
             return
         path = urllib.parse.urlsplit(self.path).path.rstrip("/")
-        claude_permission = path == "/agents/hooks/claude/permission"
-        claude_question = path == "/agents/hooks/claude/question"
-        claude_event = path == "/agents/hooks/claude/event"
-        event_response_id = None
-        prefix = "/attention/events/"
-        suffix = "/respond"
-        if path.startswith(prefix) and path.endswith(suffix):
-            encoded_id = path[len(prefix):-len(suffix)]
-            if encoded_id and "/" not in encoded_id:
-                event_response_id = urllib.parse.unquote(encoded_id)
         if path not in (
             "/local/stop",
             "/supabase/refresh",
@@ -2342,11 +2248,6 @@ class Handler(BaseHTTPRequestHandler):
             "/config/display",
             "/config/calendar",
             "/accounts",
-            "/agents/config",
-            "/agents/claude/config",
-            "/agents/codex/tasks",
-            "/agents/codex/steer",
-            "/agents/tasks",
             "/machines/config",
             "/machines/sync",
             "/study/handle",
@@ -2356,12 +2257,9 @@ class Handler(BaseHTTPRequestHandler):
             "/study/shard",
             "/study/shard/remove",
             "/study/refresh",
-        ) and event_response_id is None:
-            if claude_permission or claude_question or claude_event:
-                pass
-            else:
-                self.send_error(404)
-                return
+        ):
+            self.send_error(404)
+            return
         if not self._allowed():
             self._send_json(401, {"ok": False, "error": "token required"})
             return
@@ -2403,36 +2301,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json(
                     403, {"ok": False, "error": "mobile dashboard access disabled"})
                 return
-        elif event_response_id is not None:
-            if (not self._is_loopback()
-                    and not self._mobile_permission_allowed("agents")):
-                self._send_json(
-                    403, {"ok": False, "error": "mobile agent control disabled"})
-                return
-        elif path == "/agents/config":
-            if not self._is_loopback():
-                self._send_json(403, {"ok": False, "error": "localhost only"})
-                return
-        elif path == "/agents/tasks":
-            # Starting work runs a local executable and accepts arbitrary
-            # prompt text. Keep it on the Mac; mobile is an attention surface,
-            # not an agent client.
-            if not self._is_loopback():
-                self._send_json(403, {"ok": False, "error": "localhost only"})
-                return
-        elif path in ("/agents/claude/config", "/agents/codex/tasks",
-                      "/agents/codex/steer"):
-            # These start or steer a local executable, so they never answer
-            # over the LAN — same rule as /agents/config.
-            if not self._is_loopback():
-                self._send_json(403, {"ok": False, "error": "localhost only"})
-                return
         elif path.startswith("/study/"):
             # Imports a stranger's card and writes to ~/.headroom/study.
-            if not self._is_loopback():
-                self._send_json(403, {"ok": False, "error": "localhost only"})
-                return
-        elif claude_permission or claude_question or claude_event:
             if not self._is_loopback():
                 self._send_json(403, {"ok": False, "error": "localhost only"})
                 return
@@ -2446,10 +2316,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             length = int(self.headers.get("Content-Length", "0"))
             # A single machine record is a few KB of prefs and stamps, so a
-            # handful of peers clears 4096 immediately. Same ceiling as the
-            # hook payloads rather than a third number to keep in step.
-            bulk = (claude_permission or claude_question or claude_event
-                    or path in ("/machines/sync", "/study/friends"))
+            # handful of peers clears 4096 immediately.
+            bulk = path in ("/machines/sync", "/study/friends")
             max_length = 128 * 1024 if bulk else 4096
             if path == "/machines/sync":
                 # Each peer record carries its usage-study shard, tens of KB
@@ -2466,123 +2334,6 @@ class Handler(BaseHTTPRequestHandler):
             return
         if not isinstance(payload, dict):
             self._send_json(400, {"ok": False, "error": "JSON object required"})
-            return
-
-        if claude_permission:
-            try:
-                result = agent_gateway.get().claude_permission(payload)
-            except agent_events.InvalidEvent as error:
-                self._send_json(400, {"error": str(error)})
-                return
-            # No decision deliberately hands control back to Claude's ordinary
-            # local permission dialog.
-            self._send_json(200, result or {})
-            return
-
-        if path == "/agents/tasks":
-            try:
-                result = agent_gateway.get().start_task(
-                    payload.get("provider"), payload.get("cwd"),
-                    payload.get("prompt"))
-            except ValueError as error:
-                self._send_json(400, {"ok": False, "error": str(error)})
-                return
-            except (RuntimeError, OSError) as error:
-                self._send_json(409, {"ok": False, "error": str(error)})
-                return
-            self._send_json(200, result)
-            return
-
-        if path in ("/agents/codex/tasks", "/agents/codex/steer"):
-            gateway = agent_gateway.get()
-            try:
-                if path == "/agents/codex/tasks":
-                    result = gateway.codex_start_task(
-                        payload.get("cwd"), payload.get("prompt"))
-                else:
-                    result = gateway.codex_steer(payload.get("text"))
-            except ValueError as error:
-                self._send_json(400, {"ok": False, "error": str(error)})
-                return
-            except RuntimeError as error:
-                self._send_json(409, {"ok": False, "error": str(error)})
-                return
-            self._send_json(200, result)
-            return
-
-        if claude_question:
-            try:
-                result = agent_gateway.get().claude_question(payload)
-            except agent_events.InvalidEvent as error:
-                self._send_json(400, {"error": str(error)})
-                return
-            # A deferred decision leaves the question to the Mac.
-            self._send_json(200, result or {})
-            return
-
-        if claude_event:
-            try:
-                agent_gateway.get().claude_event(payload)
-            except agent_events.InvalidEvent as error:
-                self._send_json(400, {"error": str(error)})
-                return
-            self._send_json(200, {})
-            return
-
-        if path == "/agents/claude/config":
-            action = payload.get("action")
-            try:
-                if action == "install":
-                    mode = payload.get("question_mode")
-                    if isinstance(mode, str):
-                        app_config.set_agent_question_mode(mode)
-                    result = claude_hooks.install(
-                        port=self.server.server_port,
-                        question_mode=app_config.agent_question_mode())
-                elif action == "uninstall":
-                    result = claude_hooks.uninstall(
-                        port=self.server.server_port)
-                elif action == "test":
-                    agent_gateway.get().claude_event({
-                        "hook_event_name": "Notification",
-                        "session_id": "headroom-claude-test",
-                        "cwd": app_config.dev_root(),
-                        "notification_type": "idle_prompt",
-                        "message": "Claude Code hook test from this Mac",
-                    })
-                    result = claude_hooks.inspect(
-                        port=self.server.server_port)
-                else:
-                    raise ValueError("unknown Claude hook action")
-            except (OSError, ValueError, json.JSONDecodeError) as error:
-                self._send_json(400, {"ok": False, "error": str(error)})
-                return
-            self._send_json(200, {
-                "ok": True,
-                **result,
-                "question_mode": app_config.agent_question_mode(),
-            })
-            return
-
-        if path == "/agents/config":
-            try:
-                if "alerts" in payload:
-                    app_config.set_agent_alerts(payload["alerts"])
-                has_gateway_update = (
-                    "enabled" in payload or "codex_binary" in payload
-                )
-                if has_gateway_update:
-                    app_config.set_agent_gateway(
-                        enabled=payload.get("enabled"),
-                        codex_binary_value=payload.get("codex_binary"),
-                    )
-                    result = agent_gateway.get().reconfigure()
-                else:
-                    result = agent_gateway.get().configuration()
-            except ValueError as error:
-                self._send_json(400, {"ok": False, "error": str(error)})
-                return
-            self._send_json(200, result)
             return
 
         if path == "/machines/sync":
@@ -2636,27 +2387,6 @@ class Handler(BaseHTTPRequestHandler):
                 print("multi-mac sync error:", exc, flush=True)
             publish()
             self._send_json(200, icloud_sync.configuration())
-            return
-
-        if event_response_id is not None:
-            try:
-                result = agent_gateway.get().respond(
-                    event_response_id,
-                    revision=payload.get("revision"),
-                    action=payload.get("action"),
-                    idempotency_key=payload.get("idempotency_key"),
-                    text=payload.get("text"),
-                )
-            except agent_events.EventNotFound as error:
-                self._send_json(404, {"ok": False, "error": str(error)})
-                return
-            except agent_events.InvalidEvent as error:
-                self._send_json(400, {"ok": False, "error": str(error)})
-                return
-            except agent_events.EventConflict as error:
-                self._send_json(409, {"ok": False, "error": str(error)})
-                return
-            self._send_json(200, result)
             return
 
         if path == "/attention/ack":
@@ -3422,13 +3152,6 @@ def main():
             sys.exit(1)
         raise
 
-    # Gateway before any printing daemon threads. A raise here under threads
-    # that already write stdout aborts inside Py_FinalizeEx (LaunchAgent loop).
-    try:
-        agent_gateway.get().start()
-    except Exception as exc:
-        print(f"agent gateway failed to start: {exc}", flush=True)
-
     threading.Thread(target=_backfill_history, daemon=True).start()
     threading.Thread(target=_warmup, daemon=True).start()
     threading.Thread(target=_poller, args=(args.interval,), daemon=True).start()
@@ -3498,7 +3221,6 @@ def main():
     except KeyboardInterrupt:
         print("\nbye", flush=True)
     finally:
-        agent_gateway.get().stop()
         if bonjour is not None and bonjour.poll() is None:
             bonjour.terminate()
 

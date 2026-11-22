@@ -2759,13 +2759,11 @@ struct MachineSummary: Decodable, Identifiable, Sendable {
     var servers: Int?
     var attentionOpen: Int?
     var attentionTop: String?
-    /// Coding agents on that Mac waiting for an answer.
-    var agent: Int?
     /// True on the one Mac with the ESP32 on its desk.
     var board: Bool?
 
     enum CodingKeys: String, CodingKey {
-        case id, name, stale, providers, servers, agent, board
+        case id, name, stale, providers, servers, board
         case isSelf = "self"
         case ageS = "age_s"
         case hostVersion = "host_version"
@@ -2775,7 +2773,7 @@ struct MachineSummary: Decodable, Identifiable, Sendable {
 
     var title: String { name ?? "Mac" }
     var isCurrent: Bool { isSelf == true }
-    var needsYou: Bool { (agent ?? 0) > 0 || (attentionOpen ?? 0) > 0 }
+    var needsYou: Bool { (attentionOpen ?? 0) > 0 }
 
     /// "just now" / "4m ago" / "2h ago" / "3d ago".
     ///
@@ -2792,13 +2790,10 @@ struct MachineSummary: Decodable, Identifiable, Sendable {
     /// What that Mac is doing, in one line, or nil when there is nothing to say.
     var activityLabel: String? {
         var parts: [String] = []
-        if let agent, agent > 0 {
-            parts.append("\(agent) waiting")
-        }
         if let servers, servers > 0 {
             parts.append("\(servers) server" + (servers == 1 ? "" : "s"))
         }
-        if let top = attentionTop, !top.isEmpty, (agent ?? 0) == 0 {
+        if let top = attentionTop, !top.isEmpty {
             parts.append(top)
         }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
@@ -2837,14 +2832,9 @@ enum MobilePermission: String, CaseIterable, Codable, Sendable {
     case refresh
     case sources
     case servers
-    case agents
 
-    /// Permissions surfaced in Mac and iPhone Settings. `agents` stays in the
-    /// enum and wire struct for host compatibility while the Agents mode is
-    /// removed from the app UI.
-    static let visibleCases: [MobilePermission] = [
-        .read, .refresh, .sources, .servers,
-    ]
+    /// Permissions surfaced in Mac and iPhone Settings.
+    static let visibleCases: [MobilePermission] = allCases
 
     var title: String {
         switch self {
@@ -2852,7 +2842,6 @@ enum MobilePermission: String, CaseIterable, Codable, Sendable {
         case .refresh: "Refresh data"
         case .sources: "Manage sources"
         case .servers: "Stop local servers"
-        case .agents: "Answer coding agents"
         }
     }
 }
@@ -2862,24 +2851,21 @@ struct MobilePermissions: Codable, Sendable, Equatable {
     var refresh = false
     var sources = false
     var servers = false
-    var agents = false
 
     static let allEnabled = MobilePermissions(
-        read: true, refresh: true, sources: true, servers: true, agents: true)
+        read: true, refresh: true, sources: true, servers: true)
     static let allDisabled = MobilePermissions()
 
     init(
         read: Bool = false,
         refresh: Bool = false,
         sources: Bool = false,
-        servers: Bool = false,
-        agents: Bool = false
+        servers: Bool = false
     ) {
         self.read = read
         self.refresh = refresh
         self.sources = sources
         self.servers = servers
-        self.agents = agents
     }
 
     init(from decoder: Decoder) throws {
@@ -2888,7 +2874,6 @@ struct MobilePermissions: Codable, Sendable, Equatable {
         refresh = try values.decodeIfPresent(Bool.self, forKey: .refresh) ?? false
         sources = try values.decodeIfPresent(Bool.self, forKey: .sources) ?? false
         servers = try values.decodeIfPresent(Bool.self, forKey: .servers) ?? false
-        agents = try values.decodeIfPresent(Bool.self, forKey: .agents) ?? false
     }
 
     func encode(to encoder: Encoder) throws {
@@ -2897,11 +2882,10 @@ struct MobilePermissions: Codable, Sendable, Equatable {
         try values.encode(refresh, forKey: .refresh)
         try values.encode(sources, forKey: .sources)
         try values.encode(servers, forKey: .servers)
-        try values.encode(agents, forKey: .agents)
     }
 
     private enum CodingKeys: String, CodingKey {
-        case read, refresh, sources, servers, agents
+        case read, refresh, sources, servers
     }
 
     subscript(_ permission: MobilePermission) -> Bool {
@@ -2911,7 +2895,6 @@ struct MobilePermissions: Codable, Sendable, Equatable {
             case .refresh: refresh
             case .sources: sources
             case .servers: servers
-            case .agents: agents
             }
         }
         set {
@@ -2920,7 +2903,6 @@ struct MobilePermissions: Codable, Sendable, Equatable {
             case .refresh: refresh = newValue
             case .sources: sources = newValue
             case .servers: servers = newValue
-            case .agents: agents = newValue
             }
         }
     }
