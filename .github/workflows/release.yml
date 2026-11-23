@@ -351,7 +351,7 @@ jobs:
             || { echo "::error::SPARKLE_PRIVATE_ED_KEY does not match SUPublicEDKey in the app"; exit 1; }
 
           ./scripts/changelog-section.sh "$VERSION" > "$RUNNER_TEMP/sparkle-notes.md"
-          notes_html=$(gh api markdown -F text=@"$RUNNER_TEMP/sparkle-notes.md" -f mode=gfm -f context="$GITHUB_REPOSITORY")
+          notes_html=$(gh api markdown -F text=@"$RUNNER_TEMP/sparkle-notes.md" -f mode=markdown)
           notes_html=${notes_html//]]>/]]]]><![CDATA[>}
           url="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/Headroom-macOS.zip"
           min_line=""
