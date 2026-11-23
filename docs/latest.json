@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "version": "2.3.4",
-  "published": "2026-11-23T12:09:58Z",
-  "url": "https://github.com/michellzappa/headroom/releases/download/v2.3.4/Headroom-macOS.zip",
-  "sha256": "f147cba54c0d4b72b41b8810760f94a805972342cbfc960ce70c400bb090133f",
-  "size": 8025876,
+  "version": "2.3.5",
+  "published": "2026-11-23T22:49:45Z",
+  "url": "https://github.com/michellzappa/headroom/releases/download/v2.3.5/Headroom-macOS.zip",
+  "sha256": "4d65618348362d5cec52bcf819f4d13265f65624e96c324902a3d56f48f74e61",
+  "size": 8025933,
   "min_macos": "14.0",
-  "notes_md": "### Changed\n\n- **Updates use Sparkle.** Once a day, Headroom checks GitHub for a signed\n  update and installs it in place. Settings → General shows your version and\n  the last check. This update switches your copy over, and you don't need to\n  do anything.\n- **The host runs from Application Support.** The background host now runs\n  from `~/Library/Application Support/Headroom/host` instead of from inside\n  the app. An update can then replace the app while the host keeps serving the\n  board and the phone. Headroom moves the host the first time this version\n  opens."
+  "notes_md": "### Changed\n\n- **Cleaner update notes.** The notes in the update window now wrap to fit\n  the window. They used to break at fixed points in the middle of sentences.\n  This is also the first update that Headroom installs with Sparkle."
 }
