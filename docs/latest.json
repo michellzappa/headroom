@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "version": "2.3.3",
-  "published": "2026-11-22T15:52:09Z",
-  "url": "https://github.com/michellzappa/headroom/releases/download/v2.3.3/Headroom-macOS.zip",
-  "sha256": "ff9d9c878dc123cf8018344a90d1df81dc8e1fcd11b8df53850bd964c8b101de",
-  "size": 7038809,
+  "version": "2.3.4",
+  "published": "2026-11-23T12:09:58Z",
+  "url": "https://github.com/michellzappa/headroom/releases/download/v2.3.4/Headroom-macOS.zip",
+  "sha256": "f147cba54c0d4b72b41b8810760f94a805972342cbfc960ce70c400bb090133f",
+  "size": 8025876,
   "min_macos": "14.0",
-  "notes_md": "### Removed\n\n- **Coding-agent integrations.** Headroom is a quota app now. The host no\n  longer installs or answers Claude Code hooks, no longer runs a Codex App\n  Server, and no longer serves the `/agents/*` routes or the attention event\n  feed (`/attention/events`). The iPhone's \"Answer coding agents\" permission,\n  the agent count on the Macs list and the agent-only settings\n  (`agent_question_mode`, `agent_gateway_enabled`, `codex_binary`,\n  `agent_alerts`) are gone too. Quota, usage, burn and spend for every\n  provider work as before, and so do the usage study and the Attention\n  rollup for CI, builds and alerts. If you installed Headroom's Claude Code\n  hooks, delete the entries whose URL contains `managed_by=headroom` from\n  `~/.claude/settings.json`. Until you do, each hook gets a 404 and Claude\n  continues normally.\n\n### Fixed\n\n- **Antigravity CLI installs.** Headroom now finds the `agy` CLI at\n  `~/.local/bin/agy` and the language servers it starts. The offline hint\n  mentions `agy`."
+  "notes_md": "### Changed\n\n- **Updates use Sparkle.** Once a day, Headroom checks GitHub for a signed\n  update and installs it in place. Settings → General shows your version and\n  the last check. This update switches your copy over, and you don't need to\n  do anything.\n- **The host runs from Application Support.** The background host now runs\n  from `~/Library/Application Support/Headroom/host` instead of from inside\n  the app. An update can then replace the app while the host keeps serving the\n  board and the phone. Headroom moves the host the first time this version\n  opens."
 }
