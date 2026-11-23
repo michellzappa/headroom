@@ -7,6 +7,20 @@ are not tracked here because they move on every commit.
 Add a section here before cutting a tag. `scripts/cut-release.sh` refuses to
 tag a version that has no entry.
 
+## 2.3.4 — 2026-11-23
+
+### Changed
+
+- **Updates use Sparkle.** Once a day, Headroom checks GitHub for a signed
+  update and installs it in place. Settings → General shows your version and
+  the last check. This update switches your copy over, and you don't need to
+  do anything.
+- **The host runs from Application Support.** The background host now runs
+  from `~/Library/Application Support/Headroom/host` instead of from inside
+  the app. An update can then replace the app while the host keeps serving the
+  board and the phone. Headroom moves the host the first time this version
+  opens.
+
 ## 2.3.3 — 2026-11-22
 
 ### Removed
