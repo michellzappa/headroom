@@ -7,6 +7,14 @@ are not tracked here because they move on every commit.
 Add a section here before cutting a tag. `scripts/cut-release.sh` refuses to
 tag a version that has no entry.
 
+## 2.3.5 — 2026-11-23
+
+### Changed
+
+- **Cleaner update notes.** The notes in the update window now wrap to fit
+  the window. They used to break at fixed points in the middle of sentences.
+  This is also the first update that Headroom installs with Sparkle.
+
 ## 2.3.4 — 2026-11-23
 
 ### Changed
