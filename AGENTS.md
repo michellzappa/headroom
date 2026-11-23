@@ -392,8 +392,13 @@ not ship — which is the other reason to stage paths explicitly rather than
 `scripts/cut-release.sh` and the workflow both refuse a version with no
 `CHANGELOG.md` section, because that section becomes the release notes.
 
-**A release also writes `docs/latest.json`**, the feed installed copies poll to
-find it ([docs/updater.md](docs/updater.md)). The `feed` job does it last, only
+**A release attaches `appcast.xml`**, the Sparkle feed that builds from 2.3.4
+read ([docs/updater.md](docs/updater.md)). The macOS job signs the zip with the
+`SPARKLE_PRIVATE_ED_KEY` secret and fails when that key does not match the
+`SUPublicEDKey` in the build.
+
+**A release also writes `docs/latest.json`**, the old feed that builds up to
+2.3.3 poll to reach the first Sparkle build. The `feed` job does it last, only
 after the release is published and only when the build was notarized, and it
 commits to `main` — so expect one extra commit per release that you did not
 write. It cannot recurse: a push made with `GITHUB_TOKEN` does not trigger

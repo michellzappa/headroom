@@ -65,6 +65,9 @@ final class HostProcess: @unchecked Sendable {
     private var restarts = 0
     private var stopping = false
     private var port = HostController.defaultPort
+    /// The staged server the child runs. A restart reuses it rather than
+    /// staging again from a bundle that Sparkle may be replacing.
+    private var server: URL?
     private var failure: String?
 
     var isRunning: Bool { lock.withLock { child?.isRunning ?? false } }
@@ -76,9 +79,7 @@ final class HostProcess: @unchecked Sendable {
 
     @discardableResult
     func start(port: Int = HostController.defaultPort) throws -> Int32 {
-        guard let server = HostController.bundledServer else {
-            throw HostController.HostError.notBundled
-        }
+        let server = try HostController.stagedServer()
         lock.lock()
         if let child, child.isRunning {
             lock.unlock()
@@ -88,8 +89,11 @@ final class HostProcess: @unchecked Sendable {
         restarts = 0
         failure = nil
         self.port = port
+        self.server = server
         lock.unlock()
-        return try spawn(server: server, port: port)
+        let pid = try spawn(server: server, port: port)
+        HostController.pruneStagedHosts(keeping: server)
+        return pid
     }
 
     /// SIGTERM and return. Does not wait, because the caller is usually
@@ -202,12 +206,12 @@ final class HostProcess: @unchecked Sendable {
     }
 
     private func restartAfterFailure() {
-        guard let server = HostController.bundledServer else { return }
         lock.lock()
         let abandoned = stopping
         let port = self.port
+        let server = self.server
         lock.unlock()
-        guard !abandoned else { return }
+        guard !abandoned, let server else { return }
         _ = try? spawn(server: server, port: port)
     }
 

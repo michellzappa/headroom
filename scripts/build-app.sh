@@ -108,11 +108,17 @@ done
 # An app that ships without its updater can never replace itself, and nothing
 # about it looks wrong until someone waits months for a version that already
 # shipped. Fail the build instead. See docs/updater.md.
-[[ -f "$APP_SRC/Contents/Resources/update-app.sh" ]] || {
-  echo "error: update-app.sh missing from $APP_SRC/Contents/Resources" >&2
-  echo "       (macos/project.yml copies it in as a resource)" >&2
+[[ -d "$APP_SRC/Contents/Frameworks/Sparkle.framework" ]] || {
+  echo "error: Sparkle.framework missing from $APP_SRC/Contents/Frameworks" >&2
+  echo "       (macos/project.yml links HouseKitSparkle)" >&2
   exit 1
 }
+for key in SUFeedURL SUPublicEDKey; do
+  /usr/libexec/PlistBuddy -c "Print :$key" "$APP_SRC/Contents/Info.plist" >/dev/null 2>&1 || {
+    echo "error: $key missing from $APP_SRC/Contents/Info.plist (macos/Info.plist)" >&2
+    exit 1
+  }
+done
 
 # About → Changelog reads this offline. Shipping without it leaves a dead
 # button and a "view on GitHub" fallback — fail the build instead.
@@ -301,10 +307,31 @@ signed_app_group() {
     | sed -n 's/.*<string>\([A-Z0-9]*\.group\.[^<]*\)<\/string>.*/\1/p'
 }
 
+SPARKLE="$APP/Contents/Frameworks/Sparkle.framework"
+
+# Sparkle's XPC services and helpers, then the framework: innermost first,
+# never --deep. --preserve-metadata keeps the services' own entitlements.
+# Same order as housekit's release-mac.yml.
+sign_sparkle() {
+  local identity="$1"
+  shift
+  local bundle
+  while IFS= read -r bundle; do
+    codesign --force "$@" --sign "$identity" \
+      --preserve-metadata=entitlements "$bundle"
+  done < <(find "$SPARKLE/Versions" \( -name '*.xpc' -o -name '*.app' \) -type d -prune -print | sort -r)
+  if [[ -f "$SPARKLE/Versions/B/Autoupdate" ]]; then
+    codesign --force "$@" --sign "$identity" \
+      --preserve-metadata=entitlements "$SPARKLE/Versions/B/Autoupdate"
+  fi
+  codesign --force "$@" --sign "$identity" "$SPARKLE"
+}
+
 sign_adhoc() {
   # Ad-hoc has no team, so the app group is dead either way — the widget falls
   # back to its placeholder on a locally built .app. Run from Xcode (automatic
   # signing, your own team) to see it draw real numbers.
+  sign_sparkle - 2>/dev/null || true
   codesign --force --sign - "$WIDGET" 2>/dev/null || true
   codesign --force --sign - "$APP" 2>/dev/null || true
 }
@@ -348,7 +375,10 @@ sign_developer_id() {
     exit 1
   fi
 
-  # No nested frameworks — sign the main binary, then the bundle.
+  [[ -d "$SPARKLE" ]] || { echo "error: missing $SPARKLE" >&2; exit 1; }
+  sign_sparkle "$identity" --options runtime --timestamp
+
+  # Then the main binary, then the bundle.
   local main_bin="$APP/Contents/MacOS/Headroom"
   [[ -f "$main_bin" ]] || { echo "error: missing $main_bin" >&2; exit 1; }
   codesign --force --options runtime --timestamp \

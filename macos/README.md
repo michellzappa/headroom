@@ -21,12 +21,12 @@ Download `Headroom-macOS.zip` from GitHub Releases, open the app, confirm
 providers on Welcome. Notarized builds open without Gatekeeper workarounds —
 see [docs/releasing.md](../docs/releasing.md).
 
-**Updating.** [`scripts/update-app.sh`](../scripts/update-app.sh) replaces an
-installed `Headroom.app` with the current Release. It refuses anything that is
-not notarized and signed by the project's team, and it brackets the swap with
-`launchctl bootout` / `bootstrap` — the host runs from inside the bundle under
-a KeepAlive agent, so replacing the app under a live agent leaves launchd
-holding the old code.
+**Updating.** The app updates itself with Sparkle, from the appcast on the
+latest GitHub Release. The host runs from a staged copy in
+`~/Library/Application Support/Headroom/host`, so Sparkle can replace the app
+while the host runs. See [docs/updater.md](../docs/updater.md).
+[`scripts/update-app.sh`](../scripts/update-app.sh) still replaces an
+installed `Headroom.app` by hand:
 
 ```bash
 ./scripts/update-app.sh --check

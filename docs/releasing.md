@@ -79,10 +79,15 @@ through the same script:
 
 Manual **Actions → Release → Run workflow** builds artifacts without publishing.
 
-## The update feed
+## The update feeds
 
-A shipped `Headroom.app` polls `https://updates.centaur-labs.io/latest.json`
-to learn a newer one exists ([docs/updater.md](updater.md)). That file is
+From 2.3.4 the app updates with Sparkle. The macOS job signs the zip and
+attaches `appcast.xml` to the release; `SUFeedURL` reads it from
+`releases/latest/download/appcast.xml` ([docs/updater.md](updater.md)).
+
+Builds up to 2.3.3 poll `https://updates.centaur-labs.io/latest.json` to learn
+a newer one exists, and that is their only way to the first Sparkle build.
+That file is
 `docs/latest.json`, served by GitHub Pages from `main:/docs`, and the `feed`
 job writes it as the **last** step of a release.
 

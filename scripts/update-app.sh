@@ -8,10 +8,9 @@
 #   ./scripts/update-app.sh --url https://…/Headroom-macOS.zip
 #   ./scripts/update-app.sh --force    # reinstall even at the same version
 #
-# The app runs this too, from inside its own bundle, passing the version and
-# URL it read from the update feed (docs/updater.md). That is why --url exists:
-# the day the zip moves off GitHub Releases, the feed says so and nothing here
-# or in the app needs to know where it went.
+# Builds up to 2.3.3 run this too, from inside their own bundle, passing the
+# version and URL they read from docs/latest.json. From 2.3.4 the app updates
+# with Sparkle and does not bundle this script (docs/updater.md).
 #
 # Works from a clone or on its own — no gh, no auth, public repo. System tools
 # only: curl, unzip, plutil, codesign, spctl, launchctl.

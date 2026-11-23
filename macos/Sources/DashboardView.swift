@@ -19,7 +19,7 @@ struct DashboardView: View {
     /// `NavigationStack` — the latter's chrome is unreliable inside an
     /// `NSPopover`, and a Back that returns to the mode you left is clearer.
     @State private var serviceDetail: ServiceDetailSelection?
-    private let updates = UpdateChecker.shared
+    private let updates = Updates.shared
     @State private var updateInstallMessage: String?
     @AppStorage("confirmServerStops")
     private var confirmServerStops = true
@@ -527,18 +527,18 @@ struct DashboardView: View {
             .disabled(store.isRefreshing)
             .help("Refresh")
             .accessibilityLabel("Refresh")
-            if let update = updates.available, UpdateCheck.canSelfUpdate {
+            if let version = updates.availableVersion, updates.canInstall {
                 Button {
                     do {
-                        try UpdateInstaller.install(update)
+                        try updates.installUpdate()
                     } catch {
                         updateInstallMessage = error.localizedDescription
                     }
                 } label: {
                     Label(
                         HeadroomCopy.newVersionAvailable(
-                            from: UpdateCheck.installedVersion,
-                            to: update.version
+                            from: updates.installedVersion,
+                            to: version
                         ),
                         systemImage: "arrow.down.circle.fill"
                     )
@@ -546,11 +546,11 @@ struct DashboardView: View {
                         .foregroundStyle(.tint)
                 }
                 .buttonStyle(.plain)
-                .help("Install Headroom \(update.version)")
+                .help("Install Headroom \(version)")
                 .accessibilityLabel(
                     HeadroomCopy.newVersionAvailableAccessibility(
-                        from: UpdateCheck.installedVersion,
-                        to: update.version
+                        from: updates.installedVersion,
+                        to: version
                     )
                 )
             }

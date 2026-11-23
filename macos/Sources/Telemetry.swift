@@ -617,7 +617,8 @@ final class TelemetryCoordinator {
                 .compactMap(HeadroomTelemetry.normalizedSourceID)
         ).sorted()
 
-        let appVersion = UpdateCheck.installedVersion
+        let appVersion = Bundle.main.object(
+            forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
         let appBuild = Bundle.main.object(
             forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
         #if arch(arm64)

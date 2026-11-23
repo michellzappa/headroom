@@ -299,6 +299,86 @@ jobs:
           } > "$RUNNER_TEMP/release-body.md"
           echo "path=$RUNNER_TEMP/release-body.md" >> "$GITHUB_OUTPUT"
 
+      # The Sparkle feed (docs/updater.md). Builds from 2.3.4 read
+      # releases/latest/download/appcast.xml, so this file rides on the release
+      # it describes. Only a notarized build gets one: Sparkle would refuse an
+      # ad-hoc update anyway, and offering it breaks every check until the next
+      # release.
+      - name: Sign the update and attach appcast.xml
+        if: needs.gate.outputs.release == 'true' && steps.meta.outputs.notarized == 'true'
+        env:
+          SPARKLE_PRIVATE_ED_KEY: ${{ secrets.SPARKLE_PRIVATE_ED_KEY }}
+          SPARKLE_VERSION: "2.10.1"
+          SPARKLE_SHA256: 1a856d2a9edb8e628de88121d7be04cf0e2167f8641650b78fca00b14244cf27
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.ver.outputs.version }}
+          BUILD: ${{ steps.ver.outputs.build }}
+          TAG: ${{ needs.gate.outputs.tag }}
+        run: |
+          set -euo pipefail
+          zip="dist/Headroom-macOS.zip"
+          plist="dist/Headroom.app/Contents/Info.plist"
+          [[ -n "$SPARKLE_PRIVATE_ED_KEY" ]] || { echo "::error::SPARKLE_PRIVATE_ED_KEY is not set"; exit 1; }
+          public_key=$(/usr/libexec/PlistBuddy -c "Print :SUPublicEDKey" "$plist")
+          min_macos=$(/usr/libexec/PlistBuddy -c "Print :LSMinimumSystemVersion" "$plist" 2>/dev/null || true)
+          plist_build=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$plist")
+          [[ "$plist_build" == "$BUILD" ]] || { echo "::error::CFBundleVersion $plist_build is not build $BUILD"; exit 1; }
+
+          tools="$RUNNER_TEMP/sparkle"
+          mkdir -p "$tools"
+          curl -fsSL "https://github.com/sparkle-project/Sparkle/releases/download/$SPARKLE_VERSION/Sparkle-$SPARKLE_VERSION.tar.xz" -o "$tools/sparkle.tar.xz"
+          echo "$SPARKLE_SHA256  $tools/sparkle.tar.xz" | shasum -a 256 -c -
+          tar -xJf "$tools/sparkle.tar.xz" -C "$tools" ./bin/sign_update
+
+          signed=$(printf '%s' "$SPARKLE_PRIVATE_ED_KEY" | "$tools/bin/sign_update" --ed-key-file - "$zip")
+          signature=$(printf '%s' "$signed" | sed -n 's/.*sparkle:edSignature="\([^"]*\)".*/\1/p')
+          length=$(stat -f %z "$zip")
+          [[ -n "$signature" ]] || { echo "::error::sign_update gave no signature"; exit 1; }
+
+          # The private key must match the public key compiled into this
+          # build. A mismatch ships an update every copy rejects.
+          cat > "$tools/verify.swift" <<'SWIFT'
+          import CryptoKit
+          import Foundation
+          let a = CommandLine.arguments
+          guard let key = Data(base64Encoded: a[1]), let sig = Data(base64Encoded: a[2]),
+                let data = FileManager.default.contents(atPath: a[3]),
+                let pub = try? Curve25519.Signing.PublicKey(rawRepresentation: key),
+                pub.isValidSignature(sig, for: data) else { print("invalid"); exit(1) }
+          print("valid")
+          SWIFT
+          swift "$tools/verify.swift" "$public_key" "$signature" "$zip" \
+            || { echo "::error::SPARKLE_PRIVATE_ED_KEY does not match SUPublicEDKey in the app"; exit 1; }
+
+          ./scripts/changelog-section.sh "$VERSION" > "$RUNNER_TEMP/sparkle-notes.md"
+          notes_html=$(gh api markdown -F text=@"$RUNNER_TEMP/sparkle-notes.md" -f mode=gfm -f context="$GITHUB_REPOSITORY")
+          notes_html=${notes_html//]]>/]]]]><![CDATA[>}
+          url="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/Headroom-macOS.zip"
+          min_line=""
+          [[ -n "$min_macos" ]] && min_line="      <sparkle:minimumSystemVersion>$min_macos</sparkle:minimumSystemVersion>"
+          cat > dist/appcast.xml <<XML
+          <?xml version="1.0" encoding="utf-8"?>
+          <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+            <channel>
+              <title>Headroom</title>
+              <link>https://github.com/$GITHUB_REPOSITORY</link>
+              <item>
+                <title>Headroom $VERSION</title>
+                <pubDate>$(LC_ALL=C date -u '+%a, %d %b %Y %H:%M:%S +0000')</pubDate>
+                <sparkle:version>$BUILD</sparkle:version>
+                <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>
+          $min_line
+                <description><![CDATA[$notes_html]]></description>
+                <enclosure url="$url" length="$length" type="application/octet-stream" sparkle:edSignature="$signature"/>
+              </item>
+            </channel>
+          </rss>
+          XML
+          sed -i '' -e '/^[[:space:]]*$/d' dist/appcast.xml
+          xmllint --noout dist/appcast.xml
+          cat dist/appcast.xml
+          echo "APPCAST=1" >> "$GITHUB_ENV"
+
       - name: Create GitHub Release
         if: needs.gate.outputs.release == 'true'
         uses: softprops/action-gh-release@v2
@@ -314,6 +394,13 @@ jobs:
           generate_release_notes: true
           fail_on_unmatched_files: true
           body_path: ${{ steps.notes.outputs.path }}
+
+      - name: Attach appcast.xml
+        if: needs.gate.outputs.release == 'true' && env.APPCAST == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.gate.outputs.tag }}
+        run: gh release upload "$TAG" dist/appcast.xml --clobber -R "$GITHUB_REPOSITORY"
 
   ios-testflight:
     name: iOS → TestFlight
@@ -479,9 +566,10 @@ jobs:
           files: dist/Headroom-iOS.ipa
           fail_on_unmatched_files: true
 
-  # The update feed. A shipped app polls docs/latest.json (served at
-  # https://updates.centaur-labs.io/latest.json via GitHub Pages) to learn a
-  # newer one exists — see docs/updater.md.
+  # The old update feed. Builds before 2.3.4 poll docs/latest.json (served at
+  # https://updates.centaur-labs.io/latest.json via GitHub Pages) and install
+  # with the update-app.sh in their own bundle. This keeps them on a path to
+  # the first Sparkle build; see docs/updater.md. Newer builds use appcast.xml.
   #
   # Last, and on purpose. Written only after the release is published, so a run
   # that goes red leaves the feed pointing at the last version that actually

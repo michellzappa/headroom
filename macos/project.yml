@@ -17,9 +17,13 @@ packages:
   # move the pin on purpose.
   HouseKit:
     url: https://github.com/michellzappa/housekit
-    exactVersion: 0.1.0
+    exactVersion: 0.2.1
 settings:
   base:
+    # Sparkle's EdDSA public key (Info.plist SUPublicEDKey). The private key is
+    # the SPARKLE_PRIVATE_ED_KEY secret and a login keychain item, made by
+    # housekit/scripts/sparkle-key.sh. Empty keeps the updater off.
+    SPARKLE_PUBLIC_ED_KEY: "L0ZsX4ECFJDwNzD2Usb53fn4f8PwWJDbeMzWU/CuOsw="
     SWIFT_VERSION: "6.0"
     MACOSX_DEPLOYMENT_TARGET: "14.0"
     # MARKETING_VERSION / CURRENT_PROJECT_VERSION / DEVELOPMENT_TEAM live only
@@ -45,16 +49,11 @@ targets:
       - path: Sources
       - path: ../Shared
       - path: Assets.xcassets
-      # Bundled Python host → Contents/Resources/host/
+      # Bundled Python host → Contents/Resources/host/. The host never runs
+      # from here: HostController stages a copy outside the bundle, so Sparkle
+      # can replace the app under a running host. See docs/updater.md.
       - path: host
         type: folder
-        buildPhase: resources
-      # The updater, run from inside the bundle → Contents/Resources/.
-      # Bundled rather than reimplemented in Swift because an app cannot
-      # replace itself while it is the thing running, and this script already
-      # brackets the swap with the LaunchAgent bootout/bootstrap the embedded
-      # host needs. See docs/updater.md.
-      - path: ../scripts/update-app.sh
         buildPhase: resources
       # Release notes for Settings → About. Same file the release workflow
       # and App Store What's New already copy from — one source, shipped.
@@ -64,6 +63,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(HEADROOM_BUNDLE_PREFIX).headroom.macos
         GENERATE_INFOPLIST_FILE: YES
+        # Only the Sparkle keys. Xcode merges them into the generated plist.
+        INFOPLIST_FILE: Info.plist
         INFOPLIST_KEY_LSUIElement: YES
         INFOPLIST_KEY_CFBundleDisplayName: Headroom
         INFOPLIST_KEY_NSHumanReadableCopyright: "Copyright © 2026"
@@ -83,6 +84,9 @@ targets:
         script: '"${SRCROOT}/../scripts/version-env.sh" --stamp-product'
     dependencies:
       - package: HouseKit
+        product: HouseKit
+      - package: HouseKit
+        product: HouseKitSparkle
       - target: HeadroomWidgetMac
         embed: true
     scheme:

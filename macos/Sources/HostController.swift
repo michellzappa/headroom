@@ -3,6 +3,11 @@ import Foundation
 
 /// Locates the bundled Python host and installs/starts it as a LaunchAgent so
 /// the menu bar (and optional ESP32) keep working after the app quits.
+///
+/// The host never runs from inside the bundle. Both lifecycles run a staged
+/// copy under `stagedHostsRoot`, so Sparkle can replace Headroom.app while the
+/// host keeps running. The new app then finds a different bundled build, stages
+/// it and restarts the host (`UsageStore.checkHostVersion`). See docs/updater.md.
 enum HostController {
     static let label = "com.centaur-labs.headroom"
     /// Pre-rename label — retire on install so two agents don't fight over :8737.
@@ -50,6 +55,73 @@ enum HostController {
     }
 
     static var isBundled: Bool { bundledServer != nil }
+
+    // MARK: - The staged copy
+
+    /// `~/Library/Application Support/Headroom/host`. One folder per host build
+    /// below it, named by the build fingerprint.
+    static var stagedHostsRoot: URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/Headroom/host", isDirectory: true)
+    }
+
+    /// Copy the bundled host to `stagedHostsRoot/<build>` and return the server
+    /// script in that copy. A copy whose fingerprint already matches is reused.
+    ///
+    /// The copy lands under a temporary name and moves into place, so a
+    /// half-written folder never carries the build name.
+    static func stagedServer() throws -> URL {
+        guard let source = bundledHostDirectory, let build = bundledBuild else {
+            throw HostError.notBundled
+        }
+        let fm = FileManager.default
+        let target = stagedHostsRoot.appendingPathComponent(build, isDirectory: true)
+        let server = target.appendingPathComponent("headroom_server.py")
+        if HostVersion.build(in: target) == build, fm.isfile(server.path) {
+            return server
+        }
+        try fm.createDirectory(at: stagedHostsRoot, withIntermediateDirectories: true)
+        let temporary = stagedHostsRoot.appendingPathComponent(
+            ".\(build)-\(UUID().uuidString)", isDirectory: true)
+        try fm.copyItem(at: source, to: temporary)
+        try? fm.removeItem(at: temporary.appendingPathComponent("__pycache__"))
+        if fm.fileExists(atPath: target.path) {
+            try fm.removeItem(at: target)
+        }
+        try fm.moveItem(at: temporary, to: target)
+        return server
+    }
+
+    /// Remove every staged copy except the one `server` runs from.
+    ///
+    /// Call only after the host from `server` has started. Before that, the
+    /// outgoing host can still import a module from its own copy.
+    static func pruneStagedHosts(keeping server: URL) {
+        let keep = server.deletingLastPathComponent().standardizedFileURL.lastPathComponent
+        let fm = FileManager.default
+        guard let entries = try? fm.contentsOfDirectory(atPath: stagedHostsRoot.path) else {
+            return
+        }
+        for name in entries where name != keep {
+            try? fm.removeItem(at: stagedHostsRoot.appendingPathComponent(name))
+        }
+    }
+
+    /// True when the LaunchAgent runs a host from inside an app bundle.
+    ///
+    /// Builds before 2.3.4 pointed the agent at
+    /// `Headroom.app/Contents/Resources/host`. Sparkle would replace that
+    /// bundle under the running host, so the app moves such an agent to the
+    /// staged copy at launch. A host run from a clone is not touched.
+    static var launchAgentRunsFromBundle: Bool {
+        guard
+            let data = try? Data(contentsOf: launchAgentURL),
+            let plist = try? PropertyListSerialization.propertyList(
+                from: data, format: nil) as? [String: Any],
+            let arguments = plist["ProgramArguments"] as? [String]
+        else { return false }
+        return arguments.contains { $0.contains(".app/Contents/") }
+    }
 
     /// What the iPhone pastes to pair. Written by the host on first run, so it
     /// is absent until the helper has started at least once.
@@ -172,12 +244,11 @@ enum HostController {
         }
     }
 
-    /// Write LaunchAgent pointing at the bundled host and kickstart it.
+    /// Stage the bundled host, write a LaunchAgent pointing at the staged copy
+    /// and kickstart it.
     @discardableResult
     static func installAndStart(port: Int = defaultPort) throws -> String {
-        guard let server = bundledServer else {
-            throw HostError.notBundled
-        }
+        let server = try stagedServer()
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         let headroomDir = (home as NSString).appendingPathComponent(".headroom")
         let logDir = (headroomDir as NSString).appendingPathComponent("logs")
@@ -250,6 +321,7 @@ enum HostController {
             throw HostError.launchctl(
                 kick.stderr.isEmpty ? kick.stdout : kick.stderr)
         }
+        pruneStagedHosts(keeping: server)
         return launchAgentURL.path
     }
 

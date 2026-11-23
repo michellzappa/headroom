@@ -181,7 +181,7 @@ struct SettingsView: View {
     /// Selected pane and pushed leaf. Held here so a caller can select a
     /// pane with `navigation.show(pane:)`.
     @State var navigation = SettingsNavigation(selection: SettingsPane.generalID)
-    let updates = UpdateChecker.shared
+    let updates = Updates.shared
     @AppStorage(MenuBarIconStyle.defaultsKey)
     var menuBarIconStyle = MenuBarIconStyle.remaining.rawValue
     @AppStorage(MenuBarIconStyle.invertDefaultsKey)
