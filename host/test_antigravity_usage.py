@@ -462,16 +462,155 @@ class DetectionAndFetchTests(unittest.TestCase):
             "session": {"pct": 10.0, "resets_in_s": 1800, "resets_in": "30m", "window_s": 18000},
             "fetched_at": 1700000000.0,
         }
-        with patch.object(antigravity_usage, "_find_servers", return_value=[]):
-            with patch.object(antigravity_usage, "_read_state_db_auth", return_value=None):
-                with patch.object(antigravity_usage, "_local_install_present", return_value=True):
-                    with patch.object(cache_util, "load_disk", return_value=prior):
-                        out = antigravity_usage.fetch_quota(force=True)
+        with patch.object(antigravity_usage, "HOME_DIRS", ()):
+            with patch.object(antigravity_usage, "_find_servers", return_value=[]):
+                with patch.object(antigravity_usage, "_read_state_db_auth", return_value=None):
+                    with patch.object(antigravity_usage, "_local_install_present", return_value=True):
+                        with patch.object(cache_util, "load_disk", return_value=prior):
+                            out = antigravity_usage.fetch_quota(force=True)
         self.assertTrue(out["ok"])
         self.assertTrue(out["stale"])
         self.assertFalse(out["auth_required"])
         self.assertEqual(out["error"], "Antigravity is not running")
         self.assertEqual(out["fix"], "Open Antigravity or run agy, then refresh Headroom.")
+
+    def test_reads_agy_oauth_token_file_with_rfc3339nano_expiry(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cli_dir = Path(tmp) / "antigravity-cli"
+            cli_dir.mkdir()
+            # 5-digit fractional seconds like Go's RFC3339Nano (Python 3.9 trap).
+            (cli_dir / "antigravity-oauth-token").write_text(json.dumps({
+                "token": {
+                    "access_token": "ya29.fresh",
+                    "token_type": "Bearer",
+                    "expiry": "2027-01-15T10:00:00.75591+01:00",
+                },
+                "auth_method": "consumer",
+            }))
+            desk_dir = Path(tmp) / "antigravity"
+            desk_dir.mkdir()
+            (desk_dir / "antigravity-oauth-token").write_text(json.dumps({
+                "token": {
+                    "access_token": "ya29.expired",
+                    "expiry": "2027-01-15T07:00:00Z",
+                },
+            }))
+            now = 1800000000.0  # 2027-01-15T08:00:00Z
+            rows = antigravity_usage._read_oauth_token_files(
+                home_dirs=(str(desk_dir), str(cli_dir)), now=now)
+            self.assertEqual(len(rows), 2)
+            self.assertEqual(rows[0]["access_token"], "ya29.fresh")
+            self.assertFalse(rows[0]["expired"])
+            self.assertEqual(rows[1]["access_token"], "ya29.expired")
+            self.assertTrue(rows[1]["expired"])
+
+    def test_extract_plan_prefers_user_tier_over_legacy_plan_info(self):
+        status = {
+            "userStatus": {
+                "planStatus": {
+                    "planInfo": {"planName": "Pro", "teamsTier": "TEAMS_TIER_PRO"}
+                },
+                "userTier": {
+                    "id": "g1-ultra-lite-tier",
+                    "name": "Google AI Ultra",
+                },
+            }
+        }
+        self.assertEqual(
+            antigravity_usage._extract_plan(status), "Google AI Ultra")
+        self.assertEqual(
+            antigravity_usage._normalize_plan("g1-ultra-lite-tier"),
+            "Google AI Ultra")
+
+    def test_fetch_uses_agy_oauth_token_when_desktop_closed_or_empty_buckets(self):
+        calls = []
+
+        def fake_request_json(url, **kwargs):
+            calls.append(url)
+            if "retrieveUserQuotaSummary" in url:
+                return {
+                    "groups": [{
+                        "buckets": [
+                            {"window": "weekly", "remainingFraction": 0.50},
+                            {"window": "5h", "remainingFraction": 0.90},
+                        ]
+                    }]
+                }
+            if "loadCodeAssist" in url:
+                return {"paidTier": {"id": "g1-ultra-lite-tier", "name": "Google AI Ultra"}}
+            return {}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            cli_dir = Path(tmp) / "antigravity-cli"
+            cli_dir.mkdir()
+            (cli_dir / "antigravity-oauth-token").write_text(json.dumps({
+                "token": {
+                    "access_token": "ya29.agy-live",
+                    "expiry": "2099-01-01T00:00:00Z",
+                }
+            }))
+            with patch.object(cache_util, "CACHE_DIR", tmp):
+                with patch.object(antigravity_usage, "HOME_DIRS", (str(cli_dir),)):
+                    with patch.object(antigravity_usage, "_find_servers", return_value=[]):
+                        with patch.object(
+                                antigravity_usage.http_util, "request_json",
+                                side_effect=fake_request_json):
+                            out = antigravity_usage.fetch_quota(force=True)
+        self.assertTrue(out["ok"])
+        self.assertFalse(out["stale"])
+        self.assertEqual(out["plan"], "Google AI Ultra")
+        self.assertEqual(out["week"]["pct"], 50.0)
+        self.assertEqual(out["session"]["pct"], 10.0)
+        # Must hit daily-cloudcode-pa first, not prod cloudcode-pa.
+        self.assertTrue(
+            calls[0].startswith("https://daily-cloudcode-pa.googleapis.com"))
+
+    def test_backoff_wakes_immediately_when_daemon_or_token_appears(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            desk_dir = Path(tmp) / "antigravity"
+            daemon_dir = desk_dir / "daemon"
+            daemon_dir.mkdir(parents=True)
+            with patch.object(cache_util, "CACHE_DIR", tmp):
+                with patch.object(antigravity_usage, "HOME_DIRS", (str(desk_dir),)):
+                    with patch.object(antigravity_usage, "_read_state_db_auth", return_value=None):
+                        with patch.object(antigravity_usage, "_local_install_present", return_value=True):
+                            # 1. Fail while closed and simulate high failure backoff.
+                            with patch.object(antigravity_usage, "_find_servers", return_value=[]):
+                                out1 = antigravity_usage.fetch_quota(force=True)
+                            self.assertFalse(out1["ok"])
+                            antigravity_usage._cache["fail_streak"] = 10
+
+                            # 2. Still closed -> failure backoff holds (no _find_servers call).
+                            with patch.object(
+                                    antigravity_usage, "_find_servers",
+                                    side_effect=AssertionError("should stay in backoff")):
+                                out2 = antigravity_usage.fetch_quota(force=False)
+                            self.assertFalse(out2["ok"])
+
+                            # 3. Desktop opens and writes daemon/hub.json -> wakes immediately!
+                            (daemon_dir / "hub_1234.json").write_text(json.dumps({
+                                "pid": 1234,
+                                "httpsPort": 55555,
+                                "csrfToken": "tok-new",
+                            }))
+                            good = {
+                                "ok": True,
+                                "plan": "Google AI Ultra",
+                                "error": None,
+                                "week": {"pct": 12.0, "resets_in_s": 3600, "resets_in": "1h", "window_s": 604800},
+                                "session": None,
+                                "stale": False,
+                            }
+                            with patch.object(
+                                    antigravity_usage, "_find_servers",
+                                    return_value=[{"pid": 1234, "csrf_token": "tok-new", "https_port": 55555}]):
+                                with patch.object(
+                                        antigravity_usage, "_query_server",
+                                        return_value=good):
+                                    out3 = antigravity_usage.fetch_quota(force=False)
+                            self.assertTrue(out3["ok"])
+                            self.assertFalse(out3["stale"])
+                            self.assertEqual(out3["week"]["pct"], 12.0)
 
     def test_registry_and_providers_payload_wire_antigravity(self):
         self.assertIn("antigravity", detect_sources.PROBES)

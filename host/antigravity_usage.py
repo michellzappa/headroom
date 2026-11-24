@@ -12,9 +12,15 @@ Antigravity 2.34+ writes the server's loopback ports and CSRF token in a
 user-only `0600` file instead of exposing `--csrf_token` in argv) and
 running `language_server` processes from `ps` (older builds / IDE).
 
-When Antigravity is closed, falls back to reading a cached access token from
-`state.vscdb` (`antigravityAuthStatus`) against `cloudcode-pa.googleapis.com`
+When Antigravity Desktop is closed (or only `agy` CLI is running), falls back
+to calling `daily-cloudcode-pa.googleapis.com` (then `cloudcode-pa.googleapis.com`)
+using the OAuth access token from `~/.gemini/antigravity-cli/antigravity-oauth-token`
+(or `~/.gemini/antigravity/antigravity-oauth-token`, or legacy `state.vscdb`),
 and otherwise preserves the last-known good snapshot on disk as stale.
+
+A lightweight local state fingerprint (`daemon/*.json` + `antigravity-oauth-token`
+mtimes) wakes polling immediately out of failure backoff when Antigravity opens
+or `agy` refreshes its token, instead of waiting up to 15 minutes.
 
 Stdlib only; Python 3.9+ compatible (LaunchAgent runs Xcode's Python 3.9).
 """
@@ -32,6 +38,7 @@ import subprocess
 import time
 import urllib.error
 import urllib.request
+from datetime import datetime, timezone
 
 import cache_util
 import http_util
@@ -53,16 +60,20 @@ METADATA = {
     "locale": "en",
 }
 
-CLOUD_SUMMARY_URL = (
-    "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary"
+CLOUD_HOSTS = (
+    "https://daily-cloudcode-pa.googleapis.com",
+    "https://cloudcode-pa.googleapis.com",
 )
-CLOUD_QUOTA_URL = (
-    "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota"
-)
-CLOUD_TIER_URL = (
-    "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist"
-)
-CLOUD_UA = "antigravity/hub/2.24.0"
+CLOUD_SUMMARY_PATH = "/v1internal:retrieveUserQuotaSummary"
+CLOUD_QUOTA_PATH = "/v1internal:retrieveUserQuota"
+CLOUD_TIER_PATH = "/v1internal:loadCodeAssist"
+CLOUD_SUMMARY_URL = CLOUD_HOSTS[0] + CLOUD_SUMMARY_PATH
+CLOUD_QUOTA_URL = CLOUD_HOSTS[0] + CLOUD_QUOTA_PATH
+CLOUD_TIER_URL = CLOUD_HOSTS[0] + CLOUD_TIER_PATH
+CLOUD_UA = "antigravity/hub/2.34.0"
+
+OAUTH_TOKEN_NAME = "antigravity-oauth-token"
+_ISO_FRAC_RE = re.compile(r"\.(\d+)")
 
 STATE_DB_PATHS = (
     os.path.expanduser(
@@ -606,43 +617,153 @@ def _local_install_present():
     return False
 
 
-def _fetch_cloud(token):
-    """Best-effort cloudcode-pa fallback when the language server is closed."""
+def _parse_iso_ts(value):
+    """Parse an ISO-8601 timestamp to epoch seconds (Python 3.9 compatible)."""
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        ts = float(value)
+        return ts / 1000.0 if ts > 1e12 else ts
+    text = str(value).strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    # Python 3.9's fromisoformat only accepts 3 or 6 fractional digits; Go's
+    # RFC3339Nano (used by `agy`) emits arbitrary lengths like `.75591`.
+    text = _ISO_FRAC_RE.sub(
+        lambda m: "." + (m.group(1) + "000000")[:6], text, count=1)
+    try:
+        when = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    return when.timestamp()
+
+
+def _read_oauth_token_files(home_dirs=None, now=None):
+    """Read OAuth access tokens from `~/.gemini/antigravity*/antigravity-oauth-token`.
+
+    `agy` CLI embeds its server instead of writing `daemon/*.json`, and keeps
+    a fresh Google OAuth token in `antigravity-oauth-token` while active.
+    Returns list of dicts `{access_token, expired, mtime}` ordered freshest first.
+    """
+    now_ts = time.time() if now is None else float(now)
+    out = []
+    for home in (HOME_DIRS if home_dirs is None else home_dirs):
+        path = os.path.join(home, OAUTH_TOKEN_NAME)
+        if not os.path.isfile(path):
+            continue
+        try:
+            mtime = os.path.getmtime(path)
+            with open(path, encoding="utf-8") as handle:
+                blob = json.load(handle)
+        except (OSError, json.JSONDecodeError, ValueError):
+            continue
+        if not isinstance(blob, dict):
+            continue
+        tok = blob.get("token") if isinstance(blob.get("token"), dict) else blob
+        access = str(tok.get("access_token") or tok.get("accessToken") or "").strip()
+        if not access:
+            continue
+        exp_ts = _parse_iso_ts(tok.get("expiry") or tok.get("expires_at") or tok.get("expiresAt"))
+        expired = exp_ts is not None and exp_ts <= now_ts
+        out.append({
+            "access_token": access,
+            "expired": expired,
+            "mtime": mtime,
+            "path": path,
+        })
+    # Prefer non-expired tokens, then most recently written.
+    out.sort(key=lambda row: (1 if row["expired"] else 0, -row["mtime"]))
+    return out
+
+
+def _has_oauth_token_file(home_dirs=None):
+    for home in (HOME_DIRS if home_dirs is None else home_dirs):
+        if os.path.isfile(os.path.join(home, OAUTH_TOKEN_NAME)):
+            return True
+    return False
+
+
+def _local_state_stamp(home_dirs=None):
+    """Cheap mtime fingerprint of local discovery + OAuth files (no subprocesses).
+
+    Used to wake polling immediately out of failure backoff when Antigravity
+    Desktop opens (`daemon/*.json`) or `agy` refreshes `antigravity-oauth-token`.
+    """
+    items = []
+    for home in (HOME_DIRS if home_dirs is None else home_dirs):
+        daemon_dir = os.path.join(home, "daemon")
+        try:
+            names = sorted(os.listdir(daemon_dir))
+        except OSError:
+            names = ()
+        for name in names:
+            if not name.endswith(".json"):
+                continue
+            path = os.path.join(daemon_dir, name)
+            try:
+                st = os.stat(path)
+            except OSError:
+                continue
+            items.append((path, st.st_mtime_ns))
+        tok_path = os.path.join(home, OAUTH_TOKEN_NAME)
+        try:
+            st = os.stat(tok_path)
+        except OSError:
+            pass
+        else:
+            items.append((tok_path, st.st_mtime_ns))
+    return tuple(items)
+
+
+def _fetch_cloud_host(host, token):
+    """Query one cloudcode-pa host. Returns (mapped_dict|None, auth_failed)."""
     summary_blob = None
     quota_blob = None
     tier_blob = None
 
     try:
         summary_blob = http_util.request_json(
-            CLOUD_SUMMARY_URL,
+            host + CLOUD_SUMMARY_PATH,
             auth=f"Bearer {token}",
             json_body={},
             method="POST",
             user_agent=CLOUD_UA,
             timeout=CLOUD_TIMEOUT_S,
         )
+    except urllib.error.HTTPError as exc:
+        if exc.code in (401, 403):
+            return None, True
+        summary_blob = None
     except Exception:  # noqa: BLE001
         summary_blob = None
 
     if not summary_blob:
         try:
             quota_blob = http_util.request_json(
-                CLOUD_QUOTA_URL,
+                host + CLOUD_QUOTA_PATH,
                 auth=f"Bearer {token}",
                 json_body={},
                 method="POST",
                 user_agent=CLOUD_UA,
                 timeout=CLOUD_TIMEOUT_S,
             )
+        except urllib.error.HTTPError as exc:
+            if exc.code in (401, 403):
+                return None, True
+            quota_blob = None
         except Exception:  # noqa: BLE001
             quota_blob = None
 
     if not summary_blob and not quota_blob:
-        return None
+        return None, False
 
     try:
         tier_blob = http_util.request_json(
-            CLOUD_TIER_URL,
+            host + CLOUD_TIER_PATH,
             auth=f"Bearer {token}",
             json_body={"metadata": {"ideType": "ANTIGRAVITY"}},
             method="POST",
@@ -656,7 +777,23 @@ def _fetch_cloud(token):
         summary_blob=summary_blob,
         configs_blob=quota_blob,
         tier_blob=tier_blob,
-    )
+    ), False
+
+
+def _fetch_cloud(token):
+    """Best-effort cloudcode-pa fetch for `agy` CLI and closed Desktop app.
+
+    Tries `daily-cloudcode-pa.googleapis.com` first (the endpoint Antigravity
+    2.34+ uses for real quota buckets), falling back to `cloudcode-pa` only if
+    that host fails or returns no buckets.
+    """
+    for host in CLOUD_HOSTS:
+        out, auth_failed = _fetch_cloud_host(host, token)
+        if out and out.get("ok"):
+            return out
+        if auth_failed:
+            return None
+    return None
 
 
 # ---------------------------- payload parsing ----------------------------
@@ -678,6 +815,7 @@ def _normalize_plan(raw):
         "ultra": "Google AI Ultra",
         "google-ai-ultra": "Google AI Ultra",
         "g1-ultra-tier": "Google AI Ultra",
+        "g1-ultra-lite-tier": "Google AI Ultra",
     }
     return mapping.get(text.lower(), text)
 
@@ -687,6 +825,17 @@ def _extract_plan(blob):
         return None
     status = blob.get("userStatus")
     if isinstance(status, dict):
+        # Prefer `userTier` over `planStatus.planInfo`: Antigravity 2.34+
+        # reports the real Google One tier in `userTier` (matching
+        # `loadCodeAssist.paidTier`), while `planInfo.planName` is a legacy
+        # stub ("Pro") even on Google AI Ultra accounts.
+        tier = status.get("userTier")
+        if isinstance(tier, dict):
+            for key in ("name", "displayName", "id"):
+                if tier.get(key):
+                    return _normalize_plan(tier[key])
+        elif isinstance(tier, str) and tier.strip():
+            return _normalize_plan(tier)
         plan_status = status.get("planStatus")
         if isinstance(plan_status, dict):
             plan_info = plan_status.get("planInfo")
@@ -695,13 +844,6 @@ def _extract_plan(blob):
                             "display_name", "teamsTier"):
                     if plan_info.get(key):
                         return _normalize_plan(plan_info[key])
-        tier = status.get("userTier")
-        if isinstance(tier, dict):
-            for key in ("name", "displayName", "id"):
-                if tier.get(key):
-                    return _normalize_plan(tier[key])
-        elif isinstance(tier, str) and tier.strip():
-            return _normalize_plan(tier)
         user = status.get("user")
         if isinstance(user, dict) and user.get("tier"):
             return _normalize_plan(user["tier"])
@@ -956,6 +1098,8 @@ def signed_in():
     """Cheap local detection — no network, no Keychain prompts."""
     if _find_servers():
         return True
+    if _has_oauth_token_file():
+        return True
     if _has_state_db_auth():
         return True
     if any(os.path.isdir(p) for p in HOME_DIRS):
@@ -966,7 +1110,9 @@ def signed_in():
 
 def fetch_quota(force=False):
     now = time.time()
-    if cache_util.fresh(_cache, now, CACHE_TTL_S, FAIL_TTL_S, force):
+    stamp = _local_state_stamp()
+    wake = bool(_cache.get("err") and stamp != _cache.get("state_stamp"))
+    if cache_util.fresh(_cache, now, CACHE_TTL_S, FAIL_TTL_S, force or wake):
         return _cache["data"]
 
     try:
@@ -975,25 +1121,44 @@ def fetch_quota(force=False):
         for server in servers:
             out = _query_server(server)
             if out and out.get("ok"):
+                _cache["state_stamp"] = stamp
                 return cache_util.store(_cache, now, out, disk_name=DISK)
             if out and out.get("error"):
                 last_err = out["error"]
 
-        # Local server wasn't running (or returned no buckets); try cloud
-        # fallback if Antigravity left an access token in state.vscdb.
-        auth = _read_state_db_auth()
-        if auth and auth.get("apiKey"):
-            cloud_out = _fetch_cloud(auth["apiKey"])
+        # Local server wasn't running (or returned no buckets — e.g. only `agy`
+        # CLI is running, Desktop is closed, or language_server returned empty
+        # buckets after wake). Try the `agy` OAuth token file first, then legacy
+        # `state.vscdb` auth, against daily-cloudcode-pa.googleapis.com.
+        seen_tokens = set()
+        for tok_row in _read_oauth_token_files(now=now):
+            if tok_row.get("expired"):
+                continue
+            token = tok_row["access_token"]
+            if token in seen_tokens:
+                continue
+            seen_tokens.add(token)
+            cloud_out = _fetch_cloud(token)
             if cloud_out and cloud_out.get("ok"):
+                _cache["state_stamp"] = stamp
                 return cache_util.store(_cache, now, cloud_out, disk_name=DISK)
 
+        auth = _read_state_db_auth()
+        if auth and auth.get("apiKey") and auth["apiKey"] not in seen_tokens:
+            cloud_out = _fetch_cloud(auth["apiKey"])
+            if cloud_out and cloud_out.get("ok"):
+                _cache["state_stamp"] = stamp
+                return cache_util.store(_cache, now, cloud_out, disk_name=DISK)
+
+        _cache["state_stamp"] = stamp
         if servers:
             err = last_err or "Antigravity language server returned no quota"
             return cache_util.keep_stale(
                 _cache, now, err, _EMPTY, disk_name=DISK,
                 fix="Check that you are signed in to Antigravity, then refresh Headroom.")
 
-        if _local_install_present() or _has_state_db_auth() or cache_util.load_disk(DISK):
+        if (_local_install_present() or _has_oauth_token_file()
+                or _has_state_db_auth() or cache_util.load_disk(DISK)):
             return cache_util.keep_stale(
                 _cache, now,
                 "Antigravity is not running",
@@ -1006,5 +1171,6 @@ def fetch_quota(force=False):
             "not signed in to Antigravity — open Antigravity and sign in",
             _EMPTY, disk_name=DISK, auth_required=True)
     except Exception as exc:  # noqa: BLE001
+        _cache["state_stamp"] = stamp
         return cache_util.keep_stale(
             _cache, now, str(exc), _EMPTY, disk_name=DISK)
