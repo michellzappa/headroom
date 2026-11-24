@@ -99,6 +99,9 @@ struct StudyView: View {
         } else {
             notice(snapshot.error ?? HeadroomCopy.studyEmpty)
         }
+        // The profile needs no session logs: subs and burndowns come from
+        // /usage, and habits join only when the card exists.
+        profile
         // Always shown, even with no usage of its own: a Mac with no session
         // logs is exactly the one that needs to add another Mac's counts.
         macs(snapshot)
@@ -341,6 +344,28 @@ struct StudyView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    // MARK: Profile
+
+    private var profile: some View {
+        section(HeadroomCopy.shareProfile, caption: HeadroomCopy.shareProfileHint) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 10) {
+                    Button(HeadroomCopy.shareProfileOpen) {
+                        Task { await store.shareProfile(open: true) }
+                    }
+                    Button(store.copiedProfile
+                           ? HeadroomCopy.studyCopied
+                           : HeadroomCopy.shareProfileCopy) {
+                        Task { await store.shareProfile(open: false) }
+                    }
+                }
+                if let message = store.profileMessage {
+                    Text(message).font(.caption).foregroundStyle(.secondary)
+                }
+            }
         }
     }
 

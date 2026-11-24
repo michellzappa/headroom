@@ -424,6 +424,16 @@ struct HeadroomClient: Sendable {
         return try JSONDecoder().decode(StudySnapshot.self, from: data)
     }
 
+    /// The public profile link (`GET /share/profile`). Loopback only, like
+    /// `/study`. Building it sends nothing: the profile rides in the link.
+    func fetchShareProfile() async throws -> ShareProfileLink {
+        let url = try base()
+            .appendingPathComponent("share")
+            .appendingPathComponent("profile")
+        let data = try await send(request(url, timeout: 8))
+        return try JSONDecoder().decode(ShareProfileLink.self, from: data)
+    }
+
     /// `nil` clears the handle, and the host falls back to a generated one.
     func setStudyHandle(_ handle: String?) async throws -> StudyHandleResult {
         let url = try base()

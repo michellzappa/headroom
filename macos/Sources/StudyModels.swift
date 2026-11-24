@@ -214,6 +214,13 @@ struct StudyMachine: Decodable, Sendable, Identifiable {
 }
 
 /// `POST /study/handle`.
+/// `GET /share/profile`. Only the link is decoded: the page at `url` is what
+/// draws the profile, and the host owns its shape (host/share_profile.py).
+struct ShareProfileLink: Decodable, Sendable {
+    var ok: Bool
+    var url: String
+}
+
 struct StudyHandleResult: Decodable, Sendable {
     var ok: Bool
     var handle: String

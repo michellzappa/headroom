@@ -28,6 +28,16 @@ development status. This policy covers the **Headroom iOS / iPadOS app**
 4. Optionally uses Face ID / device authentication before asking the Mac to
    stop a local development server.
 
+## Mac share profile
+
+**Your usage → Your profile** on the Mac makes a link to a web page that shows
+the AI coding subscriptions you have turned on, their plans and list prices,
+how much of each weekly plan is left this week, your colours, and your stats
+card. The profile is inside the link, after the `#`. Browsers do not send that
+part to the server, so the page host (GitHub Pages) receives only a request
+for the page itself. Nothing is sent until you copy the link and give it to
+someone. Anyone who has the link can read the profile.
+
 ## Mac anonymous diagnostics
 
 The **Mac app** can send one aggregate diagnostics batch per week when

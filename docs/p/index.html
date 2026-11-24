@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+<title>Headroom profile</title>
+<!--
+  Draws a Headroom share profile (host/share_profile.py) from the URL fragment.
+  A browser never sends the fragment to this server, so the profile stays
+  between the person who made the link and the person who opens it.
+  Everything from the link is untrusted: it is checked here the way
+  share_profile.decode checks it, written with textContent only, and a colour
+  is used only when it is exactly #RRGGBB.
+-->
+<style>
+:root {
+  --bg: #f6f5f2; --card: #ffffff; --ink: #1d1d1f; --ink2: #5f5f66;
+  --muted: #8d8d94; --rule: #e4e2dc; --ideal: #b9b7b0; --fallback: #6b7a8f;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121214; --card: #1c1c1f; --ink: #f2f2f4; --ink2: #b4b4bb;
+    --muted: #84848c; --rule: #2e2e33; --ideal: #55555c; --fallback: #8fa0b8;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+main { max-width: 720px; margin: 0 auto; padding: 40px 16px 64px; }
+header { margin-bottom: 28px; }
+h1 { font-size: 30px; line-height: 1.15; margin: 0 0 6px; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--ink2); margin: 32px 0 12px; }
+.sub { color: var(--ink2); }
+.card { background: var(--card); border: 1px solid var(--rule); border-radius: 14px; padding: 16px; }
+.stack { display: grid; gap: 0; padding: 4px 16px; }
+.row { display: grid; grid-template-columns: 12px 1fr auto; gap: 12px; align-items: center; padding: 12px 0; border-top: 1px solid var(--rule); }
+.row:first-child { border-top: 0; }
+.dot { width: 12px; height: 12px; border-radius: 50%; }
+.name { font-weight: 600; }
+.plan { color: var(--ink2); }
+.price { color: var(--ink2); font-variant-numeric: tabular-nums; text-align: right; }
+.total { display: flex; justify-content: space-between; padding: 12px 0 8px; border-top: 1px solid var(--rule); color: var(--ink2); font-variant-numeric: tabular-nums; }
+.total b { color: var(--ink); }
+.charts { display: grid; gap: 12px; }
+.chart-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.chart-head .name { display: flex; align-items: center; gap: 8px; }
+.reading { color: var(--ink2); font-variant-numeric: tabular-nums; }
+.plot { position: relative; }
+svg { display: block; width: 100%; height: auto; overflow: visible; }
+.axis { fill: var(--muted); font-size: 11px; }
+.tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--bg); font-size: 12px; padding: 4px 8px; border-radius: 6px; white-space: nowrap; transform: translate(-50%, -130%); opacity: 0; transition: opacity .1s; }
+.bars { display: grid; gap: 8px; }
+.bar { display: grid; grid-template-columns: 9em 1fr 3em; gap: 10px; align-items: center; }
+.bar .track { height: 8px; border-radius: 4px; background: var(--rule); overflow: hidden; }
+.bar .fill { height: 100%; border-radius: 4px; background: var(--ink2); }
+.bar .pct { text-align: right; color: var(--ink2); font-variant-numeric: tabular-nums; }
+.bar .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.note { color: var(--muted); font-size: 13px; margin-top: 10px; }
+footer { margin-top: 40px; color: var(--muted); font-size: 13px; }
+footer a { color: var(--ink2); }
+.empty p { max-width: 34em; }
+@media (max-width: 480px) {
+  h1 { font-size: 25px; }
+  .bar { grid-template-columns: 7em 1fr 3em; }
+}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<script>
+"use strict";
+(function () {
+  var PREFIX = "hrp1.";
+  var MAX_ENCODED = 16384, MAX_SUBS = 16, MAX_POINTS = 64;
+  var ACCENT = /^#[0-9A-Fa-f]{6}$/;
+  var ID = /^[a-z0-9][a-z0-9-]{0,31}$/;
+  var DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  var BLOCKS = [["night_00_05", "Night"], ["morning_06_11", "Morning"],
+                ["afternoon_12_17", "Afternoon"], ["evening_18_23", "Evening"]];
+  var SVGNS = "http://www.w3.org/2000/svg";
+  var app = document.getElementById("app");
+
+  function el(tag, cls, text) {
+    var node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text != null) node.textContent = String(text);
+    return node;
+  }
+  function svg(tag, attrs) {
+    var node = document.createElementNS(SVGNS, tag);
+    for (var k in attrs) node.setAttribute(k, attrs[k]);
+    return node;
+  }
+  function isInt(v, lo, hi) { return typeof v === "number" && Math.floor(v) === v && v >= lo && v <= hi; }
+  function isText(v, max) { return typeof v === "string" && v.length > 0 && v.length <= max && !/[\u0000-\u001f\u007f-\u009f​-‏‪-‮⁦-⁩]/.test(v); }
+  function keys(o, want) {
+    if (!o || typeof o !== "object" || Array.isArray(o)) return false;
+    var have = Object.keys(o).sort().join(","), need = want.slice().sort().join(",");
+    return have === need;
+  }
+  function colour(sub) { return sub.accent && ACCENT.test(sub.accent) ? sub.accent : "var(--fallback)"; }
+
+  function decode(text) {
+    if (!text || text.length > MAX_ENCODED || text.indexOf(PREFIX) !== 0) throw new Error("This link has no Headroom profile in it, or it comes from a newer version.");
+    var body = text.slice(PREFIX.length).replace(/-/g, "+").replace(/_/g, "/");
+    while (body.length % 4) body += "=";
+    var bytes = Uint8Array.from(atob(body), function (c) { return c.charCodeAt(0); });
+    var p = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+    if (!keys(p, ["v", "handle", "week", "made", "subs", "habits"]) || p.v !== 1) throw new Error("bad profile");
+    if (!isText(p.handle, 24) || !/^\d{4}-W\d{2}$/.test(p.week) || !/^\d{4}-\d{2}-\d{2}$/.test(p.made)) throw new Error("bad profile");
+    if (!Array.isArray(p.subs) || p.subs.length > MAX_SUBS) throw new Error("bad profile");
+    p.subs.forEach(function (s) {
+      if (!keys(s, ["id", "title", "plan", "accent", "usd", "curve"])) throw new Error("bad sub");
+      if (!ID.test(s.id) || !isText(s.title, 40)) throw new Error("bad sub");
+      if (s.plan !== null && !isText(s.plan, 40)) throw new Error("bad plan");
+      if (s.accent !== null && !ACCENT.test(s.accent)) throw new Error("bad colour");
+      if (s.usd !== null && !(typeof s.usd === "number" && s.usd >= 0 && s.usd <= 10000)) throw new Error("bad price");
+      var c = s.curve;
+      if (c === null) return;
+      if (!keys(c, ["pool", "window_h", "step_h", "elapsed_h", "dow", "hour", "rem"])) throw new Error("bad curve");
+      if (!isText(c.pool, 40) || !isInt(c.window_h, 1, 800) || !isInt(c.step_h, 1, 24) || !isInt(c.elapsed_h, 1, 800) || !isInt(c.dow, 0, 6) || !isInt(c.hour, 0, 23)) throw new Error("bad curve");
+      if (!Array.isArray(c.rem) || c.rem.length < 1 || c.rem.length > MAX_POINTS || !c.rem.every(function (v) { return isInt(v, 0, 100); })) throw new Error("bad curve");
+    });
+    if (p.habits !== null && (typeof p.habits !== "object" || Array.isArray(p.habits))) throw new Error("bad habits");
+    return p;
+  }
+
+  function money(v) { return "$" + (Math.round(v) === v ? v.toFixed(0) : v.toFixed(2)); }
+
+  function stack(p) {
+    var box = el("div", "card stack");
+    var total = 0, priced = 0;
+    p.subs.forEach(function (s) {
+      var row = el("div", "row");
+      var dot = el("span", "dot"); dot.style.background = colour(s);
+      var name = el("div");
+      name.appendChild(el("span", "name", s.title));
+      if (s.plan) { name.appendChild(document.createTextNode(" ")); name.appendChild(el("span", "plan", s.plan)); }
+      row.appendChild(dot); row.appendChild(name);
+      row.appendChild(el("span", "price", s.usd === null ? "" : money(s.usd) + "/mo"));
+      box.appendChild(row);
+      if (s.usd !== null) { total += s.usd; priced++; }
+    });
+    if (priced > 1) {
+      var t = el("div", "total");
+      t.appendChild(el("span", null, "List price, estimated"));
+      t.appendChild(el("b", null, money(Math.round(total * 100) / 100) + "/mo"));
+      box.appendChild(t);
+    }
+    return box;
+  }
+
+  function curveChart(s) {
+    var c = s.curve, W = 640, H = 170, L = 34, R = 8, T = 8, B = 22;
+    var pw = W - L - R, ph = H - T - B;
+    var x = function (h) { return L + pw * Math.min(h, c.window_h) / c.window_h; };
+    var y = function (pct) { return T + ph * (1 - pct / 100); };
+    var hours = c.rem.map(function (_, i) { return i === c.rem.length - 1 ? c.elapsed_h : i * c.step_h; });
+    var last = c.rem[c.rem.length - 1];
+    var ideal = Math.max(0, 100 * (1 - c.elapsed_h / c.window_h));
+    var onPace = last >= ideal;
+
+    var wrap = el("div", "card");
+    var head = el("div", "chart-head");
+    var name = el("div", "name");
+    var dot = el("span", "dot"); dot.style.background = colour(s);
+    name.appendChild(dot); name.appendChild(el("span", null, s.title + " · " + c.pool));
+    head.appendChild(name);
+    head.appendChild(el("span", "reading", last + "% left · " + (onPace ? "On pace" : "Over pace")));
+    wrap.appendChild(head);
+
+    var plot = el("div", "plot");
+    var g = svg("svg", { viewBox: "0 0 " + W + " " + H, role: "img",
+      "aria-label": s.title + " " + c.pool + ": " + last + "% left after " + Math.round(c.elapsed_h / 24 * 10) / 10 + " of " + Math.round(c.window_h / 24) + " days" });
+    [0, 50, 100].forEach(function (v) {
+      g.appendChild(svg("line", { x1: L, x2: W - R, y1: y(v), y2: y(v), stroke: "var(--rule)", "stroke-width": 1 }));
+      var t = svg("text", { x: L - 6, y: y(v) + 4, "text-anchor": "end", "class": "axis" }); t.textContent = v + "%"; g.appendChild(t);
+    });
+    // A tick at each local midnight, labelled with the day it starts.
+    var first = (24 - c.hour) % 24;
+    for (var h = first, d = (c.dow + (c.hour ? 1 : 0)) % 7; h < c.window_h; h += 24, d = (d + 1) % 7) {
+      g.appendChild(svg("line", { x1: x(h), x2: x(h), y1: T + ph, y2: T + ph + 4, stroke: "var(--muted)", "stroke-width": 1 }));
+      if (c.window_h <= 24 * 10 && x(h) + 12 < W - R) {
+        var lab = svg("text", { x: x(h) + 12, y: H - 4, "text-anchor": "middle", "class": "axis" }); lab.textContent = DAYS[d]; g.appendChild(lab);
+      }
+    }
+    g.appendChild(svg("line", { x1: x(0), y1: y(100), x2: x(c.window_h), y2: y(0), stroke: "var(--ideal)", "stroke-width": 1.5, "stroke-dasharray": "4 4" }));
+    var pts = hours.map(function (hh, i) { return x(hh).toFixed(1) + "," + y(c.rem[i]).toFixed(1); }).join(" ");
+    var area = svg("polygon", { points: x(0) + "," + y(0) + " " + pts + " " + x(c.elapsed_h) + "," + y(0), fill: colour(s), "fill-opacity": 0.12 });
+    g.appendChild(area);
+    g.appendChild(svg("polyline", { points: pts, fill: "none", stroke: colour(s), "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+    g.appendChild(svg("circle", { cx: x(c.elapsed_h), cy: y(last), r: 4.5, fill: colour(s), stroke: "var(--card)", "stroke-width": 2 }));
+    var cross = svg("line", { y1: T, y2: T + ph, stroke: "var(--muted)", "stroke-width": 1, opacity: 0 });
+    g.appendChild(cross);
+    plot.appendChild(g);
+    var tip = el("div", "tip"); plot.appendChild(tip);
+
+    function when(hh) {
+      var abs = c.hour + hh, day = DAYS[(c.dow + Math.floor(abs / 24)) % 7], hr = abs % 24;
+      return day + " " + (hr < 10 ? "0" : "") + hr + ":00";
+    }
+    g.addEventListener("pointermove", function (ev) {
+      var r = g.getBoundingClientRect(), sx = (ev.clientX - r.left) * W / r.width;
+      var best = 0;
+      hours.forEach(function (hh, i) { if (Math.abs(x(hh) - sx) < Math.abs(x(hours[best]) - sx)) best = i; });
+      cross.setAttribute("x1", x(hours[best])); cross.setAttribute("x2", x(hours[best])); cross.setAttribute("opacity", 1);
+      tip.textContent = when(hours[best]) + " · " + c.rem[best] + "% left";
+      tip.style.left = (x(hours[best]) * r.width / W) + "px";
+      tip.style.top = (y(c.rem[best]) * r.height / H) + "px";
+      tip.style.opacity = 1;
+    });
+    g.addEventListener("pointerleave", function () { cross.setAttribute("opacity", 0); tip.style.opacity = 0; });
+    wrap.appendChild(plot);
+    return wrap;
+  }
+
+  function bars(rows) {
+    var box = el("div", "bars");
+    rows.forEach(function (r) {
+      var row = el("div", "bar");
+      row.appendChild(el("span", "label", r[0]));
+      var track = el("div", "track"), fill = el("div", "fill");
+      fill.style.width = Math.round(r[1] * 100) + "%";
+      if (r[2]) fill.style.background = r[2];
+      track.appendChild(fill); row.appendChild(track);
+      row.appendChild(el("span", "pct", Math.round(r[1] * 100) + "%"));
+      box.appendChild(row);
+    });
+    return box;
+  }
+
+  function share(v) { return typeof v === "number" && v >= 0 && v <= 1 ? v : null; }
+
+  function habits(p) {
+    var h = p.habits, out = [];
+    if (!h) return out;
+    var tod = h.time_of_day_share;
+    if (tod && typeof tod === "object") {
+      var rows = BLOCKS.map(function (b) { return [b[1], share(tod[b[0]]) || 0]; });
+      var card = el("div", "card");
+      card.appendChild(el("div", "name", "When the agents run"));
+      card.lastChild.style.marginBottom = "10px";
+      card.appendChild(bars(rows));
+      out.push(card);
+    }
+    var weeks = h.weekly_model_share;
+    if (weeks && typeof weeks === "object") {
+      var latest = Object.keys(weeks).sort().pop();
+      var row = latest && weeks[latest];
+      if (row && typeof row === "object") {
+        var models = Object.keys(row).filter(function (k) { return isText(k, 64) && share(row[k]) !== null; })
+          .sort(function (a, b) { return row[b] - row[a]; }).slice(0, 8)
+          .map(function (k) { return [k, row[k]]; });
+        if (models.length) {
+          var mc = el("div", "card");
+          mc.appendChild(el("div", "name", "Models, " + latest));
+          mc.lastChild.style.marginBottom = "10px";
+          mc.appendChild(bars(models));
+          mc.appendChild(el("p", "note", "Share of output tokens, rounded to 5%."));
+          out.push(mc);
+        }
+      }
+    }
+    return out;
+  }
+
+  function footer() {
+    var f = el("footer");
+    f.appendChild(document.createTextNode("Made with "));
+    var a = el("a", null, "Headroom"); a.href = "https://github.com/michellzappa/headroom"; a.rel = "noopener";
+    f.appendChild(a);
+    f.appendChild(document.createTextNode(". The profile is stored in the link, not on this site."));
+    return f;
+  }
+
+  function render() {
+    app.textContent = "";
+    var text = decodeURIComponent(location.hash.replace(/^#/, ""));
+    var p;
+    try { p = decode(text); } catch (e) {
+      var box = el("section", "empty");
+      box.appendChild(el("h1", null, text ? "This link does not open" : "Headroom profiles"));
+      box.appendChild(el("p", "sub", text
+        ? (e && /Headroom profile/.test(e.message) ? e.message : "The profile in this link is damaged or incomplete. Ask for the link again.")
+        : "A profile shows someone's AI coding subscriptions and how they used them this week. Open one from a link someone shared. The whole profile is in the link, so this site never sees it."));
+      app.appendChild(box); app.appendChild(footer());
+      document.title = "Headroom profile";
+      return;
+    }
+    document.title = p.handle + " · Headroom";
+    var head = el("header");
+    head.appendChild(el("h1", null, p.handle));
+    var week = p.week.split("-W");
+    head.appendChild(el("div", "sub", "Week " + Number(week[1]) + ", " + week[0] + " · shared " + p.made));
+    app.appendChild(head);
+
+    if (p.subs.length) {
+      app.appendChild(el("h2", null, "Stack"));
+      app.appendChild(stack(p));
+      var charted = p.subs.filter(function (s) { return s.curve; });
+      if (charted.length) {
+        app.appendChild(el("h2", null, "This week"));
+        var charts = el("div", "charts");
+        charted.forEach(function (s) { charts.appendChild(curveChart(s)); });
+        app.appendChild(charts);
+        app.appendChild(el("p", "note", "Each line is the share of the plan left. The dashed line is an even spend across the window."));
+      }
+    }
+    var cards = habits(p);
+    if (cards.length) {
+      app.appendChild(el("h2", null, "Habits"));
+      var hc = el("div", "charts");
+      cards.forEach(function (c) { hc.appendChild(c); });
+      app.appendChild(hc);
+    }
+    app.appendChild(footer());
+  }
+
+  window.addEventListener("hashchange", render);
+  render();
+})();
+</script>
+</body>
+</html>

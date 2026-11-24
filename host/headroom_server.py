@@ -73,6 +73,7 @@ import quota_samples
 import reset_calendar
 import sentry_alerts
 import sources_config
+import share_profile
 import study_service
 import supabase_usage
 import usb_bridge
@@ -1120,6 +1121,22 @@ def rollup():
     return doc if doc is not None else publish()
 
 
+def _share_profile_payload():
+    """GET /share/profile: the profile, its text, and the link that shows it."""
+    tz = _local_tz()
+    service = study_service.get()
+    card = None
+    try:
+        card = service.snapshot().get("card")
+    except Exception as exc:          # the profile must not depend on the study
+        print("share profile study error:", exc, flush=True)
+    profile = share_profile.build(rollup(), card, service.handle(),
+                                  now=datetime.now(tz), tz=tz)
+    text = share_profile.encode(profile)
+    return {"ok": True, "profile": profile, "text": text,
+            "url": share_profile.link(text)}
+
+
 def _bodies():
     """(usage_bytes, device_bytes) for the current document."""
     with _cache_lock:
@@ -2062,7 +2079,7 @@ class Handler(BaseHTTPRequestHandler):
                         "/config/timezone", "/config/display",
                         "/config/calendar", "/calendar.ics", "/calendar.json",
                         "/machines/config",
-                        "/study", "/study/shard"):
+                        "/study", "/study/shard", "/share/profile"):
             self.send_error(404)
             return
         if not self._allowed():
@@ -2148,6 +2165,15 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json(403, {"ok": False, "error": "localhost only"})
                 return
             self._send_json(200, icloud_sync.configuration())
+            return
+        if path == "/share/profile":
+            # The public profile link. It names your plans and burn, so it is
+            # built on request for the person at this Mac, never for the LAN
+            # or the phone. Class 1 (docs/trust.md). Building it sends nothing.
+            if not self._is_loopback():
+                self._send_json(403, {"ok": False, "error": "localhost only"})
+                return
+            self._send_json(200, _share_profile_payload())
             return
         if path in ("/study", "/study/shard"):
             # Usage habits, friends' cards and per-Mac counts. Personal, and

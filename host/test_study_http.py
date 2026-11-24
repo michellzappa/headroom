@@ -21,7 +21,7 @@ from test_usage_study import TZ, write
 LAN = ("192.168.1.9", 40000)
 LOCAL = ("127.0.0.1", 40000)
 
-GET_ROUTES = ("/study", "/study/shard")
+GET_ROUTES = ("/study", "/study/shard", "/share/profile")
 POST_ROUTES = (
     ("/study/handle", {"handle": "x"}),
     ("/study/friends", {"card": "hrc1.x"}),
@@ -112,6 +112,18 @@ class StudyHTTPTests(unittest.TestCase):
                           headers=headers)[0], 403)
 
     # ---- what they do --------------------------------------------------
+    def test_share_profile_builds_a_link_from_usage_and_the_card(self):
+        import share_profile
+        from test_share_profile import demo
+        with mock.patch("headroom_server.rollup", return_value=demo()):
+            status, body = self.get("/share/profile", peer=LOCAL)
+        self.assertEqual(status, 200)
+        self.assertTrue(body["url"].startswith(share_profile.PAGE_URL + "#"))
+        profile = share_profile.decode(body["url"])
+        self.assertEqual(profile, body["profile"])
+        self.assertEqual(profile["subs"][0]["id"], "claude")
+        self.assertIsNotNone(profile["habits"])
+
     def test_handle_then_card(self):
         status, body = self.post("/study/handle", {"handle": "nightowl"},
                                  peer=LOCAL)

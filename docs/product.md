@@ -264,6 +264,34 @@ has, and it keeps counts on your own machines.
 Until this is decided, **the study uploads nothing**. The only way data leaves a
 Mac is a card that a person copies and sends themselves.
 
+### The share profile
+
+Decided 2026-11-24. A **profile** is the public face of the same data: your
+stack (each source that is on and reading, its plan and the plan's list
+price), the burndown of each source's weekly pool this week, the colours you
+picked in Settings, and your card's data when the study has one.
+`host/share_profile.py` builds it; `GET /share/profile` returns it with a link;
+`docs/p/index.html` draws it at `https://updates.centaur-labs.io/p/`.
+
+- **The link is the profile.** The data rides in the URL fragment, which a
+  browser never sends to a server. There is no upload, no account and no
+  stored copy, so rule 3 still holds: a person shares it by hand. A link is a
+  snapshot of the moment it was made.
+- **Coarse by construction.** Burndowns are whole percent every six hours.
+  Prices are list prices and the page says "estimated" (rule 6's dollar rule).
+  No counts, no paths, no repository names (rule 7).
+- **Untrusted on both ends.** `share_profile.decode` and the page apply the
+  same checks; the page writes text only through `textContent` and uses a
+  colour only when it is exactly `#RRGGBB`.
+- **Change it like a card.** Additive within `hrp1.`; a change an older page
+  cannot draw bumps the prefix.
+
+A hosted profile (a stable URL that updates itself, follows, a feed) is the
+next step and is **not decided**. It needs a server that stores a person's
+data, which reverses "the study uploads nothing" above. Decide that before
+building it. "What I shipped this week" (commits, releases) breaks rule 7 and
+needs a per-repository opt-in if it is ever built.
+
 ### Not built yet
 
 - The friends store, local aliases, and the card import route.

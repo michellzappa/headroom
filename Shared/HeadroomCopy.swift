@@ -862,6 +862,12 @@ enum HeadroomCopy {
     static let studyCard = "Your card"
     static let studyCardHint =
         "This is all a friend gets: shares in coarse steps, never counts, prompts, or paths. Nothing is sent. Copy the card and send it yourself."
+    static let shareProfile = "Your profile"
+    static let shareProfileHint =
+        "A web page with your subscriptions, this week's burndowns, your colours and your card. Everything is in the link itself, so the server that hosts the page never sees it. Open it to check what people will see, then copy the link and post it anywhere."
+    static let shareProfileOpen = "Open profile"
+    static let shareProfileCopy = "Copy profile link"
+    static let shareProfileFailed = "The host sent a link Headroom will not open."
     static let studyHandle = "Name on your card"
     static let studyCopyCard = "Copy card"
     static let studyCopied = "Copied"

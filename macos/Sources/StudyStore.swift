@@ -20,6 +20,9 @@ final class StudyStore: ObservableObject {
     /// arrive here verbatim ("that is your own card").
     @Published private(set) var friendMessage: String?
     @Published private(set) var macsMessage: String?
+    /// Set for a couple of seconds after Copy profile link.
+    @Published private(set) var copiedProfile = false
+    @Published private(set) var profileMessage: String?
 
     /// A shard is counts for months of sessions. Far above a real one, far
     /// below anything worth reading into memory.
@@ -195,6 +198,33 @@ final class StudyStore: ObservableObject {
             await load()
         } catch {
             macsMessage = error.localizedDescription
+        }
+    }
+
+    /// Asks the host for a fresh profile link, then opens it in the browser
+    /// (the page is the preview) or copies it. The link is built on request,
+    /// so it always shows the current week.
+    func shareProfile(open: Bool) async {
+        do {
+            let link = try await HeadroomClient().fetchShareProfile()
+            guard let url = URL(string: link.url),
+                  url.scheme == "https" else {
+                profileMessage = HeadroomCopy.shareProfileFailed
+                return
+            }
+            profileMessage = nil
+            if open {
+                NSWorkspace.shared.open(url)
+                return
+            }
+            let board = NSPasteboard.general
+            board.clearContents()
+            board.setString(link.url, forType: .string)
+            copiedProfile = true
+            try? await Task.sleep(for: .seconds(2))
+            copiedProfile = false
+        } catch {
+            profileMessage = error.localizedDescription
         }
     }
 
