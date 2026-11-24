@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "version": "2.3.5",
-  "published": "2026-11-23T22:49:45Z",
-  "url": "https://github.com/michellzappa/headroom/releases/download/v2.3.5/Headroom-macOS.zip",
-  "sha256": "4d65618348362d5cec52bcf819f4d13265f65624e96c324902a3d56f48f74e61",
-  "size": 8025933,
+  "version": "2.3.6",
+  "published": "2026-11-24T08:45:22Z",
+  "url": "https://github.com/michellzappa/headroom/releases/download/v2.3.6/Headroom-macOS.zip",
+  "sha256": "50556b60d06a75375360d4da71ce6235a76c7a3700717ba92e6ea3837fed30e1",
+  "size": 8027822,
   "min_macos": "14.0",
-  "notes_md": "### Changed\n\n- **Cleaner update notes.** The notes in the update window now wrap to fit\n  the window. They used to break at fixed points in the middle of sentences.\n  This is also the first update that Headroom installs with Sparkle."
+  "notes_md": "### Fixed\n\n- **Reliable Antigravity & `agy` CLI tracking.** Headroom now reads live quota\n  directly from `agy`'s OAuth token against `daily-cloudcode-pa.googleapis.com`\n  whenever Antigravity Desktop is closed (or its local server returns empty\n  buckets after sleep/wake), reports the real Google One plan tier consistently\n  across Desktop and CLI, and wakes immediately out of failure backoff the\n  moment Antigravity opens or `agy` refreshes its token instead of waiting up\n  to 15 minutes."
 }
