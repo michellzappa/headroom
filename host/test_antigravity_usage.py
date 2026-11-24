@@ -265,7 +265,7 @@ class QuotaMappingTests(unittest.TestCase):
         }
         out = antigravity_usage._map_combined(status_blob=status, now=self.NOW)
         self.assertTrue(out["ok"])
-        self.assertEqual(out["plan"], "Google AI Ultra")
+        self.assertEqual(out["plan"], "Google AI Ultra 20x")
         self.assertIsNone(out["week"])
         self.assertEqual(out["session"]["pct"], 50.0)
         self.assertEqual(out["session"]["resets_in_s"], 5400)
@@ -517,10 +517,31 @@ class DetectionAndFetchTests(unittest.TestCase):
             }
         }
         self.assertEqual(
-            antigravity_usage._extract_plan(status), "Google AI Ultra")
+            antigravity_usage._extract_plan(status), "Google AI Ultra 5x")
         self.assertEqual(
             antigravity_usage._normalize_plan("g1-ultra-lite-tier"),
-            "Google AI Ultra")
+            "Google AI Ultra 5x")
+
+    def test_the_tier_id_tells_the_two_ultra_plans_apart(self):
+        for tid, plan in (("g1-ultra-lite-tier", "Google AI Ultra 5x"),
+                          ("g1-ultra-tier", "Google AI Ultra 20x")):
+            for blob in ({"paidTier": {"id": tid, "name": "Google AI Ultra"}},
+                         {"paidTier": [{"id": tid, "name": "Google AI Ultra"}]},
+                         {"userStatus": {"userTier": {
+                             "id": tid, "name": "Google AI Ultra"}}}):
+                self.assertEqual(antigravity_usage._extract_plan(blob), plan)
+        self.assertEqual(antigravity_usage._extract_plan(
+            {"paidTier": {"name": "Google AI Ultra"}}), "Google AI Ultra")
+
+    def test_each_ultra_plan_has_its_own_price(self):
+        import sources_config
+        source = next(s for s in sources_config.BASE_SOURCES
+                      if s.id == "antigravity")
+        prices = {p.title: p.monthly_usd
+                  for p in source.subscription_prices}
+        self.assertEqual(prices["Google AI Ultra 5x"], 100)
+        self.assertEqual(prices["Google AI Ultra 20x"], 200)
+        self.assertNotIn("Google AI Ultra", prices)
 
     def test_fetch_uses_agy_oauth_token_when_desktop_closed_or_empty_buckets(self):
         calls = []
@@ -558,7 +579,7 @@ class DetectionAndFetchTests(unittest.TestCase):
                             out = antigravity_usage.fetch_quota(force=True)
         self.assertTrue(out["ok"])
         self.assertFalse(out["stale"])
-        self.assertEqual(out["plan"], "Google AI Ultra")
+        self.assertEqual(out["plan"], "Google AI Ultra 5x")
         self.assertEqual(out["week"]["pct"], 50.0)
         self.assertEqual(out["session"]["pct"], 10.0)
         # Must hit daily-cloudcode-pa first, not prod cloudcode-pa.

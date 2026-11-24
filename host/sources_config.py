@@ -826,7 +826,11 @@ _COPILOT_SUBSCRIPTION_PRICES = (
 _GEMINI_SUBSCRIPTION_PRICES = (
     SubscriptionPrice("free", "Free", 0, 0, note="No subscription"),
     SubscriptionPrice("google-ai-pro", "Google AI Pro", 19.99),
-    SubscriptionPrice("google-ai-ultra", "Google AI Ultra", 249.99),
+    # Both Ultra plans are "Google AI Ultra" on Google's page; the multiple
+    # names them apart (antigravity_usage._TIER_IDS). Checked 2026-11-24
+    # against blog.google's I/O 2026 post: $100 and $200 (was $249.99).
+    SubscriptionPrice("google-ai-ultra-5x", "Google AI Ultra 5x", 100),
+    SubscriptionPrice("google-ai-ultra-20x", "Google AI Ultra 20x", 200),
 )
 _ZED_SUBSCRIPTION_PRICES = (
     SubscriptionPrice("free", "Personal", 0, 0, note="No subscription"),

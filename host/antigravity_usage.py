@@ -814,10 +814,31 @@ def _normalize_plan(raw):
         "g1-pro-tier": "Google AI Pro",
         "ultra": "Google AI Ultra",
         "google-ai-ultra": "Google AI Ultra",
-        "g1-ultra-tier": "Google AI Ultra",
-        "g1-ultra-lite-tier": "Google AI Ultra",
+        **_TIER_IDS,
     }
     return mapping.get(text.lower(), text)
+
+
+# Since I/O 2026 Google sells two plans that are both named "Google AI Ultra":
+# $100 with 5x Pro's limits and $200 with 20x. The tier name cannot tell them
+# apart, so the id decides, and the plan names carry the multiple the way
+# Claude's Max 5x / Max 20x do. A bare "Google AI Ultra" stays unpriced.
+_TIER_IDS = {
+    "g1-pro-tier": "Google AI Pro",
+    "g1-ultra-tier": "Google AI Ultra 20x",
+    "g1-ultra-lite-tier": "Google AI Ultra 5x",
+}
+
+
+def _tier_plan(tier):
+    """A tier object -> plan. A known id outranks the shared display name."""
+    tid = str(tier.get("id") or "").strip().lower()
+    if tid in _TIER_IDS:
+        return _TIER_IDS[tid]
+    for key in ("name", "displayName", "id"):
+        if tier.get(key):
+            return _normalize_plan(tier[key])
+    return None
 
 
 def _extract_plan(blob):
@@ -831,9 +852,9 @@ def _extract_plan(blob):
         # stub ("Pro") even on Google AI Ultra accounts.
         tier = status.get("userTier")
         if isinstance(tier, dict):
-            for key in ("name", "displayName", "id"):
-                if tier.get(key):
-                    return _normalize_plan(tier[key])
+            plan = _tier_plan(tier)
+            if plan:
+                return plan
         elif isinstance(tier, str) and tier.strip():
             return _normalize_plan(tier)
         plan_status = status.get("planStatus")
@@ -850,17 +871,19 @@ def _extract_plan(blob):
 
     # loadCodeAssist tier shape (shared with gemini_usage.py)
     paid = blob.get("paidTier")
-    if isinstance(paid, list) and paid:
-        name = (paid[0] or {}).get("name")
-        if name:
-            return _normalize_plan(name)
-    elif isinstance(paid, dict) and paid.get("name"):
-        return _normalize_plan(paid["name"])
+    if isinstance(paid, list) and paid and isinstance(paid[0], dict):
+        plan = _tier_plan(paid[0])
+        if plan:
+            return plan
+    elif isinstance(paid, dict):
+        plan = _tier_plan(paid)
+        if plan:
+            return plan
     current = blob.get("currentTier") or blob.get("tier")
     if isinstance(current, dict):
-        tid = current.get("name") or current.get("id")
-        if tid:
-            return _normalize_plan(tid)
+        plan = _tier_plan(current)
+        if plan:
+            return plan
     elif isinstance(current, str) and current.strip():
         return _normalize_plan(current)
     return None
