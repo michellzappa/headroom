@@ -7,6 +7,18 @@ are not tracked here because they move on every commit.
 Add a section here before cutting a tag. `scripts/cut-release.sh` refuses to
 tag a version that has no entry.
 
+## 2.3.6 — 2026-11-24
+
+### Fixed
+
+- **Reliable Antigravity & `agy` CLI tracking.** Headroom now reads live quota
+  directly from `agy`'s OAuth token against `daily-cloudcode-pa.googleapis.com`
+  whenever Antigravity Desktop is closed (or its local server returns empty
+  buckets after sleep/wake), reports the real Google One plan tier consistently
+  across Desktop and CLI, and wakes immediately out of failure backoff the
+  moment Antigravity opens or `agy` refreshes its token instead of waiting up
+  to 15 minutes.
+
 ## 2.3.5 — 2026-11-23
 
 ### Changed
