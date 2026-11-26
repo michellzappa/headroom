@@ -714,7 +714,7 @@ class DetectionAndFetchTests(unittest.TestCase):
                                     out = antigravity_usage.fetch_quota(force=True)
         self.assertTrue(out["ok"])
         self.assertFalse(out["stale"])
-        self.assertEqual(out["plan"], "Google AI Ultra")
+        self.assertEqual(out["plan"], "Google AI Ultra 5x")
         self.assertEqual(out["week"]["pct"], 23.0)
         self.assertEqual(out["session"]["pct"], 15.0)
 
