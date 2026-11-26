@@ -7,6 +7,27 @@ are not tracked here because they move on every commit.
 Add a section here before cutting a tag. `scripts/cut-release.sh` refuses to
 tag a version that has no entry.
 
+## 2.3.7 — 2026-11-26
+
+### Added
+
+- **Shareable stack profile.** Your usage now has a **Your profile** section
+  with **Open profile** and **Copy profile link**, generating a self-contained
+  web page of your active sources, plans, list prices, weekly burndowns, and
+  study stats carried entirely in the URL fragment (nothing is uploaded).
+
+### Fixed
+
+- **Keep reading `agy` CLI quota from macOS Keychain.** `agy 1.5.16+` stores
+  its live OAuth token in macOS Keychain (`gemini` / `antigravity`,
+  `go-keyring-base64:`) and removes the plaintext file when Keychain is
+  unlocked. Headroom now reads that Keychain token silently (cached by
+  modification date, zero prompts) and wakes out of failure backoff as soon as
+  `agy` refreshes it.
+- **Distinguish Google AI Ultra 5x and 20x plans.** Antigravity now names the
+  $100 (`g1-ultra-lite-tier`) and $200 (`g1-ultra-tier`) tiers separately as
+  **Google AI Ultra 5x** and **Google AI Ultra 20x** with accurate list prices.
+
 ## 2.3.6 — 2026-11-24
 
 ### Fixed
