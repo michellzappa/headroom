@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "version": "2.3.7",
-  "published": "2026-11-26T21:51:02Z",
-  "url": "https://github.com/michellzappa/headroom/releases/download/v2.3.7/Headroom-macOS.zip",
-  "sha256": "799fde2501ed321e0850d6a7d265fb1cb9cd9ff13fa7f9ddad931c062384b2e1",
-  "size": 4810127,
+  "version": "2.3.8",
+  "published": "2026-11-27T11:43:34Z",
+  "url": "https://github.com/michellzappa/headroom/releases/download/v2.3.8/Headroom-macOS.zip",
+  "sha256": "a5488ca97f1c6e290ba38fdfa68b58b80bbefbd3cb855b101a2244d792dd0d7f",
+  "size": 8048181,
   "min_macos": "14.0",
-  "notes_md": "### Added\n\n- **Shareable stack profile.** Your usage now has a **Your profile** section\n  with **Open profile** and **Copy profile link**, generating a self-contained\n  web page of your active sources, plans, list prices, weekly burndowns, and\n  study stats carried entirely in the URL fragment (nothing is uploaded).\n\n### Fixed\n\n- **Keep reading `agy` CLI quota from macOS Keychain.** `agy 1.5.16+` stores\n  its live OAuth token in macOS Keychain (`gemini` / `antigravity`,\n  `go-keyring-base64:`) and removes the plaintext file when Keychain is\n  unlocked. Headroom now reads that Keychain token silently (cached by\n  modification date, zero prompts) and wakes out of failure backoff as soon as\n  `agy` refreshes it.\n- **Distinguish Google AI Ultra 5x and 20x plans.** Antigravity now names the\n  $100 (`g1-ultra-lite-tier`) and $200 (`g1-ultra-tier`) tiers separately as\n  **Google AI Ultra 5x** and **Google AI Ultra 20x** with accurate list prices."
+  "notes_md": "### Fixed\n\n- **Stop macOS Keychain password prompts for `gemini`.** Removed the direct\n  Keychain secret read added in 2.3.7 for `agy`'s `gemini` / `antigravity`\n  item, because macOS's legacy login Keychain still pops an ACL password dialog\n  for third-party processes whenever `agy` writes or refreshes that item."
 }
