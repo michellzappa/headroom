@@ -7,6 +7,15 @@ are not tracked here because they move on every commit.
 Add a section here before cutting a tag. `scripts/cut-release.sh` refuses to
 tag a version that has no entry.
 
+## 2.3.8 — 2026-11-27
+
+### Fixed
+
+- **Stop macOS Keychain password prompts for `gemini`.** Removed the direct
+  Keychain secret read added in 2.3.7 for `agy`'s `gemini` / `antigravity`
+  item, because macOS's legacy login Keychain still pops an ACL password dialog
+  for third-party processes whenever `agy` writes or refreshes that item.
+
 ## 2.3.7 — 2026-11-26
 
 ### Added
