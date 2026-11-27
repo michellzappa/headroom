@@ -329,23 +329,17 @@ class DetectionAndFetchTests(unittest.TestCase):
         self._orig_cache = dict(antigravity_usage._cache)
         antigravity_usage._cache.clear()
         antigravity_usage._cache.update({"t": 0.0, "data": None, "err": None})
-        self._orig_kc_cache = dict(antigravity_usage._keychain_cache)
-        antigravity_usage._keychain_cache.clear()
-        antigravity_usage._keychain_cache.update({"modified": None, "row": None})
 
     def tearDown(self):
         antigravity_usage._cache.clear()
         antigravity_usage._cache.update(self._orig_cache)
-        antigravity_usage._keychain_cache.clear()
-        antigravity_usage._keychain_cache.update(self._orig_kc_cache)
 
     def test_detection_is_false_without_antigravity_artifacts(self):
         with patch.object(antigravity_usage, "_find_servers", return_value=[]):
-            with patch.object(antigravity_usage, "_keychain_modified", return_value=None):
-                with patch.object(antigravity_usage, "STATE_DB_PATHS", ()):
-                    with patch.object(antigravity_usage, "HOME_DIRS", ()):
-                        with patch.object(cache_util, "load_disk", return_value=None):
-                            self.assertFalse(antigravity_usage.signed_in())
+            with patch.object(antigravity_usage, "STATE_DB_PATHS", ()):
+                with patch.object(antigravity_usage, "HOME_DIRS", ()):
+                    with patch.object(cache_util, "load_disk", return_value=None):
+                        self.assertFalse(antigravity_usage.signed_in())
 
     def test_detection_finds_state_vscdb_auth(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -470,12 +464,11 @@ class DetectionAndFetchTests(unittest.TestCase):
             "fetched_at": 1700000000.0,
         }
         with patch.object(antigravity_usage, "HOME_DIRS", ()):
-            with patch.object(antigravity_usage, "_keychain_modified", return_value=None):
-                with patch.object(antigravity_usage, "_find_servers", return_value=[]):
-                    with patch.object(antigravity_usage, "_read_state_db_auth", return_value=None):
-                        with patch.object(antigravity_usage, "_local_install_present", return_value=True):
-                            with patch.object(cache_util, "load_disk", return_value=prior):
-                                out = antigravity_usage.fetch_quota(force=True)
+            with patch.object(antigravity_usage, "_find_servers", return_value=[]):
+                with patch.object(antigravity_usage, "_read_state_db_auth", return_value=None):
+                    with patch.object(antigravity_usage, "_local_install_present", return_value=True):
+                        with patch.object(cache_util, "load_disk", return_value=prior):
+                            out = antigravity_usage.fetch_quota(force=True)
         self.assertTrue(out["ok"])
         self.assertTrue(out["stale"])
         self.assertFalse(out["auth_required"])
@@ -604,119 +597,54 @@ class DetectionAndFetchTests(unittest.TestCase):
                     with patch.object(antigravity_usage, "_read_state_db_auth", return_value=None):
                         with patch.object(antigravity_usage, "_local_install_present", return_value=True):
                             # 1. Fail while closed and simulate high failure backoff.
-                            with patch.object(antigravity_usage, "_keychain_modified", return_value=None):
-                                with patch.object(antigravity_usage, "_find_servers", return_value=[]):
-                                    out1 = antigravity_usage.fetch_quota(force=True)
-                                self.assertFalse(out1["ok"])
-                                antigravity_usage._cache["fail_streak"] = 10
+                            with patch.object(antigravity_usage, "_find_servers", return_value=[]):
+                                out1 = antigravity_usage.fetch_quota(force=True)
+                            self.assertFalse(out1["ok"])
+                            antigravity_usage._cache["fail_streak"] = 10
 
-                                # 2. Still closed -> failure backoff holds (no _find_servers call).
+                            # 2. Still closed -> failure backoff holds (no _find_servers call).
+                            with patch.object(
+                                    antigravity_usage, "_find_servers",
+                                    side_effect=AssertionError("should stay in backoff")):
+                                out2 = antigravity_usage.fetch_quota(force=False)
+                            self.assertFalse(out2["ok"])
+
+                            # 3. Desktop opens and writes daemon/hub.json -> wakes immediately!
+                            (daemon_dir / "hub_1234.json").write_text(json.dumps({
+                                "pid": 1234,
+                                "httpsPort": 55555,
+                                "csrfToken": "tok-new",
+                            }))
+                            good = {
+                                "ok": True,
+                                "plan": "Google AI Ultra 5x",
+                                "error": None,
+                                "week": {"pct": 12.0, "resets_in_s": 3600, "resets_in": "1h", "window_s": 604800},
+                                "session": None,
+                                "stale": False,
+                            }
+                            with patch.object(
+                                    antigravity_usage, "_find_servers",
+                                    return_value=[{"pid": 1234, "csrf_token": "tok-new", "https_port": 55555}]):
                                 with patch.object(
-                                        antigravity_usage, "_find_servers",
-                                        side_effect=AssertionError("should stay in backoff")):
-                                    out2 = antigravity_usage.fetch_quota(force=False)
-                                self.assertFalse(out2["ok"])
+                                        antigravity_usage, "_query_server",
+                                        return_value=good):
+                                    out3 = antigravity_usage.fetch_quota(force=False)
+                            self.assertTrue(out3["ok"])
+                            self.assertFalse(out3["stale"])
+                            self.assertEqual(out3["week"]["pct"], 12.0)
 
-                                # 3. Desktop opens and writes daemon/hub.json -> wakes immediately!
-                                (daemon_dir / "hub_1234.json").write_text(json.dumps({
-                                    "pid": 1234,
-                                    "httpsPort": 55555,
-                                    "csrfToken": "tok-new",
-                                }))
-                                good = {
-                                    "ok": True,
-                                    "plan": "Google AI Ultra",
-                                    "error": None,
-                                    "week": {"pct": 12.0, "resets_in_s": 3600, "resets_in": "1h", "window_s": 604800},
-                                    "session": None,
-                                    "stale": False,
-                                }
-                                with patch.object(
-                                        antigravity_usage, "_find_servers",
-                                        return_value=[{"pid": 1234, "csrf_token": "tok-new", "https_port": 55555}]):
-                                    with patch.object(
-                                            antigravity_usage, "_query_server",
-                                            return_value=good):
-                                        out3 = antigravity_usage.fetch_quota(force=False)
-                                self.assertTrue(out3["ok"])
-                                self.assertFalse(out3["stale"])
-                                self.assertEqual(out3["week"]["pct"], 12.0)
-
-    def test_reads_and_caches_go_keyring_base64_keychain_token(self):
+    def test_decodes_go_keyring_base64_payload_in_token_file(self):
         payload = json.dumps({
             "token": {
-                "access_token": "ya29.kc-live",
+                "access_token": "ya29.b64-file",
                 "expiry": "2099-01-01T00:00:00.12345+01:00",
             },
-            "auth_method": "consumer",
         }).encode("utf-8")
         encoded = "go-keyring-base64:" + base64.b64encode(payload).decode("ascii")
-
-        calls = []
-
-        def fake_get(service, account=None, synchronizable=False, allow_ui=True):
-            calls.append((service, account, synchronizable, allow_ui))
-            return 0, encoded
-
-        with patch.object(antigravity_usage, "_keychain_modified", return_value=100.0):
-            with patch.object(antigravity_usage.keychain, "get_generic_password", side_effect=fake_get):
-                row1 = antigravity_usage._read_keychain_oauth_token(now=1800000000.0)
-                row2 = antigravity_usage._read_keychain_oauth_token(now=1800000060.0)
-        self.assertEqual(row1["access_token"], "ya29.kc-live")
-        self.assertFalse(row1["expired"])
-        self.assertEqual(row2["access_token"], "ya29.kc-live")
-        # Second poll with unchanged Keychain modified date must hit in-memory cache.
-        self.assertEqual(len(calls), 1)
-        self.assertEqual(calls[0], ("gemini", "antigravity", False, False))
-
-        # When Keychain mtime advances, it re-reads the refreshed token.
-        with patch.object(antigravity_usage, "_keychain_modified", return_value=200.0):
-            with patch.object(antigravity_usage.keychain, "get_generic_password", side_effect=fake_get):
-                row3 = antigravity_usage._read_keychain_oauth_token(now=1800000120.0)
-        self.assertEqual(row3["access_token"], "ya29.kc-live")
-        self.assertEqual(len(calls), 2)
-
-    def test_fetch_uses_keychain_token_when_desktop_closed_and_no_token_file(self):
-        payload = json.dumps({
-            "token": {
-                "access_token": "ya29.kc-only",
-                "expiry": "2099-01-01T00:00:00Z",
-            }
-        }).encode("utf-8")
-        encoded = "go-keyring-base64:" + base64.b64encode(payload).decode("ascii")
-
-        def fake_request_json(url, **kwargs):
-            self.assertEqual(kwargs.get("auth"), "Bearer ya29.kc-only")
-            if "retrieveUserQuotaSummary" in url:
-                return {
-                    "groups": [{
-                        "buckets": [
-                            {"window": "weekly", "remainingFraction": 0.77},
-                            {"window": "5h", "remainingFraction": 0.85},
-                        ]
-                    }]
-                }
-            if "loadCodeAssist" in url:
-                return {"paidTier": {"id": "g1-ultra-lite-tier", "name": "Google AI Ultra"}}
-            return {}
-
-        with tempfile.TemporaryDirectory() as tmp:
-            with patch.object(cache_util, "CACHE_DIR", tmp):
-                with patch.object(antigravity_usage, "HOME_DIRS", ()):
-                    with patch.object(antigravity_usage, "_find_servers", return_value=[]):
-                        with patch.object(antigravity_usage, "_keychain_modified", return_value=12345.0):
-                            with patch.object(
-                                    antigravity_usage.keychain, "get_generic_password",
-                                    return_value=(0, encoded)):
-                                with patch.object(
-                                        antigravity_usage.http_util, "request_json",
-                                        side_effect=fake_request_json):
-                                    out = antigravity_usage.fetch_quota(force=True)
-        self.assertTrue(out["ok"])
-        self.assertFalse(out["stale"])
-        self.assertEqual(out["plan"], "Google AI Ultra 5x")
-        self.assertEqual(out["week"]["pct"], 23.0)
-        self.assertEqual(out["session"]["pct"], 15.0)
+        decoded = antigravity_usage._decode_oauth_blob(encoded)
+        self.assertIsNotNone(decoded)
+        self.assertEqual(decoded["access_token"], "ya29.b64-file")
 
     def test_registry_and_providers_payload_wire_antigravity(self):
         self.assertIn("antigravity", detect_sources.PROBES)

@@ -43,7 +43,6 @@ from datetime import datetime, timezone
 
 import cache_util
 import http_util
-import keychain
 import quota_util
 
 CACHE_TTL_S = 60
@@ -75,11 +74,8 @@ CLOUD_TIER_URL = CLOUD_HOSTS[0] + CLOUD_TIER_PATH
 CLOUD_UA = "antigravity/hub/2.34.0"
 
 OAUTH_TOKEN_NAME = "antigravity-oauth-token"
-KEYCHAIN_SERVICE = "gemini"
-KEYCHAIN_ACCOUNT = "antigravity"
 GO_KEYRING_B64_PREFIX = "go-keyring-base64:"
 _ISO_FRAC_RE = re.compile(r"\.(\d+)")
-_keychain_cache = {"modified": None, "row": None}
 
 STATE_DB_PATHS = (
     os.path.expanduser(
@@ -677,64 +673,15 @@ def _decode_oauth_blob(raw):
     return {"access_token": access, "exp_ts": exp_ts}
 
 
-def _keychain_modified():
-    """Modification timestamp of `agy`'s Keychain token (attributes-only, no UI)."""
-    try:
-        return keychain.generic_password_modified(
-            KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT, synchronizable=False)
-    except Exception:  # noqa: BLE001
-        return None
-
-
-def _read_keychain_oauth_token(now=None):
-    """Read `agy`'s OAuth token from macOS Keychain (`gemini`/`antigravity`).
-
-    `agy 1.5.16+` stores its live token in Keychain (using `zalando/go-keyring`
-    `go-keyring-base64:` encoding) whenever the login Keychain is unlocked,
-    removing the plaintext `antigravity-oauth-token` file. Cached in memory by
-    Keychain modification date so polls stay sub-millisecond and never prompt.
-    """
-    now_ts = time.time() if now is None else float(now)
-    modified = _keychain_modified()
-    if modified is None:
-        _keychain_cache.update(modified=None, row=None)
-        return None
-
-    cached_row = _keychain_cache.get("row")
-    if _keychain_cache.get("modified") == modified and cached_row is not None:
-        exp_ts = cached_row.get("exp_ts")
-        return {
-            "access_token": cached_row["access_token"],
-            "expired": exp_ts is not None and exp_ts <= now_ts,
-            "mtime": modified,
-            "source": "keychain",
-        }
-
-    try:
-        status, raw = keychain.get_generic_password(
-            KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT,
-            synchronizable=False, allow_ui=False)
-    except Exception:  # noqa: BLE001
-        return None
-    if status != keychain.ERR_SEC_SUCCESS or not raw:
-        return None
-    decoded = _decode_oauth_blob(raw)
-    if not decoded:
-        return None
-    _keychain_cache.update(modified=modified, row=decoded)
-    exp_ts = decoded.get("exp_ts")
-    return {
-        "access_token": decoded["access_token"],
-        "expired": exp_ts is not None and exp_ts <= now_ts,
-        "mtime": modified,
-        "source": "keychain",
-    }
-
-
 def _read_oauth_token_files(home_dirs=None, now=None):
     """Read OAuth access tokens from `~/.gemini/antigravity*/antigravity-oauth-token`.
 
-    `agy` CLI writes this file when the login Keychain is locked (e.g. over SSH).
+    Note: We intentionally do NOT read `agy`'s macOS Keychain item
+    (`service="gemini"`, `account="antigravity"`). `go-keyring` creates/rewrites
+    it with an ACL restricted to `agy`, and `kSecUseAuthenticationUIFail` does
+    not suppress legacy login-Keychain ACL prompts — reading it from Python
+    triggers repeated macOS password dialogs.
+
     Returns list of dicts `{access_token, expired, mtime}` ordered freshest first.
     """
     now_ts = time.time() if now is None else float(now)
@@ -801,9 +748,6 @@ def _local_state_stamp(home_dirs=None):
             pass
         else:
             items.append((tok_path, st.st_mtime_ns))
-    kc_mod = _keychain_modified()
-    if kc_mod is not None:
-        items.append(("keychain", KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT, kc_mod))
     return tuple(items)
 
 
@@ -1209,8 +1153,6 @@ def signed_in():
     """Cheap local detection — no network, no Keychain prompts."""
     if _find_servers():
         return True
-    if _keychain_modified() is not None:
-        return True
     if _has_oauth_token_file():
         return True
     if _has_state_db_auth():
@@ -1239,19 +1181,11 @@ def fetch_quota(force=False):
             if out and out.get("error"):
                 last_err = out["error"]
 
-        # Local server wasn't running (or returned no buckets — e.g. only `agy`
-        # CLI is running, Desktop is closed, or language_server returned empty
-        # buckets after wake). Try `agy`'s Keychain OAuth token first, then
+        # Local server wasn't running (or returned no buckets). Try any
         # file-based `antigravity-oauth-token`, then legacy `state.vscdb`,
         # against daily-cloudcode-pa.googleapis.com.
-        token_candidates = []
-        kc_tok = _read_keychain_oauth_token(now=now)
-        if kc_tok:
-            token_candidates.append(kc_tok)
-        token_candidates.extend(_read_oauth_token_files(now=now))
-
         seen_tokens = set()
-        for tok_row in token_candidates:
+        for tok_row in _read_oauth_token_files(now=now):
             if tok_row.get("expired"):
                 continue
             token = tok_row["access_token"]
@@ -1277,9 +1211,8 @@ def fetch_quota(force=False):
                 _cache, now, err, _EMPTY, disk_name=DISK,
                 fix="Check that you are signed in to Antigravity, then refresh Headroom.")
 
-        if (_local_install_present() or _keychain_modified() is not None
-                or _has_oauth_token_file() or _has_state_db_auth()
-                or cache_util.load_disk(DISK)):
+        if (_local_install_present() or _has_oauth_token_file()
+                or _has_state_db_auth() or cache_util.load_disk(DISK)):
             return cache_util.keep_stale(
                 _cache, now,
                 "Antigravity is not running",
